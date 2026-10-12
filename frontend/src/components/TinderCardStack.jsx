@@ -209,6 +209,7 @@ const TinderCardStack = ({ profiles = [] }) => {
 
   const likeOpacity = active && isHorizontal && dx > 0 ? Math.min(dx / 80, 1) : animatingDir === 'to-right' ? 1 : 0;
   const rejectOpacity = active && isHorizontal && dx < 0 ? Math.min(Math.abs(dx) / 80, 1) : animatingDir === 'to-left' ? 1 : 0;
+  const greenBorderOpacity = active && isHorizontal && dx > 0 ? Math.min(dx / 50, 1) : animatingDir === 'to-right' ? 1 : 0;
 
   // Render card helper
   const renderCardContent = (card, isCurrent = false) => {
@@ -294,6 +295,12 @@ const TinderCardStack = ({ profiles = [] }) => {
           onTouchEnd={handleTouchEnd}
         >
           {renderCardContent(activeCard, true)}
+
+          {/* Dynamic Green Border when Swiping Right */}
+          <div 
+            className="dz-swipe-border-green" 
+            style={{ opacity: greenBorderOpacity }}
+          />
 
           {/* Dynamic Action Badges for Horizontal Swipes */}
           <div 
