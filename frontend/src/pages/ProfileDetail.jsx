@@ -26,7 +26,11 @@ const ProfileDetail = () => {
           <div className="detail-area">
             <div className="dz-media-card style-2">
               <div className="dz-media">
-                <img src={profile.image} alt={profile.name} />
+                {profile.video ? (
+                  <video src={profile.video} poster={profile.image} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <img src={profile.image} alt={profile.name} />
+                )}
               </div>
               <div className="dz-content">
                 <div className="left-content">

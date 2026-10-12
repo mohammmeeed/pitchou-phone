@@ -95,7 +95,8 @@ body {
   border-radius: 20px !important;
 }
 
-.dzSwipe_card .dz-media img {
+.dzSwipe_card .dz-media img,
+.dzSwipe_card .dz-media video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;

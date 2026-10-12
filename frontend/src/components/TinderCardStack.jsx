@@ -216,7 +216,18 @@ const TinderCardStack = ({ profiles = [] }) => {
     return (
       <>
         <div className="dz-media">
-          <img src={card.image} alt={card.name} />
+          {card.video ? (
+            <video 
+              src={card.video} 
+              poster={card.image}
+              autoPlay 
+              loop 
+              muted 
+              playsInline 
+            />
+          ) : (
+            <img src={card.image} alt={card.name} />
+          )}
         </div>
         <div className="dz-content">
           <div className="left-content">

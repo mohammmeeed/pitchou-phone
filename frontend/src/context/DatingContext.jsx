@@ -4,6 +4,19 @@ const DatingContext = createContext();
 
 export const initialProfiles = [
   {
+    id: 5,
+    name: "Autumn Tales",
+    age: 24,
+    location: "Bibliothèque Secrète",
+    distance: "10s Vidéo",
+    video: "/assets/videos/book-trailer.mp4",
+    image: "/assets/images/books/book1.jpg",
+    bio: "The Chronicles of Autumn – Épopée poétique illustrée. Une immersion contemplative de 10 secondes au cœur des pages enluminées et de la lumière d'automne. Un grimoire secret révélé à la lueur d'une bougie et d'un café fumant.",
+    badge: "",
+    interests: ["Vidéo", "Poésie", "Automne", "Grimoire"],
+    languages: ["Français", "English"],
+  },
+  {
     id: 1,
     name: "Richard",
     age: 22,
