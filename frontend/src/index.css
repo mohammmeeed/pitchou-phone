@@ -1,0 +1,236 @@
+/* DatingKit React Custom Styles */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  background-color: #f7f7f9;
+}
+
+.page-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Home Card Area: stretches from header to bottom navbar to fill remaining width & height */
+.home-card-wrapper {
+  position: absolute !important;
+  top: 60px !important;
+  bottom: 65px !important;
+  left: 0 !important;
+  right: 0 !important;
+  margin: 0 !important;
+  padding: 6px 10px 8px 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  z-index: 2 !important;
+  box-sizing: border-box !important;
+}
+
+.home-card-container {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 600px !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+/* Tinder Card Stack: fills 100% of available space */
+.dzSwipe_card-cont.dz-gallery-slider,
+.dzSwipe_card-cont {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+  background-color: #1e1e24 !important;
+}
+
+/* Individual Card */
+.dzSwipe_card {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  background-color: #1e1e24 !important;
+  user-select: none !important;
+  transform-origin: 50% 100%;
+}
+
+.dzSwipe_card.card-active {
+  z-index: 5 !important;
+  opacity: 1 !important;
+}
+
+.dzSwipe_card.card-next,
+.dzSwipe_card.card-prev {
+  z-index: 4 !important;
+  opacity: 1 !important;
+}
+
+/* Card Media (Image) - fills full card with rounded corners */
+.dzSwipe_card .dz-media {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  overflow: hidden !important;
+  border-radius: 20px !important;
+}
+
+.dzSwipe_card .dz-media img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  border-radius: 20px !important;
+}
+
+/* Card Content: overlaid INSIDE at the bottom of the card */
+.dzSwipe_card .dz-content {
+  position: absolute !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  padding: 24px 20px !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: space-between !important;
+  z-index: 10 !important;
+  box-sizing: border-box !important;
+}
+
+/* Smooth gradient behind text inside the card */
+.dzSwipe_card .dz-content::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 260px !important;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.94) 0%, rgba(0, 0, 0, 0.72) 65%, rgba(0, 0, 0, 0.2) 90%, transparent 100%) !important;
+  border-radius: 0 0 20px 20px !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+  transition: min-height 0.3s ease;
+}
+
+.dzSwipe_card .dz-content .left-content {
+  flex: 1 !important;
+  padding-right: 12px !important;
+}
+
+/* Title / Name & Age */
+.dzSwipe_card .dz-content .title,
+.dzSwipe_card .dz-content .title a {
+  color: #ffffff !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  margin-bottom: 8px !important;
+  text-decoration: none !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6) !important;
+  display: block !important;
+}
+
+/* TikTok-style Book Description */
+.book-desc-container {
+  margin-top: 4px;
+  max-width: 100%;
+  transition: all 0.3s ease;
+}
+
+.book-desc-container.expanded {
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.book-desc-container.expanded::-webkit-scrollbar {
+  width: 4px;
+}
+
+.book-desc-container.expanded::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+
+.book-desc-text {
+  color: rgba(255, 255, 255, 0.94) !important;
+  font-size: 13.5px !important;
+  line-height: 1.45 !important;
+  margin-bottom: 0 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
+  font-weight: 400 !important;
+  word-break: break-word !important;
+}
+
+.book-desc-more {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  margin-left: 3px !important;
+  opacity: 0.95;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+  transition: opacity 0.2s ease;
+}
+
+.book-desc-more:hover {
+  opacity: 1;
+}
+
+/* Circular Star Action Button */
+.dzSwipe_card .dz-content .dz-icon.dz-sp-like {
+  background: linear-gradient(135deg, #FF50A2 0%, #FF7B54 100%) !important;
+  color: #ffffff !important;
+  min-width: 50px !important;
+  width: 50px !important;
+  height: 50px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  box-shadow: 0 4px 15px rgba(255, 80, 162, 0.5) !important;
+  cursor: pointer !important;
+  z-index: 12 !important;
+  flex-shrink: 0 !important;
+  margin-left: 10px !important;
+}
+
+.dzSwipe_card .dz-content .dz-icon.dz-sp-like i {
+  font-size: 24px !important;
+  color: #ffffff !important;
+  line-height: 1 !important;
+}
+
+/* Swiping Animation transitions */
+.dzSwipe_card.to-left,
+.dzSwipe_card.to-right,
+.dzSwipe_card.to-upside {
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out !important;
+  opacity: 0 !important;
+}
+
+.dzSwipe_card.reset {
+  transition: transform 0.3s ease-out !important;
+  transform: translateX(0) rotate(0) !important;
+}
