@@ -2,16 +2,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 
-const countryCodes = [
-  { code: '+213', flag: '🇩🇿' },
-  { code: '+33', flag: '🇫🇷' },
-  { code: '+212', flag: '🇲🇦' },
-  { code: '+216', flag: '🇹🇳' },
-  { code: '+1', flag: '🇺🇸' },
-  { code: '+44', flag: '🇬🇧' },
-  { code: '+971', flag: '🇦🇪' },
-];
-
 const Auth = ({ defaultTab = 'login' }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -21,7 +11,6 @@ const Auth = ({ defaultTab = 'login' }) => {
   const { setUserProfile } = useDating();
 
   // Login state (telephone + mot de passe)
-  const [loginCountryCode, setLoginCountryCode] = useState('+213');
   const [loginPhone, setLoginPhone] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -29,7 +18,6 @@ const Auth = ({ defaultTab = 'login' }) => {
   // Register state (nom complet + email + telephone facultatif + mot de passe)
   const [regFullName, setRegFullName] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regCountryCode, setRegCountryCode] = useState('+213');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
@@ -56,7 +44,7 @@ const Auth = ({ defaultTab = 'login' }) => {
     setTimeout(() => {
       setUserProfile(prev => ({
         ...prev,
-        phone: `${loginCountryCode} ${loginPhone}`,
+        phone: loginPhone,
       }));
       setSuccessMsg('Connexion réussie ! Redirection...');
       setTimeout(() => {
@@ -88,7 +76,7 @@ const Auth = ({ defaultTab = 'login' }) => {
         ...prev,
         name: regFullName.trim(),
         email: regEmail.trim(),
-        phone: regPhone.trim() ? `${regCountryCode} ${regPhone}` : prev.phone,
+        phone: regPhone.trim() ? regPhone.trim() : prev.phone,
       }));
       setSuccessMsg('Compte créé avec succès ! Bienvenue.');
       setTimeout(() => {
@@ -174,20 +162,11 @@ const Auth = ({ defaultTab = 'login' }) => {
                     <label className="form-label font-14 font-w600 text-dark mb-2">
                       Numéro de téléphone
                     </label>
-                    <div className="input-group dz-select">
-                      <div className="input-group-text p-0"> 
-                        <select 
-                          className="form-control border-0 bg-transparent ps-3 pe-2 font-14 font-w600 text-dark"
-                          value={loginCountryCode}
-                          onChange={(e) => setLoginCountryCode(e.target.value)}
-                          style={{ width: '90px', cursor: 'pointer', height: '50px' }}
-                        >
-                          {countryCodes.map(c => (
-                            <option key={c.code} value={c.code}>
-                              {c.flag} {c.code}
-                            </option>
-                          ))}
-                        </select>
+                    <div className="input-group input-group-icon">
+                      <div className="input-group-text">
+                        <div className="input-icon">
+                          <i className="icon feather icon-phone"></i>
+                        </div>
                       </div>
                       <input 
                         type="tel" 
@@ -322,20 +301,11 @@ const Auth = ({ defaultTab = 'login' }) => {
                     <label className="form-label font-14 font-w600 text-dark mb-2">
                       Numéro de téléphone
                     </label>
-                    <div className="input-group dz-select">
-                      <div className="input-group-text p-0"> 
-                        <select 
-                          className="form-control border-0 bg-transparent ps-3 pe-2 font-14 font-w600 text-dark"
-                          value={regCountryCode}
-                          onChange={(e) => setRegCountryCode(e.target.value)}
-                          style={{ width: '90px', cursor: 'pointer', height: '50px' }}
-                        >
-                          {countryCodes.map(c => (
-                            <option key={c.code} value={c.code}>
-                              {c.flag} {c.code}
-                            </option>
-                          ))}
-                        </select>
+                    <div className="input-group input-group-icon">
+                      <div className="input-group-text">
+                        <div className="input-icon">
+                          <i className="icon feather icon-phone"></i>
+                        </div>
                       </div>
                       <input 
                         type="tel" 
