@@ -1,9 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
 const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [dragState, setDragState] = useState({
     active: false,
     startX: 0,
@@ -16,10 +15,6 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
 
   const wheelLock = useRef(false);
   const containerRef = useRef(null);
-
-  useEffect(() => {
-    setIsExpanded(false);
-  }, [currentIndex]);
 
   if (!profiles || profiles.length === 0) return null;
 
@@ -251,33 +246,6 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
                 )}
               </span>
             </h4>
-            {card.bio && (
-              <div 
-                className={`book-desc-container ${isCurrent && isExpanded ? 'expanded' : 'collapsed'}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isCurrent) setIsExpanded(prev => !prev);
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                <p className="book-desc-text">
-                  {(isCurrent && isExpanded) || card.bio.length <= 75
-                    ? card.bio 
-                    : `${card.bio.slice(0, 75)}... `}
-                  {card.bio.length > 75 && (
-                    <span 
-                      className="book-desc-more"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isCurrent) setIsExpanded(prev => !prev);
-                      }}
-                    >
-                      {isCurrent && isExpanded ? ' moins' : 'plus'}
-                    </span>
-                  )}
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </>
