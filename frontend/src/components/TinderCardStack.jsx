@@ -247,6 +247,40 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
               </span>
             </h4>
           </div>
+
+          <div className="card-price-wrap">
+            <span className="card-price-value">
+              {card.priceFormatted || (card.price ? (card.price === 2500 ? '45,00 $' : `${card.price < 100 ? `${card.price},00` : card.price} $`) : '45,00 $')}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="card-add-to-cart-btn"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onOpenDetail) {
+                onOpenDetail(card);
+              }
+            }}
+          >
+            <svg 
+              width="19" 
+              height="19" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="#000000" 
+              strokeWidth="2.3" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <circle cx="9" cy="21" r="1"></circle>
+              <circle cx="20" cy="21" r="1"></circle>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <span>AJOUTER AU PANIER</span>
+          </button>
         </div>
       </>
     );
