@@ -250,7 +250,7 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
 
           <div className="card-price-wrap">
             <span className="card-price-value">
-              {card.priceFormatted || (card.price ? (card.price === 2500 ? '45,00 $' : `${card.price < 100 ? `${card.price},00` : card.price} $`) : '45,00 $')}
+              {card.priceFormatted || (card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : '2 500 DA')}
             </span>
           </div>
 
