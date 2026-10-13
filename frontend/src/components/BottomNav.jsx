@@ -6,9 +6,9 @@ const BottomNav = () => {
   const currentPath = location.pathname;
 
   const tabs = [
-    { path: '/home', icon: 'flaticon flaticon-dog-house' },
-    { path: '/explore', icon: 'flaticon flaticon-search' },
+    { path: '/explore', icon: 'icon feather icon-shopping-cart' },
     { path: '/wishlist', icon: 'flaticon flaticon-heart' },
+    { path: '/home', icon: 'flaticon flaticon-dog-house' },
     { path: '/chat-list', icon: 'flaticon flaticon-chat-1' },
     { path: '/profile', icon: 'flaticon flaticon-user' },
   ];

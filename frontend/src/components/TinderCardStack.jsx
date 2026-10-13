@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-const TinderCardStack = ({ profiles = [] }) => {
+const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
   const [dragState, setDragState] = useState({
@@ -232,7 +232,24 @@ const TinderCardStack = ({ profiles = [] }) => {
         <div className="dz-content">
           <div className="left-content">
             <h4 className="title">
-              <Link to={`/profile-detail?id=${card.id}`}>{card.name}, {card.age} ans</Link>
+              <span 
+                className="book-title-clickable"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onOpenDetail) {
+                    onOpenDetail(card);
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {card.name}
+                {card.author && (
+                  <span style={{ fontSize: '0.78em', opacity: 0.85, fontWeight: 400, marginLeft: '6px' }}>
+                    • {card.author}
+                  </span>
+                )}
+              </span>
             </h4>
             {card.bio && (
               <div 

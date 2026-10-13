@@ -50,55 +50,7 @@ const Profile = () => {
               </div>
             </div>
 
-            <div className="row g-2 mb-4">
-              <div className="col-4">
-                <div className="card style-2 text-center">
-                  <div className="card-body p-2">
-                    <Link to="/subscription">	
-                      <div className="card-icon mb-1">
-                        <i className="flaticon flaticon-star-1 font-24 text-primary"></i>
-                      </div>
-                      <div className="card-content">
-                        <p className="font-12 mb-1">0 Super Likes</p>
-                      </div>
-                      <i className="icon feather icon-plus font-14"></i>
-                    </Link>
-                  </div>
-                </div>
-              </div>
 
-              <div className="col-4">
-                <div className="card style-2 text-center">
-                  <div className="card-body p-2">
-                    <Link to="/subscription">
-                      <div className="card-icon mb-1">
-                        <i className="flaticon flaticon-shuttle font-24 text-primary"></i>
-                      </div>
-                      <div className="card-content">
-                        <p className="font-12 mb-1">My Boosts</p>
-                      </div>
-                      <i className="icon feather icon-plus font-14"></i>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-4">
-                <div className="card style-2 text-center">
-                  <div className="card-body p-2">
-                    <Link to="/subscription">
-                      <div className="card-icon mb-1">
-                        <i className="flaticon flaticon-bell font-24 text-primary"></i>
-                      </div>
-                      <div className="card-content">
-                        <p className="font-12 mb-1">Subscriptions</p>
-                      </div>
-                      <i className="icon feather icon-plus font-14"></i>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             <div className="card style-3">
               <div className="card-body">

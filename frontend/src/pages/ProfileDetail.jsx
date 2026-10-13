@@ -7,15 +7,7 @@ const ProfileDetail = () => {
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
 
-  const profile = initialProfiles.find(p => String(p.id) === id) || {
-    name: "Chelsea",
-    age: 21,
-    location: "5 miles away",
-    image: "/assets/images/liked/pic2.png",
-    bio: "Just moved back to Jakarta after living in Montreal for 10+ years. Coffee lover and spontaneous adventurer.",
-    interests: ["Photography", "Music", "Study", "Movies", "Instagram", "Travelling"],
-    languages: ["English", "Spanish", "German"]
-  };
+  const profile = initialProfiles.find(p => String(p.id) === id) || initialProfiles[0];
 
   return (
     <div className="page-wrapper">
@@ -24,7 +16,7 @@ const ProfileDetail = () => {
       <div className="page-content space-top p-b40">
         <div className="container">
           <div className="detail-area">
-            <div className="dz-media-card style-2">
+            <div className="dz-media-card style-2 recommendation-media-animate">
               <div className="dz-media">
                 {profile.video ? (
                   <video src={profile.video} poster={profile.image} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -34,14 +26,14 @@ const ProfileDetail = () => {
               </div>
               <div className="dz-content">
                 <div className="left-content">
-                  <h4 className="title">{profile.name}, {profile.age}</h4>
-                  <p className="mb-0"><i className="icon feather icon-map-pin"></i> {profile.distance || "5 miles away"}</p>
+                  <h4 className="title">{profile.name} {profile.author ? `• ${profile.author}` : ''}</h4>
+                  <p className="mb-0"><i className="icon feather icon-book-open"></i> {profile.format || "Édition Reliée"}</p>
                 </div>
                 <a role="button" tabIndex={0} className="dz-icon" style={{ cursor: 'pointer' }}><i className="flaticon flaticon-star-1"></i></a>
               </div>
             </div>
 
-            <div className="detail-bottom-area">
+            <div className="detail-bottom-area recommendation-details-animate">
               <div className="about">
                 <h6 className="title">Basic information</h6>
                 <p className="para-text">{profile.bio}</p>					
