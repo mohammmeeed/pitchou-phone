@@ -29,7 +29,6 @@ const ProfileDetail = () => {
                   <h4 className="title">{profile.name} {profile.author ? `• ${profile.author}` : ''}</h4>
                   <p className="mb-0"><i className="icon feather icon-book-open"></i> {profile.format || "Édition Reliée"}</p>
                 </div>
-                <a role="button" tabIndex={0} className="dz-icon" style={{ cursor: 'pointer' }}><i className="flaticon flaticon-star-1"></i></a>
               </div>
             </div>
 
