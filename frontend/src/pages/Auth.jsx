@@ -3,13 +3,13 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 
 const countryCodes = [
-  { code: '+213', flag: '🇩🇿', label: 'Algérie (+213)' },
-  { code: '+33', flag: '🇫🇷', label: 'France (+33)' },
-  { code: '+212', flag: '🇲🇦', label: 'Maroc (+212)' },
-  { code: '+216', flag: '🇹🇳', label: 'Tunisie (+216)' },
-  { code: '+1', flag: '🇨🇦', label: 'Canada / USA (+1)' },
-  { code: '+44', flag: '🇬🇧', label: 'Royaume-Uni (+44)' },
-  { code: '+971', flag: '🇦🇪', label: 'Émirats (+971)' },
+  { code: '+213', flag: '🇩🇿' },
+  { code: '+33', flag: '🇫🇷' },
+  { code: '+212', flag: '🇲🇦' },
+  { code: '+216', flag: '🇹🇳' },
+  { code: '+1', flag: '🇺🇸' },
+  { code: '+44', flag: '🇬🇧' },
+  { code: '+971', flag: '🇦🇪' },
 ];
 
 const Auth = ({ defaultTab = 'login' }) => {
@@ -20,13 +20,13 @@ const Auth = ({ defaultTab = 'login' }) => {
 
   const { setUserProfile } = useDating();
 
-  // Login form state (numéro de téléphone + mot de passe)
+  // Login state (telephone + mot de passe)
   const [loginCountryCode, setLoginCountryCode] = useState('+213');
   const [loginPhone, setLoginPhone] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
 
-  // Register form state (nom complet + email + mot de passe + téléphone facultatif)
+  // Register state (nom complet + email + telephone facultatif + mot de passe)
   const [regFullName, setRegFullName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regCountryCode, setRegCountryCode] = useState('+213');
@@ -34,7 +34,7 @@ const Auth = ({ defaultTab = 'login' }) => {
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
 
-  // UI state
+  // Status
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +44,7 @@ const Auth = ({ defaultTab = 'login' }) => {
     setErrorMsg('');
 
     if (!loginPhone.trim()) {
-      setErrorMsg('Veuillez saisir votre numéro de téléphone.');
+      setErrorMsg('Veuillez renseigner votre numéro de téléphone.');
       return;
     }
     if (!loginPassword) {
@@ -58,11 +58,11 @@ const Auth = ({ defaultTab = 'login' }) => {
         ...prev,
         phone: `${loginCountryCode} ${loginPhone}`,
       }));
-      setSuccessMsg('Connexion réussie ! Redirection en cours...');
+      setSuccessMsg('Connexion réussie ! Redirection...');
       setTimeout(() => {
         navigate('/home');
-      }, 700);
-    }, 600);
+      }, 600);
+    }, 500);
   };
 
   const handleRegisterSubmit = (e) => {
@@ -93,308 +93,325 @@ const Auth = ({ defaultTab = 'login' }) => {
       setSuccessMsg('Compte créé avec succès ! Bienvenue.');
       setTimeout(() => {
         navigate('/home');
-      }, 700);
-    }, 600);
+      }, 600);
+    }, 500);
   };
 
   return (
-    <div className="auth-page-wrapper">
-      <div className="auth-card-container">
-        {/* Top Navigation */}
-        <div className="auth-top-bar">
-          <button 
-            type="button" 
-            onClick={() => navigate(-1)} 
-            className="auth-back-btn"
-            aria-label="Retour"
-          >
-            <i className="icon feather icon-chevron-left"></i>
-          </button>
-          <div className="auth-brand-badge">
-            <span className="auth-heart-icon">💖</span>
-            <span className="auth-brand-name">TikTok Shop</span>
-          </div>
-          <div style={{ width: 40 }}></div>
-        </div>
-
-        {/* Head Title */}
-        <div className="auth-header-section">
-          <h2 className="auth-main-title">
-            {activeTab === 'login' ? 'Bon retour !' : 'Créer un compte'}
-          </h2>
-          <p className="auth-sub-title">
-            {activeTab === 'login' 
-              ? 'Connectez-vous pour retrouver vos coups de cœur et vos commandes.'
-              : 'Rejoignez-nous pour découvrir nos livres et offres exclusives.'}
-          </p>
-        </div>
-
-        {/* Segmented Tab Switcher */}
-        <div className="auth-tabs-switcher">
-          <button
-            type="button"
-            className={`auth-tab-btn ${activeTab === 'login' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('login');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-          >
-            Se connecter
-          </button>
-          <button
-            type="button"
-            className={`auth-tab-btn ${activeTab === 'register' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('register');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-          >
-            S'inscrire
-          </button>
-        </div>
-
-        {/* Feedback Alert Messages */}
-        {errorMsg && (
-          <div className="auth-alert-box error">
-            <i className="icon feather icon-alert-circle"></i>
-            <span>{errorMsg}</span>
-          </div>
-        )}
-        {successMsg && (
-          <div className="auth-alert-box success">
-            <i className="icon feather icon-check-circle"></i>
-            <span>{successMsg}</span>
-          </div>
-        )}
-
-        {/* TAB 1 : SE CONNECTER (Numéro de téléphone + Mot de passe) */}
-        {activeTab === 'login' && (
-          <form onSubmit={handleLoginSubmit} className="auth-form-body">
-            {/* Phone Number Field */}
-            <div className="auth-field-group">
-              <label className="auth-field-label">Numéro de téléphone</label>
-              <div className="auth-input-phone-wrap">
-                <select 
-                  className="auth-country-select"
-                  value={loginCountryCode}
-                  onChange={(e) => setLoginCountryCode(e.target.value)}
-                >
-                  {countryCodes.map(c => (
-                    <option key={c.code} value={c.code}>
-                      {c.flag} {c.code}
-                    </option>
-                  ))}
-                </select>
-                <div className="auth-input-with-icon">
-                  <i className="icon feather icon-phone auth-input-icon"></i>
-                  <input 
-                    type="tel"
-                    className="auth-text-input"
-                    placeholder="05 50 12 34 56"
-                    value={loginPhone}
-                    onChange={(e) => setLoginPhone(e.target.value)}
-                    autoComplete="tel"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Password Field */}
-            <div className="auth-field-group">
-              <div className="auth-label-row">
-                <label className="auth-field-label">Mot de passe</label>
-                <button 
-                  type="button" 
-                  className="auth-forgot-link"
-                  onClick={() => alert("Lien de réinitialisation par SMS envoyé.")}
-                >
-                  Mot de passe oublié ?
-                </button>
-              </div>
-              <div className="auth-input-with-icon">
-                <i className="icon feather icon-lock auth-input-icon"></i>
-                <input 
-                  type={showLoginPassword ? 'text' : 'password'}
-                  className="auth-text-input"
-                  placeholder="Entrez votre mot de passe"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  autoComplete="current-password"
-                  required
-                />
-                <button
-                  type="button"
-                  className="auth-toggle-password-btn"
-                  onClick={() => setShowLoginPassword(prev => !prev)}
-                  aria-label="Afficher ou masquer le mot de passe"
-                >
-                  <i className={`icon feather ${showLoginPassword ? 'icon-eye-off' : 'icon-eye'}`}></i>
-                </button>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button 
-              type="submit" 
-              className="auth-submit-btn" 
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <span className="auth-loading-spinner"></span>
-              ) : (
-                <>
-                  <span>Se connecter</span>
-                  <i className="icon feather icon-arrow-right"></i>
-                </>
-              )}
-            </button>
-
-            {/* Bottom Toggle Note */}
-            <div className="auth-footer-prompt">
-              <span>Vous n'avez pas de compte ? </span>
+    <div className="bg-white" style={{ minHeight: '100vh' }}>
+      <div className="page-wrapper">
+        <div className="page-content">
+          <div className="container">
+            <div className="account-area">
+              {/* Back button */}
               <button 
                 type="button" 
-                className="auth-switch-link"
-                onClick={() => {
-                  setActiveTab('register');
-                  setErrorMsg('');
-                }}
+                onClick={() => navigate(-1)} 
+                className="back-btn dz-flex-box border-0"
+                style={{ cursor: 'pointer' }}
+                aria-label="Retour"
               >
-                S'inscrire
+                <i className="icon feather icon-chevron-left"></i>
               </button>
-            </div>
-          </form>
-        )}
 
-        {/* TAB 2 : S'INSCRIRE (Nom complet + Email + Mot de passe + Téléphone facultatif) */}
-        {activeTab === 'register' && (
-          <form onSubmit={handleRegisterSubmit} className="auth-form-body">
-            {/* Nom complet */}
-            <div className="auth-field-group">
-              <label className="auth-field-label">Nom complet</label>
-              <div className="auth-input-with-icon">
-                <i className="icon feather icon-user auth-input-icon"></i>
-                <input 
-                  type="text"
-                  className="auth-text-input"
-                  placeholder="Ex: Mohamed Amine"
-                  value={regFullName}
-                  onChange={(e) => setRegFullName(e.target.value)}
-                  autoComplete="name"
-                  required
-                />
+              {/* Title Header */}
+              <div className="section-head ps-0 mt-3 mb-3">
+                <h3 className="title mb-1 font-w700">
+                  {activeTab === 'login' ? 'Bon retour !' : 'Créer un compte'}
+                </h3>
+                <p className="text-secondary font-14 mb-0">
+                  {activeTab === 'login' 
+                    ? 'Connectez-vous pour retrouver vos commandes et vos favoris.'
+                    : 'Inscrivez-vous pour commander vos livres en quelques clics.'}
+                </p>
               </div>
-            </div>
 
-            {/* Email */}
-            <div className="auth-field-group">
-              <label className="auth-field-label">Adresse email</label>
-              <div className="auth-input-with-icon">
-                <i className="icon feather icon-mail auth-input-icon"></i>
-                <input 
-                  type="email"
-                  className="auth-text-input"
-                  placeholder="exemple@domaine.com"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  autoComplete="email"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Téléphone (Facultatif / Pas obligé) */}
-            <div className="auth-field-group">
-              <div className="auth-label-row">
-                <label className="auth-field-label">Numéro de téléphone</label>
-                <span className="auth-optional-badge">Optionnel</span>
-              </div>
-              <div className="auth-input-phone-wrap">
-                <select 
-                  className="auth-country-select"
-                  value={regCountryCode}
-                  onChange={(e) => setRegCountryCode(e.target.value)}
-                >
-                  {countryCodes.map(c => (
-                    <option key={c.code} value={c.code}>
-                      {c.flag} {c.code}
-                    </option>
-                  ))}
-                </select>
-                <div className="auth-input-with-icon">
-                  <i className="icon feather icon-phone auth-input-icon"></i>
-                  <input 
-                    type="tel"
-                    className="auth-text-input"
-                    placeholder="Numéro (facultatif)"
-                    value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
-                    autoComplete="tel"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Mot de passe */}
-            <div className="auth-field-group">
-              <label className="auth-field-label">Mot de passe</label>
-              <div className="auth-input-with-icon">
-                <i className="icon feather icon-lock auth-input-icon"></i>
-                <input 
-                  type={showRegPassword ? 'text' : 'password'}
-                  className="auth-text-input"
-                  placeholder="Choisissez un mot de passe sécurisé"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  autoComplete="new-password"
-                  required
-                />
+              {/* Segmented Switcher in DatingKit Style */}
+              <div className="auth-site-tabs-wrap mb-4">
                 <button
                   type="button"
-                  className="auth-toggle-password-btn"
-                  onClick={() => setShowRegPassword(prev => !prev)}
-                  aria-label="Afficher ou masquer le mot de passe"
+                  className={`auth-site-tab-btn ${activeTab === 'login' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('login');
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                  }}
                 >
-                  <i className={`icon feather ${showRegPassword ? 'icon-eye-off' : 'icon-eye'}`}></i>
+                  Se connecter
+                </button>
+                <button
+                  type="button"
+                  className={`auth-site-tab-btn ${activeTab === 'register' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('register');
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                  }}
+                >
+                  S'inscrire
                 </button>
               </div>
-            </div>
 
-            {/* Submit Button */}
-            <button 
-              type="submit" 
-              className="auth-submit-btn" 
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <span className="auth-loading-spinner"></span>
-              ) : (
-                <>
-                  <span>Créer mon compte</span>
-                  <i className="icon feather icon-arrow-right"></i>
-                </>
+              {/* Alerts */}
+              {errorMsg && (
+                <div className="alert alert-danger py-2 px-3 font-13 d-flex align-items-center gap-2 mb-3 rounded-lg">
+                  <i className="icon feather icon-alert-circle"></i>
+                  <span>{errorMsg}</span>
+                </div>
               )}
-            </button>
+              {successMsg && (
+                <div className="alert alert-success py-2 px-3 font-13 d-flex align-items-center gap-2 mb-3 rounded-lg">
+                  <i className="icon feather icon-check-circle"></i>
+                  <span>{successMsg}</span>
+                </div>
+              )}
 
-            {/* Bottom Toggle Note */}
-            <div className="auth-footer-prompt">
-              <span>Vous avez déjà un compte ? </span>
-              <button 
-                type="button" 
-                className="auth-switch-link"
-                onClick={() => {
-                  setActiveTab('login');
-                  setErrorMsg('');
-                }}
-              >
-                Se connecter
-              </button>
+              {/* Formulaire : Se connecter (Téléphone + Mot de passe) */}
+              {activeTab === 'login' && (
+                <form onSubmit={handleLoginSubmit}>
+                  {/* Numéro de téléphone */}
+                  <div className="mb-3">
+                    <label className="form-label font-14 font-w600 text-dark mb-2">
+                      Numéro de téléphone
+                    </label>
+                    <div className="input-group dz-select">
+                      <div className="input-group-text p-0"> 
+                        <select 
+                          className="form-control border-0 bg-transparent ps-3 pe-2 font-14 font-w600 text-dark"
+                          value={loginCountryCode}
+                          onChange={(e) => setLoginCountryCode(e.target.value)}
+                          style={{ width: '90px', cursor: 'pointer', height: '50px' }}
+                        >
+                          {countryCodes.map(c => (
+                            <option key={c.code} value={c.code}>
+                              {c.flag} {c.code}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <input 
+                        type="tel" 
+                        className="form-control font-14" 
+                        placeholder="Numéro de téléphone"
+                        value={loginPhone}
+                        onChange={(e) => setLoginPhone(e.target.value)}
+                        required
+                        style={{ height: '50px' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mot de passe */}
+                  <div className="mb-3">
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <label className="form-label font-14 font-w600 text-dark mb-0">
+                        Mot de passe
+                      </label>
+                      <a 
+                        role="button" 
+                        onClick={() => alert("Un code SMS de réinitialisation a été envoyé.")} 
+                        className="font-12 font-w600 text-primary"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        Mot de passe oublié ?
+                      </a>
+                    </div>
+                    <div className="input-group input-group-icon">
+                      <div className="input-group-text">
+                        <div className="input-icon">
+                          <i className="icon feather icon-lock"></i>
+                        </div>
+                      </div>
+                      <input 
+                        type={showLoginPassword ? 'text' : 'password'}
+                        className="form-control font-14" 
+                        placeholder="Entrez votre mot de passe"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        required
+                        style={{ height: '50px' }}
+                      />
+                      <span 
+                        className="input-group-text show-pass"
+                        onClick={() => setShowLoginPassword(prev => !prev)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <i className={`icon feather ${showLoginPassword ? 'icon-eye-off' : 'icon-eye'}`}></i>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bouton Se connecter */}
+                  <div className="mt-4">
+                    <button 
+                      type="submit" 
+                      className="btn btn-lg btn-gradient w-100 dz-flex-box btn-shadow rounded-xl"
+                      disabled={isLoading}
+                      style={{ height: '52px', fontSize: '15px' }}
+                    >
+                      {isLoading ? 'Connexion en cours...' : 'Se connecter'}
+                    </button>
+                  </div>
+
+                  {/* Lien vers Inscription */}
+                  <div className="text-center mt-3 mb-4">
+                    <span className="font-14 text-secondary">Vous n'avez pas de compte ? </span>
+                    <a 
+                      role="button" 
+                      onClick={() => { setActiveTab('register'); setErrorMsg(''); }}
+                      className="font-14 font-w700 text-primary"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      S'inscrire
+                    </a>
+                  </div>
+                </form>
+              )}
+
+              {/* Formulaire : S'inscrire (Nom complet + Email + Téléphone pas obligatoire + Mot de passe) */}
+              {activeTab === 'register' && (
+                <form onSubmit={handleRegisterSubmit}>
+                  {/* Nom complet */}
+                  <div className="mb-3">
+                    <label className="form-label font-14 font-w600 text-dark mb-2">
+                      Nom complet
+                    </label>
+                    <div className="input-group input-group-icon">
+                      <div className="input-group-text">
+                        <div className="input-icon">
+                          <i className="icon feather icon-user"></i>
+                        </div>
+                      </div>
+                      <input 
+                        type="text" 
+                        className="form-control font-14" 
+                        placeholder="Ex: Mohamed Amine"
+                        value={regFullName}
+                        onChange={(e) => setRegFullName(e.target.value)}
+                        required
+                        style={{ height: '50px' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="mb-3">
+                    <label className="form-label font-14 font-w600 text-dark mb-2">
+                      Adresse email
+                    </label>
+                    <div className="input-group input-group-icon">
+                      <div className="input-group-text">
+                        <div className="input-icon">
+                          <i className="icon feather icon-mail"></i>
+                        </div>
+                      </div>
+                      <input 
+                        type="email" 
+                        className="form-control font-14" 
+                        placeholder="exemple@email.com"
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        required
+                        style={{ height: '50px' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Téléphone (facultatif / pas obligatoire) */}
+                  <div className="mb-3">
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <label className="form-label font-14 font-w600 text-dark mb-0">
+                        Numéro de téléphone
+                      </label>
+                      <span className="badge bg-light text-secondary font-11 px-2 py-1 rounded-pill">
+                        Facultatif
+                      </span>
+                    </div>
+                    <div className="input-group dz-select">
+                      <div className="input-group-text p-0"> 
+                        <select 
+                          className="form-control border-0 bg-transparent ps-3 pe-2 font-14 font-w600 text-dark"
+                          value={regCountryCode}
+                          onChange={(e) => setRegCountryCode(e.target.value)}
+                          style={{ width: '90px', cursor: 'pointer', height: '50px' }}
+                        >
+                          {countryCodes.map(c => (
+                            <option key={c.code} value={c.code}>
+                              {c.flag} {c.code}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <input 
+                        type="tel" 
+                        className="form-control font-14" 
+                        placeholder="Numéro (pas obligatoire)"
+                        value={regPhone}
+                        onChange={(e) => setRegPhone(e.target.value)}
+                        style={{ height: '50px' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mot de passe */}
+                  <div className="mb-3">
+                    <label className="form-label font-14 font-w600 text-dark mb-2">
+                      Mot de passe
+                    </label>
+                    <div className="input-group input-group-icon">
+                      <div className="input-group-text">
+                        <div className="input-icon">
+                          <i className="icon feather icon-lock"></i>
+                        </div>
+                      </div>
+                      <input 
+                        type={showRegPassword ? 'text' : 'password'}
+                        className="form-control font-14" 
+                        placeholder="Créez votre mot de passe"
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        required
+                        style={{ height: '50px' }}
+                      />
+                      <span 
+                        className="input-group-text show-pass"
+                        onClick={() => setShowRegPassword(prev => !prev)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <i className={`icon feather ${showRegPassword ? 'icon-eye-off' : 'icon-eye'}`}></i>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bouton Créer un compte */}
+                  <div className="mt-4">
+                    <button 
+                      type="submit" 
+                      className="btn btn-lg btn-gradient w-100 dz-flex-box btn-shadow rounded-xl"
+                      disabled={isLoading}
+                      style={{ height: '52px', fontSize: '15px' }}
+                    >
+                      {isLoading ? 'Création en cours...' : 'Créer un compte'}
+                    </button>
+                  </div>
+
+                  {/* Lien vers Connexion */}
+                  <div className="text-center mt-3 mb-4">
+                    <span className="font-14 text-secondary">Vous avez déjà un compte ? </span>
+                    <a 
+                      role="button" 
+                      onClick={() => { setActiveTab('login'); setErrorMsg(''); }}
+                      className="font-14 font-w700 text-primary"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      Se connecter
+                    </a>
+                  </div>
+                </form>
+              )}
             </div>
-          </form>
-        )}
+          </div>
+        </div>
       </div>
     </div>
   );
