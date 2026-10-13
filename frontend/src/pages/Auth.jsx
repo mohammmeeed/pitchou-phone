@@ -317,16 +317,11 @@ const Auth = ({ defaultTab = 'login' }) => {
                     </div>
                   </div>
 
-                  {/* Téléphone (facultatif / pas obligatoire) */}
+                  {/* Téléphone */}
                   <div className="mb-3">
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <label className="form-label font-14 font-w600 text-dark mb-0">
-                        Numéro de téléphone
-                      </label>
-                      <span className="badge bg-light text-secondary font-11 px-2 py-1 rounded-pill">
-                        Facultatif
-                      </span>
-                    </div>
+                    <label className="form-label font-14 font-w600 text-dark mb-2">
+                      Numéro de téléphone
+                    </label>
                     <div className="input-group dz-select">
                       <div className="input-group-text p-0"> 
                         <select 
