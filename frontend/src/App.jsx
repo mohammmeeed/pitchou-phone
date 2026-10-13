@@ -5,6 +5,7 @@ import { DatingProvider } from './context/DatingContext';
 
 // Pages
 import Onboarding from './pages/Onboarding';
+import Auth from './pages/Auth';
 import Login from './pages/Login';
 import Otp from './pages/Otp';
 import FirstName from './pages/FirstName';
@@ -40,8 +41,11 @@ function App() {
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/onboarding.html" element={<Navigate to="/onboarding" replace />} />
             
+            <Route path="/auth" element={<Auth />} />
             <Route path="/login" element={<Login />} />
             <Route path="/login.html" element={<Navigate to="/login" replace />} />
+            <Route path="/register" element={<Auth defaultTab="register" />} />
+            <Route path="/signup" element={<Auth defaultTab="register" />} />
 
             <Route path="/otp" element={<Otp />} />
             <Route path="/otp.html" element={<Navigate to="/otp" replace />} />

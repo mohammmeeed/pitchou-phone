@@ -16,7 +16,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: "Chat", path: "/chat-list", icon: "icon-grid" },
     { name: "Settings", path: "/setting", icon: "icon-settings" },
     { name: "Profile", path: "/profile", icon: "icon-user" },
-    { name: "Logout", path: "/onboarding", icon: "icon-log-out" },
+    { name: "Connexion / Inscription", path: "/auth", icon: "icon-log-in" },
+    { name: "Déconnexion", path: "/auth", icon: "icon-log-out" },
   ];
 
   return (
