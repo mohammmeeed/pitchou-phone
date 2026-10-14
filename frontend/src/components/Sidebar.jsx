@@ -5,17 +5,62 @@ import { useDating } from '../context/DatingContext';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { darkMode, toggleDarkMode } = useTheme();
-  const { userProfile } = useDating();
+  const { userProfile, setUserProfile } = useDating();
   const location = useLocation();
 
+  // Récupérer le nom de compte et le numéro de téléphone du client
+  const [customerUser, setCustomerUser] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem('customer_user');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
+
+  React.useEffect(() => {
+    if (isOpen) {
+      try {
+        const saved = localStorage.getItem('customer_user');
+        if (saved) setCustomerUser(JSON.parse(saved));
+      } catch (e) {}
+    }
+  }, [isOpen]);
+
+  const customerName = customerUser?.name || userProfile?.name || "mouh";
+  const customerPhone = customerUser?.phone || userProfile?.phone || "0697037109";
+
+  const handleNavClick = (item) => {
+    if (item.name === "Déconnexion") {
+      try {
+        localStorage.removeItem('customer_user');
+        localStorage.removeItem('customer_token');
+        if (setUserProfile) {
+          setUserProfile({
+            name: "Client",
+            email: "",
+            phone: "",
+            gender: "Men",
+            interestedIn: "Livres",
+            lookingFor: "Lectures passionnantes",
+            avatar: null,
+            age: 24,
+            location: "Alger",
+          });
+        }
+        setCustomerUser(null);
+      } catch (e) {}
+    }
+    onClose();
+  };
+
   const navItems = [
-    { name: "Home", path: "/home", icon: "icon-home" },
-    { name: "Subscription", path: "/subscription", icon: "icon-heart" },
-    { name: "Wishlist", path: "/wishlist", icon: "icon-list" },
-    { name: "Explore", path: "/explore", icon: "icon-wind" },
-    { name: "Chat", path: "/chat-list", icon: "icon-grid" },
-    { name: "Settings", path: "/setting", icon: "icon-settings" },
-    { name: "Profile", path: "/profile", icon: "icon-user" },
+    { name: "Accueil", path: "/home", icon: "icon-home" },
+    { name: "Favoris", path: "/wishlist", icon: "icon-list" },
+    { name: "Mon Panier", path: "/explore", icon: "icon-shopping-cart" },
+    { name: "Messagerie", path: "/chat", icon: "icon-message-circle" },
+    { name: "Paramètres", path: "/setting", icon: "icon-settings" },
+    { name: "Mon Profil", path: "/profile", icon: "icon-user" },
+    { name: "Panneau Admin", path: "/admin", icon: "icon-shield" },
     { name: "Connexion / Inscription", path: "/auth", icon: "icon-log-in" },
     { name: "Déconnexion", path: "/auth", icon: "icon-log-out" },
   ];
@@ -30,12 +75,32 @@ const Sidebar = ({ isOpen, onClose }) => {
       <div className={`sidebar ${isOpen ? 'show' : ''}`}>
         <div className="inner-sidebar">
           <Link to="/profile" onClick={onClose} className="author-box">
-            <div className="dz-media">
-              <img src={userProfile?.avatar || "/assets/images/user/pic1.jpg"} alt="author-image" />
+            <div 
+              className="dz-media" 
+              style={{ 
+                width: '45px', 
+                height: '45px', 
+                borderRadius: '50%', 
+                background: 'var(--btn-gradient, var(--primary-gradient))',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '18px',
+                flexShrink: 0,
+                boxShadow: 'var(--btn-shadow, 0 4px 12px var(--rgba-primary-3))'
+              }}
+            >
+              {customerUser?.avatar && !customerUser.avatar.includes('150x150') && !customerUser.avatar.includes('pic1.jpg') ? (
+                <img src={customerUser.avatar} alt="author-image" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                <span>{(customerName || 'C').charAt(0).toUpperCase()}</span>
+              )}
             </div>
             <div className="dz-info">
-              <h5 className="name">{userProfile?.name || "John Doe"}</h5>
-              <span>{userProfile?.email || "example@gmail.com"}</span>
+              <h5 className="name">{customerName}</h5>
+              <span>{customerPhone}</span>
             </div>
           </Link>
 
@@ -44,7 +109,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               <li key={item.name}>
                 <Link 
                   to={item.path} 
-                  onClick={onClose}
+                  onClick={() => handleNavClick(item)}
                   className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
                 >
                   <span className="dz-icon">

@@ -1,21 +1,93 @@
-/* DatingKit React Custom Styles */
-html, body, #root {
-  height: 100%;
+/* DatingKit React Custom Styles - Full Scroll Down Support Across All Pages */
+html {
   width: 100%;
+  min-height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
 }
 
 body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
   background-color: #f7f7f9;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
 }
 
+#root {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Page wrapper: full vertical scrollability across all pages */
 .page-wrapper {
   position: relative;
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100vh;
+  height: auto !important;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
+/* Page content: full visibility and smooth scroll */
+.page-content {
+  overflow: visible !important;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
+/* Ensure padding-bottom on all scrollable pages so bottom content & buttons are never clipped behind fixed BottomNav or footers */
+.page-wrapper:not(.overflow-hidden) .page-content {
+  padding-bottom: 95px !important;
+}
+
+/* Safe scroll area for all container elements */
+.page-wrapper:not(.overflow-hidden) .container {
+  overflow: visible !important;
+}
+
+/* Sleek subtle scrollbars */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.page-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+.page-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+.page-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+.page-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Only the Home page card deck stays pinned to screen without extra vertical page scroll */
+.page-wrapper.overflow-hidden {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
 }
 
 /* Home Card Area: stretches from header to bottom navbar to fill remaining width & height */
@@ -264,7 +336,7 @@ body {
 
 /* Circular Star Action Button */
 .dzSwipe_card .dz-content .dz-icon.dz-sp-like {
-  background: linear-gradient(135deg, #FF50A2 0%, #FF7B54 100%) !important;
+  background: var(--primary-gradient, linear-gradient(135deg, #FF50A2 0%, #FF7B54 100%)) !important;
   color: #ffffff !important;
   min-width: 50px !important;
   width: 50px !important;
@@ -273,7 +345,7 @@ body {
   align-items: center !important;
   justify-content: center !important;
   border-radius: 50% !important;
-  box-shadow: 0 4px 15px rgba(255, 80, 162, 0.5) !important;
+  box-shadow: 0 4px 15px var(--rgba-primary-5, rgba(255, 80, 162, 0.5)) !important;
   cursor: pointer !important;
   z-index: 12 !important;
   flex-shrink: 0 !important;
@@ -419,12 +491,19 @@ body {
   transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s ease !important;
 }
 
+.menubar-area .menubar-nav .nav-link:after,
+.menubar-area .menubar-nav .nav-link.active:after {
+  background: var(--btn-gradient, var(--primary-gradient, linear-gradient(180deg, var(--primary) 0%, var(--primary-dark, var(--primary)) 100%))) !important;
+  box-shadow: 0px 10px 25px var(--rgba-primary-5, rgba(0, 0, 0, 0.25)) !important;
+}
+
 .menubar-area .menubar-nav .nav-link.active:after {
   display: block !important;
   animation: navBubblePop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
 }
 
 .menubar-area .menubar-nav .nav-link.active i {
+  color: #ffffff !important;
   animation: navIconBounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
 }
 
@@ -511,7 +590,7 @@ body {
 .cart-item-price {
   font-size: 15px !important;
   font-weight: 800 !important;
-  color: #FE77B6 !important;
+  color: var(--primary) !important;
 }
 
 .cart-qty-ctrl {
@@ -760,8 +839,8 @@ body {
 }
 
 .badge-recommendation {
-  background: linear-gradient(135deg, rgba(254, 44, 85, 0.12), rgba(255, 61, 151, 0.12)) !important;
-  color: #fe2c55 !important;
+  background: var(--primary-light, rgba(254, 44, 85, 0.12)) !important;
+  color: var(--primary) !important;
   font-size: 11px !important;
   font-weight: 700 !important;
   padding: 4px 10px !important;
@@ -869,7 +948,7 @@ body {
 .book-sheet-price {
   font-size: 22px !important;
   font-weight: 800 !important;
-  color: #fe2c55 !important;
+  color: var(--primary) !important;
   white-space: nowrap !important;
 }
 
@@ -911,8 +990,8 @@ body {
 .book-tag-pill {
   font-size: 12px !important;
   font-weight: 600 !important;
-  color: #fe2c55 !important;
-  background: rgba(254, 44, 85, 0.08) !important;
+  color: var(--primary) !important;
+  background: var(--primary-light, rgba(254, 44, 85, 0.08)) !important;
   padding: 4px 12px !important;
   border-radius: 12px !important;
 }
@@ -961,7 +1040,7 @@ body {
   height: 50px !important;
   font-size: 15px !important;
   font-weight: 700 !important;
-  box-shadow: 0 4px 15px rgba(254, 44, 85, 0.35) !important;
+  box-shadow: var(--btn-shadow, 0 4px 15px var(--rgba-primary-4, rgba(254, 44, 85, 0.35))) !important;
   transition: all 0.25s ease !important;
 }
 
@@ -996,10 +1075,10 @@ body {
 }
 
 .auth-site-tab-btn.active {
-  background: linear-gradient(135deg, #FF50A2 0%, #FF7B54 100%);
+  background: var(--primary-gradient, linear-gradient(135deg, #FF50A2 0%, #FF7B54 100%));
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 4px 15px rgba(255, 80, 162, 0.35);
+  box-shadow: 0 4px 15px var(--rgba-primary-4, rgba(255, 80, 162, 0.35));
 }
 
 .account-area .input-group.input-group-icon {
@@ -1011,8 +1090,8 @@ body {
 }
 
 .account-area .input-group.input-group-icon:focus-within {
-  border-color: #FF50A2;
-  box-shadow: 0 0 0 3px rgba(255, 80, 162, 0.12);
+  border-color: var(--primary, #FF50A2);
+  box-shadow: 0 0 0 3px var(--rgba-primary-1, rgba(255, 80, 162, 0.12));
 }
 
 .account-area .input-group.input-group-icon .input-group-text {
@@ -1047,8 +1126,8 @@ body {
 }
 
 .account-area .input-group.dz-select:focus-within {
-  border-color: #FF50A2;
-  box-shadow: 0 0 0 3px rgba(255, 80, 162, 0.12);
+  border-color: var(--primary, #FF50A2);
+  box-shadow: 0 0 0 3px var(--rgba-primary-1, rgba(255, 80, 162, 0.12));
 }
 
 .account-area .input-group.dz-select .form-control {
@@ -1062,5 +1141,159 @@ body {
   box-shadow: none;
 }
 
+/* Scrollability for Auth Page */
+.auth-scroll-page {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: smooth;
+}
 
+.auth-scroll-page .page-wrapper {
+  height: auto !important;
+  min-height: 100% !important;
+  overflow: visible !important;
+}
+
+.auth-scroll-page .page-content {
+  overflow: visible !important;
+  padding-bottom: 70px !important;
+}
+
+/* 2-Column Grid Layout for Auth Fields */
+.auth-grid-2 {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 12px !important;
+}
+
+.auth-grid-item {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.auth-grid-item .form-label {
+  font-size: 13.5px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.auth-grid-item .input-group-text {
+  padding: 0 10px !important;
+}
+
+.auth-grid-item .form-control {
+  font-size: 13.5px !important;
+  padding-right: 6px !important;
+}
+
+@media (max-width: 360px) {
+  .auth-grid-2 {
+    gap: 8px !important;
+  }
+  .auth-grid-item .form-label {
+    font-size: 12px !important;
+  }
+}
+
+/* ============================================================
+   GLOBAL DYNAMIC THEME SYSTEM OVERRIDES (ADMIN COLOR SYNC)
+   ============================================================ */
+
+/* 1. All Action & Gradient Buttons Across Entire Public Site */
+.btn.btn-gradient,
+.btn-gradient,
+a.btn-gradient,
+button.btn-gradient,
+input[type="submit"].btn-gradient {
+  background: var(--btn-gradient, var(--primary-gradient, linear-gradient(135deg, var(--primary) 0%, var(--primary-hover, var(--primary)) 100%))) !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+}
+
+.btn.btn-gradient:hover,
+.btn-gradient:hover,
+a.btn-gradient:hover,
+button.btn-gradient:hover {
+  background: var(--btn-gradient, var(--primary-gradient)) !important;
+  opacity: 0.94 !important;
+  color: #ffffff !important;
+}
+
+.btn.btn-shadow,
+.btn-shadow {
+  box-shadow: var(--btn-shadow, 0 8px 25px var(--rgba-primary-4, rgba(0, 0, 0, 0.2))) !important;
+}
+
+/* 2. Standard Bootstrap Primary Buttons */
+.btn-primary,
+.btn.btn-primary {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+.btn-primary:hover,
+.btn.btn-primary:hover,
+.btn-primary:focus,
+.btn.btn-primary:focus,
+.btn-primary:active,
+.btn.btn-primary:active {
+  background-color: var(--primary-hover, var(--primary)) !important;
+  border-color: var(--primary-hover, var(--primary)) !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-primary,
+.btn.btn-outline-primary {
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+.btn-outline-primary:hover,
+.btn.btn-outline-primary:hover {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+/* 3. Range Slider Thumb (Price Filter & Settings) */
+.form-range::-webkit-slider-thumb {
+  background-color: var(--primary) !important;
+  box-shadow: 0 2px 8px var(--rgba-primary-5, rgba(0, 0, 0, 0.25)) !important;
+}
+
+.form-range::-moz-range-thumb {
+  background-color: var(--primary) !important;
+  box-shadow: 0 2px 8px var(--rgba-primary-5, rgba(0, 0, 0, 0.25)) !important;
+}
+
+.form-range::-webkit-slider-thumb:active {
+  background-color: var(--primary-hover, var(--primary)) !important;
+}
+
+.form-range::-moz-range-thumb:active {
+  background-color: var(--primary-hover, var(--primary)) !important;
+}
+
+.form-range:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 1px #ffffff, 0 0 0 0.25rem var(--rgba-primary-3) !important;
+}
+
+.form-range:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 1px #ffffff, 0 0 0 0.25rem var(--rgba-primary-3) !important;
+}
+
+/* 4. Text & Background Accents */
+.text-primary {
+  color: var(--primary) !important;
+}
+
+.bg-primary {
+  background-color: var(--primary) !important;
+}
 

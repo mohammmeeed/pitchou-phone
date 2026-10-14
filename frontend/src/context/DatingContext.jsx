@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+// frontend/src/context/DatingContext.jsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const DatingContext = createContext();
 
@@ -13,7 +14,7 @@ export const initialProfiles = [
     image: "/assets/images/books/book1.jpg",
     bio: "Une épopée poétique illustrée au cœur des légendes d'automne. Ce grimoire d'exception vous plonge dans un univers médiéval mystique, entre enluminures dorées, contes oubliés et contemplation au coin du feu.",
     location: "Éditions du Grimoire",
-    distance: "10s Vidéo",
+    distance: "2 500 DA",
     interests: ["Poésie", "Grimoire", "Fantasy", "Reliure Cuir"],
     languages: ["Français", "English"],
   },
@@ -26,7 +27,7 @@ export const initialProfiles = [
     image: "/assets/images/books/book2.jpg",
     bio: "Un voyage poétique et contemplatif explorant les pensées secrètes et les songes de l'âme. Relié de dorures précieuses, ce chef-d'œuvre invite au calme et à la rêverie littéraire au coin du feu.",
     location: "Éditions Poesis",
-    distance: "Livre Relié",
+    distance: "1 850 DA",
     interests: ["Poésie", "Classique", "Dorures"],
     languages: ["Français", "English"],
   },
@@ -39,7 +40,7 @@ export const initialProfiles = [
     image: "/assets/images/books/book2.jpg",
     bio: "Partez à la découverte de secrets enfouis au cœur des bibliothèques sacrées de l'Antiquité. Une quête initiatique captivante qui ravira tous les passionnés d'histoire, d'énigmes et de vieux manuscrits.",
     location: "Éditions Historia",
-    distance: "Grand Format",
+    distance: "2 300 DA",
     interests: ["Histoire", "Mystère", "Aventure"],
     languages: ["Français"],
   },
@@ -52,7 +53,7 @@ export const initialProfiles = [
     image: "/assets/images/books/book3.jpg",
     bio: "Plongez au cœur d'une forêt ancestrale magique, où chaque murmure raconte une légende oubliée. Guidé par la lueur d'une bougie, découvrez les secrets millénaires cachés sous le grand chêne.",
     location: "Éditions Sylvestre",
-    distance: "Roman Broché",
+    distance: "2 100 DA",
     interests: ["Fantasy", "Nature", "Légendes"],
     languages: ["Français", "English"],
   },
@@ -65,62 +66,377 @@ export const initialProfiles = [
     image: "/assets/images/books/book1.jpg",
     bio: "Méditation poétique sur les mots et la sérénité. Un recueil intime et apaisant qui célèbre la beauté de la solitude et le réconfort de la lecture au calme en toute harmonie.",
     location: "Éditions Sérénité",
-    distance: "Poche Collector",
+    distance: "1 950 DA",
     interests: ["Philosophie", "Méditation", "Bien-être"],
     languages: ["Français"],
   }
 ];
 
 export const DatingProvider = ({ children }) => {
-  const [profiles, setProfiles] = useState(initialProfiles);
-  const [swipedList, setSwipedList] = useState([]);
-  const [likedList, setLikedList] = useState([
-    { id: 101, name: "Chelsea", school: "Harvard University", image: "/assets/images/liked/pic1.png" },
-    { id: 102, name: "Abby", school: "Chapman University", image: "/assets/images/liked/pic2.png" },
-    { id: 103, name: "Javelle", school: "Law student at Stanford", image: "/assets/images/liked/pic3.png" },
-    { id: 104, name: "Veronica", school: "Harvard University", image: "/assets/images/liked/pic4.png" },
-    { id: 105, name: "Richard", school: "Law student at Stanford", image: "/assets/images/liked/pic5.png" },
-  ]);
-
-  const [matches, setMatches] = useState([
-    { id: 1, name: "Grayson", image: "/assets/images/user/pic1.jpg", lastMsg: "Would love to!", time: "2m ago", active: true },
-    { id: 2, name: "Matt", image: "/assets/images/user/pic2.jpg", lastMsg: "Is that because we like...", time: "4m ago", active: false },
-    { id: 3, name: "Elisha", image: "/assets/images/user/pic3.jpg", lastMsg: "See you tomorrow!", time: "12m ago", active: true },
-    { id: 4, name: "Mitchell", image: "/assets/images/user/pic4.jpg", lastMsg: "Hey there!", time: "1h ago", active: false },
-    { id: 5, name: "Stephon", image: "/assets/images/user/pic5.jpg", lastMsg: "Let's catch up soon", time: "2h ago", active: true },
-  ]);
-
-  const [userProfile, setUserProfile] = useState({
-    name: "John Doe",
-    email: "example@gmail.com",
-    phone: "+123 4567 890",
-    gender: "Men",
-    interestedIn: "Women",
-    lookingFor: "Long-term partner",
-    avatar: "/assets/images/user/pic1.jpg",
-    age: 24,
-    location: "Montreal, Canada",
+  const [allProfiles, setAllProfiles] = useState(initialProfiles);
+  const [activeFilters, setActiveFilters] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tiktok_shop_active_filters');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      categories: [],
+      languages: [],
+      maxPrice: 6000
+    };
   });
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('tiktok_shop_active_filters', JSON.stringify(activeFilters));
+    } catch (e) {}
+  }, [activeFilters]);
+
+  // Profils filtrés selon les critères actifs
+  const profiles = React.useMemo(() => {
+    return allProfiles.filter((p) => {
+      // 1. Catégories
+      if (activeFilters.categories && activeFilters.categories.length > 0) {
+        if (!p.category || !activeFilters.categories.includes(p.category)) {
+          return false;
+        }
+      }
+      // 2. Langues
+      if (activeFilters.languages && activeFilters.languages.length > 0) {
+        const pLangs = Array.isArray(p.languages)
+          ? p.languages
+          : (typeof p.languages === 'string' && p.languages.trim() !== ''
+              ? p.languages.split(',').map((s) => s.trim())
+              : []);
+        const matchesLang = pLangs.some((l) => activeFilters.languages.includes(l));
+        if (!matchesLang) return false;
+      }
+      // 3. Prix maximum
+      if (activeFilters.maxPrice && Number(p.price) > Number(activeFilters.maxPrice)) {
+        return false;
+      }
+      return true;
+    });
+  }, [allProfiles, activeFilters]);
+
+  const [swipedList, setSwipedList] = useState([]);
+
+  const [likedList, setLikedList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tiktok_shop_favorites');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [
+      {
+        id: 5,
+        name: "The Chronicles of Autumn",
+        author: "Alexander Thorne",
+        school: "Alexander Thorne • 2 500 DA",
+        format: "Édition Vidéo & Reliure Cuir",
+        price: 2500,
+        image: "/assets/images/books/book1.jpg",
+        bio: "Une épopée poétique illustrée au cœur des légendes d'automne."
+      },
+      {
+        id: 1,
+        name: "The Art of Whispers",
+        author: "Éléonore Vance",
+        school: "Éléonore Vance • 1 850 DA",
+        format: "Recueil Poétique & Dorures",
+        price: 1850,
+        image: "/assets/images/books/book2.jpg",
+        bio: "Un voyage poétique et contemplatif explorant les pensées secrètes."
+      }
+    ];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('tiktok_shop_favorites', JSON.stringify(likedList));
+    } catch (e) {}
+  }, [likedList]);
+
+  const [matches, setMatches] = useState([
+    { id: 1, name: "Support TikTok Shop", image: "/assets/images/user/pic1.jpg", lastMsg: "Bonjour ! Comment pouvons-nous vous aider ?", time: "À l'instant", active: true },
+    { id: 2, name: "Service Livraison", image: "/assets/images/user/pic2.jpg", lastMsg: "Votre colis est bien pris en charge avec Yalidine.", time: "1h", active: false },
+    { id: 3, name: "Conseiller Client", image: "/assets/images/user/pic3.jpg", lastMsg: "Ce livre est bien disponible en stock.", time: "Hier", active: false }
+  ]);
+
+  const [userProfile, setUserProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem('customer_user');
+      if (saved) {
+        const u = JSON.parse(saved);
+        if (u && (u.name || u.phone)) {
+          return {
+            name: u.name || "mouh",
+            email: u.email || "mohamedguedaoui13@gmail.com",
+            phone: u.phone || "0697037109",
+            gender: "Men",
+            interestedIn: "Livres",
+            lookingFor: "Lectures passionnantes",
+            avatar: u.avatar || null,
+            age: 24,
+            location: u.address || "Alger",
+          };
+        }
+      }
+    } catch (e) {}
+    return {
+      name: "mouh",
+      email: "mohamedguedaoui13@gmail.com",
+      phone: "0697037109",
+      gender: "Men",
+      interestedIn: "Livres",
+      lookingFor: "Lectures passionnantes",
+      avatar: null,
+      age: 24,
+      location: "Alger",
+    };
+  });
+
+  // Synchroniser automatiquement avec les données réelles du compte client
+  useEffect(() => {
+    const syncCustomerAccount = async () => {
+      try {
+        const saved = localStorage.getItem('customer_user');
+        let current = null;
+        if (saved) {
+          try { current = JSON.parse(saved); } catch (e) {}
+        }
+
+        // Si aucun compte dans localStorage ou s'il s'agit encore du placeholder "Client TikTok Shop"
+        if (!current || !current.name || current.name === 'Client TikTok Shop' || current.name === 'John Doe') {
+          const res = await fetch('http://localhost:8000/api/customers');
+          if (res.ok) {
+            const json = await res.json();
+            if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+              const latest = json.data[0];
+              const realUser = {
+                id: latest.id,
+                name: latest.name,
+                phone: latest.phone,
+                email: latest.email,
+                address: latest.address
+              };
+              localStorage.setItem('customer_user', JSON.stringify(realUser));
+              setUserProfile(prev => ({
+                ...prev,
+                name: realUser.name,
+                phone: realUser.phone,
+                email: realUser.email,
+                location: realUser.address
+              }));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Erreur synchro compte client:', err);
+      }
+    };
+
+    syncCustomerAccount();
+
+    const handleStorageChange = () => {
+      try {
+        const saved = localStorage.getItem('customer_user');
+        if (saved) {
+          const u = JSON.parse(saved);
+          setUserProfile(prev => ({
+            ...prev,
+            name: u.name || prev.name,
+            phone: u.phone || prev.phone,
+            email: u.email || prev.email,
+            location: u.address || prev.location
+          }));
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Panier e-commerce synchronisé avec localStorage
+  const [cartItems, setCartItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tiktok_cart');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [
+      {
+        id: 1,
+        title: "The Chronicles of Autumn",
+        format: "Édition Vidéo & Reliure Cuir",
+        price: 2500,
+        quantity: 1,
+        image: "/assets/images/books/book1.jpg"
+      }
+    ];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('tiktok_cart', JSON.stringify(cartItems));
+    } catch (e) {}
+  }, [cartItems]);
+
+  // Charger les produits réels depuis le backend PHP MySQL (Admin Panel)
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/products');
+      if (!res.ok) throw new Error('API non joignable');
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        const formatted = json.data.map((p) => ({
+          id: p.id,
+          name: p.name,
+          title: p.name,
+          author: p.author || '',
+          format: p.format || '',
+          price: Number(p.price) || 0,
+          priceFormatted: `${Number(p.price).toLocaleString('fr-FR')} DA`,
+          image: p.image || '/assets/images/books/book1.jpg',
+          video: p.video || null,
+          bio: p.bio || '',
+          location: p.location || '',
+          distance: `${Number(p.price).toLocaleString('fr-FR')} DA`,
+          category: p.category || '',
+          stock: p.stock || 0,
+          languages: Array.isArray(p.languages)
+            ? p.languages
+            : (typeof p.languages === 'string' && p.languages.trim() !== ''
+                ? p.languages.split(',').map((s) => s.trim()).filter(Boolean)
+                : [])
+        }));
+        setAllProfiles(formatted);
+      }
+    } catch (err) {
+      console.warn('Utilisation des données initiales locales:', err.message);
+    }
+  };
+
+  const addToCart = (product) => {
+    if (!product) return;
+    setCartItems((prev) => {
+      const existing = prev.find((item) => String(item.id) === String(product.id));
+      if (existing) {
+        return prev.map((item) =>
+          String(item.id) === String(product.id)
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: product.id,
+          title: product.name || product.title,
+          format: product.format || '',
+          price: Number(product.price) || 0,
+          quantity: 1,
+          image: product.image || '/assets/images/books/book1.jpg'
+        }
+      ];
+    });
+  };
+
+  const updateQuantity = (id, delta) => {
+    setCartItems((prev) =>
+      prev
+        .map((item) => {
+          if (String(item.id) === String(id)) {
+            const newQty = item.quantity + delta;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean)
+    );
+  };
+
+  const removeItem = (id) => {
+    setCartItems((prev) => prev.filter((item) => String(item.id) !== String(id)));
+  };
+
+  const clearCart = () => {
+    setCartItems([]);
+  };
+
   const swipeCard = (id, action) => {
-    setSwipedList(prev => [...prev, { id, action }]);
+    setSwipedList((prev) => [...prev, { id, action }]);
   };
 
   const resetCards = () => {
     setSwipedList([]);
   };
 
+  const addToLiked = (card) => {
+    if (!card) return;
+    setLikedList((prev) => {
+      const exists = prev.some((item) => String(item.id) === String(card.id));
+      if (exists) return prev;
+      const newItem = {
+        id: card.id,
+        name: card.name || card.title,
+        author: card.author || '',
+        school: card.author 
+          ? `${card.author} • ${card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : ''}`
+          : (card.distance || (card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : '')),
+        price: card.price || 0,
+        priceFormatted: card.priceFormatted || (card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : ''),
+        image: card.image || '/assets/images/books/book1.jpg',
+        video: card.video || null,
+        format: card.format || '',
+        bio: card.bio || '',
+      };
+      return [newItem, ...prev];
+    });
+  };
+
+  const removeFromLiked = (id) => {
+    setLikedList((prev) => prev.filter((item) => String(item.id) !== String(id)));
+  };
+
+  const isLiked = (id) => {
+    return likedList.some((item) => String(item.id) === String(id));
+  };
+
   return (
-    <DatingContext.Provider value={{
-      profiles,
-      swipedList,
-      swipeCard,
-      resetCards,
-      likedList,
-      matches,
-      userProfile,
-      setUserProfile,
-    }}>
+    <DatingContext.Provider
+      value={{
+        profiles,
+        allProfiles,
+        setProfiles: setAllProfiles,
+        activeFilters,
+        setActiveFilters,
+        fetchProducts,
+        swipedList,
+        swipeCard,
+        resetCards,
+        likedList,
+        setLikedList,
+        addToLiked,
+        removeFromLiked,
+        isLiked,
+        matches,
+        setMatches,
+        userProfile,
+        setUserProfile,
+        cartItems,
+        addToCart,
+        updateQuantity,
+        removeItem,
+        clearCart
+      }}
+    >
       {children}
     </DatingContext.Provider>
   );

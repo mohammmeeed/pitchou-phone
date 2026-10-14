@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useDating } from '../context/DatingContext';
 
@@ -7,138 +7,147 @@ const EditProfile = () => {
   const navigate = useNavigate();
   const { userProfile, setUserProfile } = useDating();
 
-  const [formData, setFormData] = useState({
-    name: userProfile?.name || "Richard",
-    age: userProfile?.age || 20,
-    location: userProfile?.location || "Mentreal, Canada",
-    bio: "Passionate about photography, indie music, and travelling across new cities.",
-    job: "Photographer & Designer",
-    company: "Freelance Studio",
-    school: "University of Arts",
+  const [loggedUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('customer_user');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
   });
 
-  const handleSubmit = (e) => {
+  const [formData, setFormData] = useState({
+    name: loggedUser?.name || userProfile?.name || "mouh",
+    phone: loggedUser?.phone || userProfile?.phone || "0697037109",
+    email: loggedUser?.email || userProfile?.email || "mohamedguedaoui13@gmail.com",
+    address: loggedUser?.address || userProfile?.location || "Alger",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setUserProfile(prev => ({
-      ...prev,
-      name: formData.name,
-      age: formData.age,
-      location: formData.location
-    }));
+    setSaving(true);
+
+    const updatedUser = {
+      ...(loggedUser || {}),
+      name: formData.name.trim(),
+      phone: formData.phone.trim(),
+      email: formData.email.trim(),
+      address: formData.address.trim()
+    };
+
+    localStorage.setItem('customer_user', JSON.stringify(updatedUser));
+
+    if (setUserProfile) {
+      setUserProfile(prev => ({
+        ...prev,
+        name: updatedUser.name,
+        phone: updatedUser.phone,
+        email: updatedUser.email,
+        location: updatedUser.address
+      }));
+    }
+
+    if (loggedUser?.id) {
+      try {
+        await fetch('http://localhost:8000/api/customers', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: loggedUser.id,
+            name: updatedUser.name,
+            phone: updatedUser.phone,
+            email: updatedUser.email,
+            address: updatedUser.address
+          })
+        });
+      } catch (err) {
+        console.warn('Erreur mise à jour client API:', err);
+      }
+    }
+
+    setSaving(false);
     navigate('/profile');
   };
 
   return (
     <div className="page-wrapper">
-      <Header title="Edit Profile" showBack={true} backUrl="/profile" bgWhite={true} />
+      <Header title="Modifier le Profil" showBack={true} backUrl="/profile" bgWhite={true} />
 
       <div className="page-content space-top p-b60">
         <div className="container">
           <form onSubmit={handleSubmit}>
-            {/* Photos Upload Grid */}
-            <div className="row g-3 mb-3">
-              <div className="col-8">
-                <div className="dz-drop-box style-2">
-                  <div className="drop-bx bx-lg">
-                    <div 
-                      className="imagePreview" 
-                      style={{ 
-                        backgroundImage: `url(${userProfile?.avatar || '/assets/images/user/pic1.jpg'})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center'
-                      }}
-                    >
-                    </div>
-                  </div>
+            <div className="card mb-4" style={{ borderRadius: '16px', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+              <div className="card-header pb-2 pt-3 px-3 border-0 bg-transparent">
+                <h6 className="title mb-0 font-15 font-w600 text-dark">Informations Personnelles</h6>
+              </div>
+              <div 
+                className="card-body p-3"
+                style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr', 
+                  gap: '14px',
+                  width: '100%'
+                }}
+              >
+                <div style={{ width: '100%' }}>
+                  <label className="form-label font-w600 font-13 text-muted mb-1 d-block">Nom Complet</label>
+                  <input 
+                    type="text" 
+                    className="form-control w-100" 
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Votre nom complet"
+                    style={{ height: '48px', borderRadius: '12px', fontSize: '14px' }}
+                  />
+                </div>
+
+                <div style={{ width: '100%' }}>
+                  <label className="form-label font-w600 font-13 text-muted mb-1 d-block">Numéro de Téléphone</label>
+                  <input 
+                    type="text" 
+                    className="form-control w-100" 
+                    required
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="Ex: 0697037109"
+                    style={{ height: '48px', borderRadius: '12px', fontSize: '14px' }}
+                  />
+                </div>
+
+                <div style={{ width: '100%' }}>
+                  <label className="form-label font-w600 font-13 text-muted mb-1 d-block">Adresse Email</label>
+                  <input 
+                    type="email" 
+                    className="form-control w-100" 
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="nom@exemple.com"
+                    style={{ height: '48px', borderRadius: '12px', fontSize: '14px' }}
+                  />
+                </div>
+
+                <div style={{ width: '100%' }}>
+                  <label className="form-label font-w600 font-13 text-muted mb-1 d-block">Wilaya / Adresse de Livraison</label>
+                  <input 
+                    type="text" 
+                    className="form-control w-100" 
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="Ex: Alger, Oran, Constantine..."
+                    style={{ height: '48px', borderRadius: '12px', fontSize: '14px' }}
+                  />
                 </div>
               </div>
-              <div className="col-4">
-                <div className="row g-3">
-                  <div className="col-12">
-                    <div className="dz-drop-box style-2">
-                      <div className="drop-bx">
-                        <div 
-                          className="imagePreview" 
-                          style={{ 
-                            backgroundImage: 'url(/assets/images/slider/pic2.png)',
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center'
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-12">
-                    <div className="dz-drop-box style-2">
-                      <div className="drop-bx">
-                        <div 
-                          className="imagePreview" 
-                          style={{ 
-                            backgroundImage: 'url(/assets/images/slider/pic3.png)',
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center'
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* Profile fields */}
-            <div className="mb-3">
-              <label className="form-label font-w600 font-14">Display Name</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label font-w600 font-14">About Me</label>
-              <textarea 
-                className="form-control" 
-                rows="3"
-                value={formData.bio}
-                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-              ></textarea>
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label font-w600 font-14">Job Title</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={formData.job}
-                onChange={(e) => setFormData({ ...formData, job: e.target.value })}
-              />
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label font-w600 font-14">Company</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="form-label font-w600 font-14">Living in</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              />
-            </div>
-
-            <button type="submit" className="btn btn-lg btn-gradient w-100 dz-flex-box rounded-xl">
-              Save Changes
+            <button 
+              type="submit" 
+              className="btn btn-lg btn-gradient w-100 dz-flex-box rounded-xl"
+              disabled={saving}
+              style={{ cursor: 'pointer', height: '50px', fontSize: '15px', fontWeight: 600 }}
+            >
+              {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
             </button>
           </form>
         </div>

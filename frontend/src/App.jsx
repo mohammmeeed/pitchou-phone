@@ -30,6 +30,16 @@ import HomeSetting from './pages/HomeSetting';
 import Subscription from './pages/Subscription';
 import ErrorPage from './pages/ErrorPage';
 
+// Admin Pages (Hospital React Mediqu Design System)
+import AdminDashboard from './admin/pages/AdminDashboard';
+import AdminProducts from './admin/pages/AdminProducts';
+import AdminOrders from './admin/pages/AdminOrders';
+import AdminCustomers from './admin/pages/AdminCustomers';
+import AdminChat from './admin/pages/AdminChat';
+import AdminParameter from './admin/pages/AdminParameter';
+import AdminLogin from './admin/pages/AdminLogin';
+import AdminAccount from './admin/pages/AdminAccount';
+
 function App() {
   return (
     <ThemeProvider>
@@ -85,8 +95,8 @@ function App() {
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/wishlist.html" element={<Navigate to="/wishlist" replace />} />
 
-            <Route path="/chat-list" element={<ChatList />} />
-            <Route path="/chat-list.html" element={<Navigate to="/chat-list" replace />} />
+            <Route path="/chat-list" element={<Navigate to="/chat" replace />} />
+            <Route path="/chat-list.html" element={<Navigate to="/chat" replace />} />
 
             <Route path="/chat" element={<Chat />} />
             <Route path="/chat.html" element={<Navigate to="/chat" replace />} />
@@ -111,6 +121,17 @@ function App() {
 
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/subscription.html" element={<Navigate to="/subscription" replace />} />
+
+            {/* Admin Panel (Hospital React / Mediqu Design System) */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/products" element={<AdminProducts />} />
+            <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/customers" element={<AdminCustomers />} />
+            <Route path="/admin/chat" element={<AdminChat />} />
+            <Route path="/admin/parameter" element={<AdminParameter />} />
+            <Route path="/admin/account" element={<AdminAccount />} />
 
             {/* Fallback 404 */}
             <Route path="/error" element={<ErrorPage />} />

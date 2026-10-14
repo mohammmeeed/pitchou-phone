@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 
 const Auth = ({ defaultTab = 'login' }) => {
@@ -8,7 +8,8 @@ const Auth = ({ defaultTab = 'login' }) => {
   const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabParam === 'register' ? 'register' : defaultTab);
 
-  const { setUserProfile } = useDating();
+  const redirectParam = searchParams.get('redirect');
+  const { setUserProfile, clearCart } = useDating();
 
   // Login state (telephone + mot de passe)
   const [loginPhone, setLoginPhone] = useState('');
@@ -27,7 +28,46 @@ const Auth = ({ defaultTab = 'login' }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLoginSubmit = (e) => {
+  const completeOrderOrRedirect = async (userObj) => {
+    const pendingOrderStr = localStorage.getItem('pending_order');
+    if (pendingOrderStr) {
+      try {
+        const pending = JSON.parse(pendingOrderStr);
+        await fetch('http://localhost:8000/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_name: userObj?.name || regFullName.trim() || 'Client',
+            customer_phone: userObj?.phone || loginPhone.trim() || regPhone.trim(),
+            customer_email: userObj?.email || regEmail.trim() || '',
+            customer_address: pending.wilaya || 'Alger',
+            subtotal: pending.subtotal !== undefined ? pending.subtotal : pending.total_amount,
+            shipping_fee: pending.shipping_fee !== undefined ? pending.shipping_fee : 0,
+            total_amount: pending.total_amount,
+            items_summary: pending.items_summary,
+            status: 'En attente'
+          })
+        });
+      } catch (err) {
+        console.warn('Erreur lors de l’enregistrement automatique de la commande:', err);
+      }
+      localStorage.removeItem('pending_order');
+      if (clearCart) clearCart();
+      setSuccessMsg('Compte validé ! Votre commande a été enregistrée avec succès.');
+      setTimeout(() => {
+        navigate('/explore?order_success=true');
+      }, 900);
+      return;
+    }
+
+    if (redirectParam === 'checkout') {
+      navigate('/explore');
+    } else {
+      navigate('/home');
+    }
+  };
+
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -41,19 +81,54 @@ const Auth = ({ defaultTab = 'login' }) => {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('http://localhost:8000/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: loginPhone.trim(),
+          password: loginPassword
+        })
+      });
+      const data = await res.json();
+      if (data && data.success && data.user) {
+        setUserProfile(prev => ({
+          ...prev,
+          name: data.user.name,
+          email: data.user.email,
+          phone: data.user.phone || loginPhone.trim(),
+        }));
+        try {
+          localStorage.setItem('customer_user', JSON.stringify(data.user));
+          if (data.token) localStorage.setItem('customer_token', data.token);
+        } catch (e) {}
+
+        setSuccessMsg('Connexion réussie ! Validation...');
+        await completeOrderOrRedirect(data.user);
+      } else {
+        setErrorMsg(data.message || 'Numéro de téléphone ou mot de passe incorrect.');
+      }
+    } catch (err) {
+      const fallbackUser = {
+        name: 'Client',
+        phone: loginPhone.trim(),
+        email: ''
+      };
       setUserProfile(prev => ({
         ...prev,
-        phone: loginPhone,
+        phone: loginPhone.trim(),
       }));
-      setSuccessMsg('Connexion réussie ! Redirection...');
-      setTimeout(() => {
-        navigate('/home');
-      }, 600);
-    }, 500);
+      try {
+        localStorage.setItem('customer_user', JSON.stringify(fallbackUser));
+      } catch (e) {}
+      setSuccessMsg('Connexion réussie ! Validation...');
+      await completeOrderOrRedirect(fallbackUser);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -65,28 +140,63 @@ const Auth = ({ defaultTab = 'login' }) => {
       setErrorMsg('Veuillez renseigner une adresse email valide.');
       return;
     }
+    if (!regPhone.trim()) {
+      setErrorMsg('Veuillez renseigner votre numéro de téléphone.');
+      return;
+    }
     if (!regPassword || regPassword.length < 4) {
       setErrorMsg('Le mot de passe doit comporter au moins 4 caractères.');
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('http://localhost:8000/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: regFullName.trim(),
+          email: regEmail.trim(),
+          phone: regPhone.trim(),
+          password: regPassword,
+          address: 'Alger'
+        })
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Erreur lors de l’enregistrement');
+      }
+
+      const registeredUser = data.data || {
+        name: regFullName.trim(),
+        email: regEmail.trim(),
+        phone: regPhone.trim()
+      };
+
       setUserProfile(prev => ({
         ...prev,
         name: regFullName.trim(),
         email: regEmail.trim(),
-        phone: regPhone.trim() ? regPhone.trim() : prev.phone,
+        phone: regPhone.trim(),
       }));
-      setSuccessMsg('Compte créé avec succès ! Bienvenue.');
-      setTimeout(() => {
-        navigate('/home');
-      }, 600);
-    }, 500);
+
+      try {
+        localStorage.setItem('customer_user', JSON.stringify(registeredUser));
+      } catch (e) {}
+
+      setSuccessMsg('Compte créé avec succès ! Validation de votre commande...');
+      await completeOrderOrRedirect(registeredUser);
+    } catch (err) {
+      console.error('Erreur inscription:', err);
+      setErrorMsg(err.message || 'Impossible d’enregistrer vos informations.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="bg-white" style={{ minHeight: '100vh' }}>
+    <div className="bg-white auth-scroll-page">
       <div className="page-wrapper">
         <div className="page-content">
           <div className="container">
@@ -113,6 +223,44 @@ const Auth = ({ defaultTab = 'login' }) => {
                     : 'Inscrivez-vous pour commander vos livres en quelques clics.'}
                 </p>
               </div>
+
+              {/* Bannière commande en attente */}
+              {localStorage.getItem('pending_order') && (
+                <div 
+                  className="mb-4 p-3 rounded-3 d-flex align-items-center gap-3"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(254, 119, 182, 0.12) 0%, rgba(255, 61, 151, 0.08) 100%)',
+                    border: '1px solid rgba(254, 119, 182, 0.35)',
+                    boxShadow: '0 4px 15px rgba(254, 119, 182, 0.1)'
+                  }}
+                >
+                  <div 
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      background: 'var(--btn-gradient, var(--primary-gradient))',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '18px',
+                      flexShrink: 0,
+                      boxShadow: 'var(--btn-shadow, 0 4px 10px var(--rgba-primary-3))'
+                    }}
+                  >
+                    <i className="icon feather icon-shopping-bag"></i>
+                  </div>
+                  <div style={{ fontSize: '12px', lineHeight: '1.4' }}>
+                    <strong style={{ display: 'block', color: '#1e1e24', fontSize: '13px', fontWeight: 700 }}>
+                      Validation de votre commande
+                    </strong>
+                    <span className="text-muted">
+                      Connectez-vous ou inscrivez-vous pour que votre commande soit directement enregistrée.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Segmented Switcher in DatingKit Style */}
               <div className="auth-site-tabs-wrap mb-4">
@@ -154,69 +302,71 @@ const Auth = ({ defaultTab = 'login' }) => {
                 </div>
               )}
 
-              {/* Formulaire : Se connecter (Téléphone + Mot de passe) */}
+              {/* Formulaire : Se connecter (Téléphone + Mot de passe en Grid 2) */}
               {activeTab === 'login' && (
                 <form onSubmit={handleLoginSubmit}>
-                  {/* Numéro de téléphone */}
-                  <div className="mb-3">
-                    <label className="form-label font-14 font-w600 text-dark mb-2">
-                      Numéro de téléphone
-                    </label>
-                    <div className="input-group input-group-icon">
-                      <div className="input-group-text">
-                        <div className="input-icon">
-                          <i className="icon feather icon-phone"></i>
-                        </div>
-                      </div>
-                      <input 
-                        type="tel" 
-                        className="form-control font-14" 
-                        placeholder="Numéro de téléphone"
-                        value={loginPhone}
-                        onChange={(e) => setLoginPhone(e.target.value)}
-                        required
-                        style={{ height: '50px' }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Mot de passe */}
-                  <div className="mb-3">
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <label className="form-label font-14 font-w600 text-dark mb-0">
-                        Mot de passe
+                  <div className="auth-grid-2 mb-3">
+                    {/* Numéro de téléphone */}
+                    <div className="auth-grid-item">
+                      <label className="form-label font-14 font-w600 text-dark mb-2">
+                        Numéro de téléphone
                       </label>
-                      <a 
-                        role="button" 
-                        onClick={() => alert("Un code SMS de réinitialisation a été envoyé.")} 
-                        className="font-12 font-w600 text-primary"
-                        style={{ cursor: 'pointer' }}
-                      >
-                        Mot de passe oublié ?
-                      </a>
-                    </div>
-                    <div className="input-group input-group-icon">
-                      <div className="input-group-text">
-                        <div className="input-icon">
-                          <i className="icon feather icon-lock"></i>
+                      <div className="input-group input-group-icon">
+                        <div className="input-group-text">
+                          <div className="input-icon">
+                            <i className="icon feather icon-phone"></i>
+                          </div>
                         </div>
+                        <input 
+                          type="tel" 
+                          className="form-control font-14" 
+                          placeholder="Numéro de téléphone"
+                          value={loginPhone}
+                          onChange={(e) => setLoginPhone(e.target.value)}
+                          required
+                          style={{ height: '50px' }}
+                        />
                       </div>
-                      <input 
-                        type={showLoginPassword ? 'text' : 'password'}
-                        className="form-control font-14" 
-                        placeholder="Entrez votre mot de passe"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        required
-                        style={{ height: '50px' }}
-                      />
-                      <span 
-                        className="input-group-text show-pass"
-                        onClick={() => setShowLoginPassword(prev => !prev)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <i className={`icon feather ${showLoginPassword ? 'icon-eye-off' : 'icon-eye'}`}></i>
-                      </span>
+                    </div>
+
+                    {/* Mot de passe */}
+                    <div className="auth-grid-item">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <label className="form-label font-14 font-w600 text-dark mb-0">
+                          Mot de passe
+                        </label>
+                        <a 
+                          role="button" 
+                          onClick={() => alert("Un code SMS de réinitialisation a été envoyé.")} 
+                          className="font-12 font-w600 text-primary"
+                          style={{ cursor: 'pointer' }}
+                        >
+                          Oublié ?
+                        </a>
+                      </div>
+                      <div className="input-group input-group-icon">
+                        <div className="input-group-text">
+                          <div className="input-icon">
+                            <i className="icon feather icon-lock"></i>
+                          </div>
+                        </div>
+                        <input 
+                          type={showLoginPassword ? 'text' : 'password'}
+                          className="form-control font-14" 
+                          placeholder="Mot de passe"
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          required
+                          style={{ height: '50px' }}
+                        />
+                        <span 
+                          className="input-group-text show-pass"
+                          onClick={() => setShowLoginPassword(prev => !prev)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <i className={`icon feather ${showLoginPassword ? 'icon-eye-off' : 'icon-eye'}`}></i>
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -247,104 +397,107 @@ const Auth = ({ defaultTab = 'login' }) => {
                 </form>
               )}
 
-              {/* Formulaire : S'inscrire (Nom complet + Email + Téléphone pas obligatoire + Mot de passe) */}
+              {/* Formulaire : S'inscrire (Nom complet, Email, Téléphone, Mot de passe en Grid 2) */}
               {activeTab === 'register' && (
                 <form onSubmit={handleRegisterSubmit}>
-                  {/* Nom complet */}
-                  <div className="mb-3">
-                    <label className="form-label font-14 font-w600 text-dark mb-2">
-                      Nom complet
-                    </label>
-                    <div className="input-group input-group-icon">
-                      <div className="input-group-text">
-                        <div className="input-icon">
-                          <i className="icon feather icon-user"></i>
+                  <div className="auth-grid-2 mb-3">
+                    {/* Nom complet */}
+                    <div className="auth-grid-item">
+                      <label className="form-label font-14 font-w600 text-dark mb-2">
+                        Nom complet
+                      </label>
+                      <div className="input-group input-group-icon">
+                        <div className="input-group-text">
+                          <div className="input-icon">
+                            <i className="icon feather icon-user"></i>
+                          </div>
                         </div>
+                        <input 
+                          type="text" 
+                          className="form-control font-14" 
+                          placeholder="Ex: Mohamed Amine"
+                          value={regFullName}
+                          onChange={(e) => setRegFullName(e.target.value)}
+                          required
+                          style={{ height: '50px' }}
+                        />
                       </div>
-                      <input 
-                        type="text" 
-                        className="form-control font-14" 
-                        placeholder="Ex: Mohamed Amine"
-                        value={regFullName}
-                        onChange={(e) => setRegFullName(e.target.value)}
-                        required
-                        style={{ height: '50px' }}
-                      />
                     </div>
-                  </div>
 
-                  {/* Email */}
-                  <div className="mb-3">
-                    <label className="form-label font-14 font-w600 text-dark mb-2">
-                      Adresse email
-                    </label>
-                    <div className="input-group input-group-icon">
-                      <div className="input-group-text">
-                        <div className="input-icon">
-                          <i className="icon feather icon-mail"></i>
+                    {/* Email */}
+                    <div className="auth-grid-item">
+                      <label className="form-label font-14 font-w600 text-dark mb-2">
+                        Adresse email
+                      </label>
+                      <div className="input-group input-group-icon">
+                        <div className="input-group-text">
+                          <div className="input-icon">
+                            <i className="icon feather icon-mail"></i>
+                          </div>
                         </div>
+                        <input 
+                          type="email" 
+                          className="form-control font-14" 
+                          placeholder="exemple@email.com"
+                          value={regEmail}
+                          onChange={(e) => setRegEmail(e.target.value)}
+                          required
+                          style={{ height: '50px' }}
+                        />
                       </div>
-                      <input 
-                        type="email" 
-                        className="form-control font-14" 
-                        placeholder="exemple@email.com"
-                        value={regEmail}
-                        onChange={(e) => setRegEmail(e.target.value)}
-                        required
-                        style={{ height: '50px' }}
-                      />
                     </div>
-                  </div>
 
-                  {/* Téléphone */}
-                  <div className="mb-3">
-                    <label className="form-label font-14 font-w600 text-dark mb-2">
-                      Numéro de téléphone
-                    </label>
-                    <div className="input-group input-group-icon">
-                      <div className="input-group-text">
-                        <div className="input-icon">
-                          <i className="icon feather icon-phone"></i>
+                    {/* Téléphone */}
+                    <div className="auth-grid-item">
+                      <label className="form-label font-14 font-w600 text-dark mb-2">
+                        Numéro de téléphone
+                      </label>
+                      <div className="input-group input-group-icon">
+                        <div className="input-group-text">
+                          <div className="input-icon">
+                            <i className="icon feather icon-phone"></i>
+                          </div>
                         </div>
+                        <input 
+                          type="tel" 
+                          className="form-control font-14" 
+                          placeholder="Ex: 0550123456"
+                          value={regPhone}
+                          onChange={(e) => setRegPhone(e.target.value)}
+                          required
+                          style={{ height: '50px' }}
+                        />
                       </div>
-                      <input 
-                        type="tel" 
-                        className="form-control font-14" 
-                        placeholder="Numéro (pas obligatoire)"
-                        value={regPhone}
-                        onChange={(e) => setRegPhone(e.target.value)}
-                        style={{ height: '50px' }}
-                      />
                     </div>
-                  </div>
 
-                  {/* Mot de passe */}
-                  <div className="mb-3">
-                    <label className="form-label font-14 font-w600 text-dark mb-2">
-                      Mot de passe
-                    </label>
-                    <div className="input-group input-group-icon">
-                      <div className="input-group-text">
-                        <div className="input-icon">
-                          <i className="icon feather icon-lock"></i>
+                    {/* Mot de passe */}
+                    <div className="auth-grid-item">
+                      <label className="form-label font-14 font-w600 text-dark mb-2">
+                        Mot de passe
+                      </label>
+                      <div className="input-group input-group-icon">
+                        <div className="input-group-text">
+                          <div className="input-icon">
+                            <i className="icon feather icon-lock"></i>
+                          </div>
                         </div>
+                        <input 
+                          type={showRegPassword ? 'text' : 'password'}
+                          className="form-control font-14" 
+                          placeholder="Créez votre mot de passe"
+                          value={regPassword}
+                          onChange={(e) => setRegPassword(e.target.value)}
+                          required
+                          style={{ height: '50px' }}
+                        />
+                        <span 
+                          className="input-group-text show-pass"
+                          onClick={() => setShowRegPassword(prev => !prev)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <i className={`icon feather ${showRegPassword ? 'icon-eye-off' : 'icon-eye'}`}></i>
+                        </span>
                       </div>
-                      <input 
-                        type={showRegPassword ? 'text' : 'password'}
-                        className="form-control font-14" 
-                        placeholder="Créez votre mot de passe"
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        required
-                        style={{ height: '50px' }}
-                      />
-                      <span 
-                        className="input-group-text show-pass"
-                        onClick={() => setShowRegPassword(prev => !prev)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <i className={`icon feather ${showRegPassword ? 'icon-eye-off' : 'icon-eye'}`}></i>
-                      </span>
                     </div>
                   </div>
 

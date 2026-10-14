@@ -5,7 +5,8 @@ import BottomNav from '../components/BottomNav';
 import { useDating } from '../context/DatingContext';
 
 const ChatList = () => {
-  const { matches } = useDating();
+  const datingCtx = useDating();
+  const matches = Array.isArray(datingCtx?.matches) ? datingCtx.matches : [];
 
   return (
     <div className="page-wrapper">

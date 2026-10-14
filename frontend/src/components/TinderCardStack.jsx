@@ -1,7 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useDating } from '../context/DatingContext';
 
-const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
+const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
+  const datingCtx = useDating();
+  const addToLiked = datingCtx?.addToLiked;
+  const isLiked = datingCtx?.isLiked;
+  const removeFromLiked = datingCtx?.removeFromLiked;
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [dragState, setDragState] = useState({
     active: false,
@@ -71,7 +77,7 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
     const isHorizontal = Math.abs(dx) > Math.abs(dy);
 
     const cardWidth = containerRef.current?.offsetWidth || 380;
-    const threshold = cardWidth * 0.28;
+    const threshold = Math.min(cardWidth * 0.22, 70);
 
     if (isHorizontal) {
       if (dx > threshold) {
@@ -105,6 +111,14 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
         setAnimatingDir('');
       }, 250);
       return;
+    }
+
+    if (direction === 'to-right' && activeCard) {
+      if (onSwipeRight) {
+        onSwipeRight(activeCard);
+      } else if (addToLiked) {
+        addToLiked(activeCard);
+      }
     }
 
     setTimeout(() => {
@@ -208,6 +222,8 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
 
   // Render card helper
   const renderCardContent = (card, isCurrent = false) => {
+    const isCardFavorited = isLiked ? isLiked(card.id) : false;
+
     return (
       <>
         <div className="dz-media">
@@ -239,9 +255,9 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
                 style={{ cursor: 'pointer' }}
               >
                 {card.name}
-                {card.author && (
+                {card.author && card.author.trim() !== '' && card.author.trim().toLowerCase() !== 'auteur' && (
                   <span style={{ fontSize: '0.78em', opacity: 0.85, fontWeight: 400, marginLeft: '6px' }}>
-                    • {card.author}
+                    • {card.author.trim()}
                   </span>
                 )}
               </span>
@@ -250,37 +266,85 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
 
           <div className="card-price-wrap">
             <span className="card-price-value">
-              {card.priceFormatted || (card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : '2 500 DA')}
+              {card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : (card.priceFormatted || '')}
             </span>
           </div>
 
-          <button
-            type="button"
-            className="card-add-to-cart-btn"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (onOpenDetail) {
-                onOpenDetail(card);
-              }
-            }}
-          >
-            <svg 
-              width="19" 
-              height="19" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="#000000" 
-              strokeWidth="2.3" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
+          <div className="d-flex align-items-center gap-2">
+            <button
+              type="button"
+              className="card-add-to-cart-btn flex-grow-1"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onOpenDetail) {
+                  onOpenDetail(card);
+                }
+              }}
             >
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-            <span>AJOUTER AU PANIER</span>
-          </button>
+              <svg 
+                width="19" 
+                height="19" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="#000000" 
+                strokeWidth="2.3" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+              </svg>
+              <span>AJOUTER AU PANIER</span>
+            </button>
+
+            {/* Bouton Favoris / Swipe Droit */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isCardFavorited) {
+                  if (removeFromLiked) removeFromLiked(card.id);
+                } else {
+                  if (isCurrent) {
+                    startSlide('to-right');
+                  } else if (addToLiked) {
+                    addToLiked(card);
+                  }
+                }
+              }}
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '14px',
+                background: isCardFavorited ? 'var(--primary, #ff4458)' : 'rgba(255, 255, 255, 0.95)',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                flexShrink: 0,
+                boxShadow: isCardFavorited ? 'var(--btn-shadow, 0 4px 14px var(--rgba-primary-4))' : '0 4px 14px rgba(0,0,0,0.18)',
+                transition: 'all 0.25s ease'
+              }}
+              title={isCardFavorited ? 'En favoris (cliquer pour retirer)' : 'Mettre en favoris'}
+            >
+              <svg 
+                width="22" 
+                height="22" 
+                viewBox="0 0 24 24" 
+                fill={isCardFavorited ? '#ffffff' : 'var(--primary, #ff4458)'} 
+                stroke={isCardFavorited ? '#ffffff' : 'var(--primary, #ff4458)'} 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+            </button>
+          </div>
         </div>
       </>
     );
@@ -320,16 +384,21 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
           onMouseDown={handleTouchStart}
           onMouseMove={handleTouchMove}
           onMouseUp={handleTouchEnd}
+          onMouseLeave={handleTouchEnd}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
           {renderCardContent(activeCard, true)}
 
-          {/* Dynamic Green Border when Swiping Right */}
+          {/* Dynamic Green/Pink Border when Swiping Right */}
           <div 
             className="dz-swipe-border-green" 
-            style={{ opacity: greenBorderOpacity }}
+            style={{ 
+              opacity: greenBorderOpacity,
+              borderColor: '#ff4458',
+              boxShadow: 'inset 0 0 25px rgba(255, 68, 88, 0.4)'
+            }}
           />
 
           {/* Dynamic Action Badges for Horizontal Swipes */}
@@ -341,9 +410,20 @@ const TinderCardStack = ({ profiles = [], onOpenDetail }) => {
           </div>
           <div 
             className="dzSwipe_card__option dzLike"
-            style={{ opacity: likeOpacity }}
+            style={{ 
+              opacity: likeOpacity,
+              background: '#ff4458',
+              borderColor: '#ff4458',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              padding: '8px 14px'
+            }}
           >
-            <i className="fa-solid fa-check"></i>
+            <i className="fa-solid fa-heart" style={{ fontSize: '24px', color: '#fff' }}></i>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#fff', letterSpacing: '0.5px' }}>FAVORI</span>
           </div>
 
           <div className="dzSwipe_card__drag"></div>

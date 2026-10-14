@@ -6,11 +6,10 @@ const BottomNav = () => {
   const currentPath = location.pathname;
 
   const tabs = [
-    { path: '/explore', icon: 'icon feather icon-shopping-cart' },
-    { path: '/wishlist', icon: 'flaticon flaticon-heart' },
     { path: '/home', icon: 'flaticon flaticon-dog-house' },
-    { path: '/chat-list', icon: 'flaticon flaticon-chat-1' },
-    { path: '/profile', icon: 'flaticon flaticon-user' },
+    { path: '/wishlist', icon: 'flaticon flaticon-heart' },
+    { path: '/chat', icon: 'flaticon flaticon-chat-1' },
+    { path: '/explore', icon: 'icon feather icon-shopping-cart' },
   ];
 
   return (
@@ -18,8 +17,8 @@ const BottomNav = () => {
       <div className="toolbar-inner menubar-nav">
         {tabs.map((tab) => {
           const isActive = currentPath === tab.path || 
-            (tab.path === '/chat-list' && currentPath.startsWith('/chat')) ||
-            (tab.path === '/profile' && currentPath.startsWith('/profile'));
+            (tab.path === '/chat' && currentPath.startsWith('/chat')) ||
+            (tab.path === '/home' && (currentPath === '/' || currentPath.startsWith('/home')));
 
           return (
             <Link 

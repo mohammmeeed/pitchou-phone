@@ -1,111 +1,198 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 
-const defaultMessages = [
-  { id: 1, text: "Hi Richard, thanks for adding me", time: "08:35", isUser: false },
-  { id: 2, text: "Hi Miselia, you're welcome, nice to meet you too", time: "08:40", isUser: true },
-  { id: 3, text: "I see you're into music, can you sing for me?", time: "09:44 AM", isUser: false },
-  { id: 4, text: "Sure, anytime!", time: "09:45 AM", isUser: true },
-  { id: 5, text: "Really! What style do you sing?", time: "10:44 AM", isUser: false },
-  { id: 6, text: "Acoustic pop and indie vibes :)", time: "10:45 AM", isUser: true },
-];
+const API_BASE = 'http://localhost:8000/api';
 
 const Chat = () => {
   const [searchParams] = useSearchParams();
-  const { matches } = useDating();
-  const contactId = searchParams.get('id');
-  const contact = matches.find(m => String(m.id) === contactId) || {
-    name: "Miselia, 24",
-    image: "/assets/images/user/pic1.jpg",
+  const datingCtx = useDating();
+
+  const [customer, setCustomer] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const [messages, setMessages] = useState(defaultMessages);
-  const [inputText, setInputText] = useState('');
+  // Résoudre le client connecté ou en session
+  useEffect(() => {
+    const initCustomer = async () => {
+      let currentCust = null;
+      try {
+        const stored = localStorage.getItem('customer_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed) {
+            currentCust = parsed;
+          }
+        }
+      } catch (e) {}
 
-  const handleSend = (e) => {
-    e.preventDefault();
-    if (!inputText.trim()) return;
+      const userPhone = currentCust?.phone || datingCtx?.userProfile?.phone;
+      const userEmail = currentCust?.email || datingCtx?.userProfile?.email;
 
-    const newMsg = {
-      id: Date.now(),
-      text: inputText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isUser: true,
+      // Toujours vérifier avec la base de données pour synchroniser l'ID réel dans la table `customers`
+      try {
+        const res = await fetch(`${API_BASE}/customers`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          if (userPhone || userEmail) {
+            const matched = json.data.find(c => 
+              (userPhone && String(c.phone).trim() === String(userPhone).trim()) || 
+              (userEmail && String(c.email).trim().toLowerCase() === String(userEmail).trim().toLowerCase())
+            );
+            if (matched) {
+              currentCust = matched;
+              localStorage.setItem('customer_user', JSON.stringify(matched));
+            }
+          } else if (!currentCust || !currentCust.id) {
+            currentCust = json.data[0];
+            localStorage.setItem('customer_user', JSON.stringify(currentCust));
+          }
+        }
+      } catch (err) {
+        console.warn('Erreur chargement clients:', err);
+      }
+
+      if (currentCust) {
+        setCustomer(currentCust);
+        await fetchMessages(currentCust.id, true);
+      }
     };
 
-    setMessages(prev => [...prev, newMsg]);
-    setInputText('');
+    initCustomer();
+  }, []);
 
-    // Optional cute automated reply after 1 sec
-    setTimeout(() => {
-      setMessages(prev => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          text: "Sounds great! Let's definitely talk more about it 😊",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isUser: false,
+  // Polling automatique pour synchroniser les réponses de l'admin en temps réel
+  useEffect(() => {
+    if (!customer?.id) return;
+    const interval = setInterval(() => {
+      fetchMessages(customer.id, false);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [customer?.id]);
+
+  const fetchMessages = async (customerId, autoScroll = false) => {
+    try {
+      const res = await fetch(`${API_BASE}/messages?customer_id=${customerId}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.messages)) {
+        setMessages(json.messages);
+        if (autoScroll) {
+          setTimeout(scrollToBottom, 50);
         }
-      ]);
-    }, 1000);
+      }
+    } catch (err) {
+      console.warn('Erreur messages:', err);
+    }
+  };
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!inputText.trim() || !customer?.id || sending) return;
+
+    const trimmed = inputText.trim();
+    setInputText('');
+    setSending(true);
+
+    const optimistic = {
+      id: Date.now(),
+      customer_id: customer.id,
+      sender: 'customer',
+      message: trimmed,
+      created_at: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, optimistic]);
+    setTimeout(scrollToBottom, 40);
+
+    try {
+      const res = await fetch(`${API_BASE}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: customer.id,
+          sender: 'customer',
+          message: trimmed
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        await fetchMessages(customer.id, true);
+      }
+    } catch (err) {
+      console.error('Erreur envoi message:', err);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const formatTime = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      if (typeof dateStr === 'string' && dateStr.includes(' ')) {
+        return dateStr.split(' ')[1].substring(0, 5);
+      }
+    } catch (e) {}
+    return '';
   };
 
   return (
     <div className="page-wrapper">
-      {/* Header */}
-      <header className="header header-fixed bg-white">
+      {/* Header Support TikTok Shop - Modern Clean */}
+      <header className="header header-fixed bg-white border-bottom" style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
         <div className="container">
           <div className="header-content">
-            <div className="left-content me-3">
-              <Link to="/chat-list" className="back-btn">
+            <div className="left-content">
+              <Link to="/home" className="back-btn me-2">
                 <i className="icon feather icon-chevron-left"></i>
               </Link>
+              <h5 className="title mb-0 font-w600" style={{ fontSize: '17px', color: '#111' }}>
+                Support TikTok Shop
+              </h5>
             </div>
-            <div className="mid-content d-flex align-items-center text-start">
-              <div className="media media-40 rounded-circle me-3">
-                <img src={contact.image} alt={contact.name} className="rounded-circle w-100 h-100" style={{ objectFit: 'cover' }} />
-              </div>
-              <div>
-                <h6 className="title mb-0">{contact.name}</h6>
-                <span className="font-12 text-muted">Online 24m ago</span>
-              </div>	
-            </div>
-            <div className="right-content d-flex align-items-center gap-2">
-              <a role="button" tabIndex={0} className="dz-icon btn btn-primary light" style={{ cursor: 'pointer' }}>
-                <i className="fa-solid fa-phone"></i>
-              </a>
-              <a role="button" tabIndex={0} className="dz-icon me-0 btn btn-primary light" style={{ cursor: 'pointer' }}>
-                <i className="fa-solid fa-video"></i>
-              </a>
-            </div>
+            <div className="mid-content"></div>
+            <div className="right-content"></div>
           </div>
         </div>
       </header>
 
-      {/* Messages Feed */}
+      {/* Page Content Start - DatingKit original layout */}
       <div className="page-content space-top p-b60 message-content" style={{ minHeight: 'calc(100vh - 120px)' }}>
         <div className="container"> 
           <div className="chat-box-area"> 
-            {messages.map((msg) => (
-              <div key={msg.id} className={`chat-content ${msg.isUser ? 'user' : ''}`}>
+            {messages.map((msg, index) => (
+              <div 
+                key={msg.id || index} 
+                className={`chat-content ${msg.sender === 'customer' ? 'user' : ''}`}
+              >
                 <div className="message-item">
-                  <div className="bubble">{msg.text}</div>    
-                  <div className="message-time">{msg.time}</div>    
+                  <div className="bubble">{msg.message}</div>    
+                  <div className="message-time">{formatTime(msg.created_at)}</div>    
                 </div>
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
         </div> 
       </div>
 
-      {/* Input Footer */}
+      {/* Input Footer - DatingKit original */}
       <footer className="footer border-top fixed bg-white">
         <div className="container p-2">
           <div className="chat-footer">
             <form onSubmit={handleSend}>
               <div className="form-group mb-0">
                 <div className="input-wrapper message-area">
+                  <div className="append-media"></div>
                   <input 
                     type="text" 
                     className="form-control" 

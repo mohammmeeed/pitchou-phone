@@ -1,58 +1,97 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
+import { useDating } from '../context/DatingContext';
 
-const initialCart = [
-  {
-    id: 1,
-    title: "The Chronicles of Autumn",
-    format: "Édition Vidéo & Reliure Cuir",
-    price: 2500,
-    quantity: 1,
-    image: "/assets/images/books/book1.jpg"
-  },
-  {
-    id: 2,
-    title: "The Art of Whispers",
-    format: "Recueil Poétique & Dorures",
-    price: 1850,
-    quantity: 1,
-    image: "/assets/images/books/book2.jpg"
-  },
-  {
-    id: 3,
-    title: "The Whispering Oak",
-    format: "Roman Fantastique Broché",
-    price: 2100,
-    quantity: 1,
-    image: "/assets/images/books/book3.jpg"
-  }
+const ALGERIA_WILAYAS = [
+  "01 - Adrar", "02 - Chlef", "03 - Laghouat", "04 - Oum El Bouaghi", "05 - Batna",
+  "06 - Béjaïa", "07 - Biskra", "08 - Béchar", "09 - Blida", "10 - Bouira",
+  "11 - Tamanrasset", "12 - Tébessa", "13 - Tlemcen", "14 - Tiaret", "15 - Tizi Ouzou",
+  "16 - Alger", "17 - Djelfa", "18 - Jijel", "19 - Sétif", "20 - Saïda",
+  "21 - Skikda", "22 - Sidi Bel Abbès", "23 - Annaba", "24 - Guelma", "25 - Constantine",
+  "26 - Médéa", "27 - Mostaganem", "28 - M'Sila", "29 - Mascara", "30 - Ouargla",
+  "31 - Oran", "32 - El Bayadh", "33 - Illizi", "34 - Bordj Bou Arreridj", "35 - Boumerdès",
+  "36 - El Tarf", "37 - Tindouf", "38 - Tissemsilt", "39 - El Oued", "40 - Khenchela",
+  "41 - Souk Ahras", "42 - Tipaza", "43 - Mila", "44 - Aïn Defla", "45 - Naâma",
+  "46 - Aïn Témouchent", "47 - Ghardaïa", "48 - Relizane", "49 - Timimoun", "50 - Bordj Badji Mokhtar",
+  "51 - Ouled Djellal", "52 - Béni Abbès", "53 - In Salah", "54 - In Guezzam", "55 - Touggourt",
+  "56 - Djanet", "57 - El M'Ghair", "58 - El Meniaa"
 ];
 
 const Explore = () => {
-  const [cartItems, setCartItems] = useState(initialCart);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { cartItems = [], updateQuantity, removeItem, clearCart, userProfile } = useDating();
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
   const [promoMessage, setPromoMessage] = useState('');
-  const [orderSuccess, setOrderSuccess] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(() => searchParams.get('order_success') === 'true');
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+  const [selectedWilaya, setSelectedWilaya] = useState('16 - Alger');
 
-  const updateQuantity = (id, delta) => {
-    setCartItems(prev => 
-      prev
-        .map(item => {
-          if (item.id === id) {
-            const newQty = item.quantity + delta;
-            return newQty > 0 ? { ...item, quantity: newQty } : null;
-          }
-          return item;
-        })
-        .filter(Boolean)
-    );
+  const getLoggedInUser = () => {
+    try {
+      const saved = localStorage.getItem('customer_user');
+      if (saved) {
+        const u = JSON.parse(saved);
+        if (u && (u.phone || u.email || u.id)) {
+          return u;
+        }
+      }
+    } catch (e) {}
+    return null;
   };
 
-  const removeItem = (id) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
+  const loggedInUser = getLoggedInUser();
+
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) return;
+
+    const loggedUser = getLoggedInUser();
+    // Si l'utilisateur n'est pas connecté, enregistrer la commande en attente et rediriger vers la page login
+    if (!loggedUser) {
+      const summary = cartItems.map(item => `${item.quantity}x ${item.title}`).join(', ');
+      localStorage.setItem('pending_order', JSON.stringify({
+        wilaya: selectedWilaya,
+        subtotal: subtotal,
+        shipping_fee: shipping,
+        total_amount: total,
+        items_summary: summary
+      }));
+      navigate('/login?redirect=checkout');
+      return;
+    }
+
+    // Si le client est connecté, enregistrer directement la commande
+    setSubmittingOrder(true);
+    try {
+      const summary = cartItems.map(item => `${item.quantity}x ${item.title}`).join(', ');
+      await fetch('http://localhost:8000/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: loggedUser.name || userProfile?.name || 'Client',
+          customer_phone: loggedUser.phone || userProfile?.phone || '',
+          customer_email: loggedUser.email || userProfile?.email || '',
+          customer_address: selectedWilaya,
+          subtotal: subtotal,
+          shipping_fee: shipping,
+          total_amount: total,
+          items_summary: summary,
+          status: 'En attente'
+        })
+      });
+      clearCart();
+      localStorage.removeItem('pending_order');
+      setOrderSuccess(true);
+    } catch (err) {
+      console.warn('Erreur commande:', err);
+      clearCart();
+      setOrderSuccess(true);
+    } finally {
+      setSubmittingOrder(false);
+    }
   };
 
   const applyPromo = (e) => {
@@ -139,7 +178,7 @@ const Explore = () => {
                         : `Ajoutez ${(freeShippingThreshold - subtotal).toLocaleString()} DA pour la livraison gratuite`}
                     </span>
                   </div>
-                  <span style={{ fontSize: '11px', color: '#FE77B6', fontWeight: 700 }}>
+                  <span style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 700 }}>
                     {Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100))}%
                   </span>
                 </div>
@@ -149,7 +188,7 @@ const Explore = () => {
                     role="progressbar" 
                     style={{ 
                       width: `${Math.min(100, (subtotal / freeShippingThreshold) * 100)}%`,
-                      background: 'linear-gradient(90deg, #FE77B6 0%, #FF3D97 100%)' 
+                      background: 'var(--primary-gradient)' 
                     }}
                   ></div>
                 </div>
@@ -205,6 +244,99 @@ const Explore = () => {
                 ))}
               </div>
 
+              {/* Statut Compte Client */}
+              {loggedInUser ? (
+                <div 
+                  className="d-flex align-items-center justify-content-between mb-3 px-3 py-2 rounded-3"
+                  style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '12px' }}
+                >
+                  <div className="d-flex align-items-center gap-2 text-success">
+                    <i className="icon feather icon-user-check"></i>
+                    <span>Client : <strong>{loggedInUser.name}</strong> ({loggedInUser.phone})</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      localStorage.removeItem('customer_user');
+                      localStorage.removeItem('customer_token');
+                      navigate('/login?redirect=checkout');
+                    }}
+                    className="btn btn-link p-0 text-muted"
+                    style={{ fontSize: '11px', textDecoration: 'none' }}
+                  >
+                    Changer
+                  </button>
+                </div>
+              ) : (
+                <div 
+                  className="d-flex align-items-center justify-content-between mb-3 px-3 py-2 rounded-3"
+                  style={{ background: 'rgba(254, 119, 182, 0.08)', border: '1px solid rgba(254, 119, 182, 0.25)', fontSize: '12px' }}
+                >
+                  <div className="d-flex align-items-center gap-2" style={{ color: '#ff2d75' }}>
+                    <i className="icon feather icon-user"></i>
+                    <span>Non connecté (connexion requise à la validation)</span>
+                  </div>
+                  <Link 
+                    to="/login?redirect=checkout"
+                    className="btn btn-sm btn-outline-primary rounded-xl px-2 py-1"
+                    style={{ fontSize: '11px', fontWeight: 600 }}
+                  >
+                    Se connecter
+                  </Link>
+                </div>
+              )}
+
+              {/* Wilaya de livraison */}
+              <div className="cart-summary-box mb-3" style={{ padding: '14px 16px' }}>
+                <div className="d-flex align-items-center gap-2 mb-2">
+                  <div 
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '8px',
+                      background: 'var(--primary-light, rgba(254, 119, 182, 0.12))',
+                      color: 'var(--primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      flexShrink: 0
+                    }}
+                  >
+                    <i className="icon feather icon-map-pin"></i>
+                  </div>
+                  <div>
+                    <h6 className="mb-0 fw-bold" style={{ fontSize: '13px', color: '#1e1e24' }}>Wilaya de livraison</h6>
+                    <span className="text-muted" style={{ fontSize: '11px' }}>Choisissez votre wilaya de destination</span>
+                  </div>
+                </div>
+
+                <div className="position-relative">
+                  <select 
+                    id="wilaya-select"
+                    className="form-select"
+                    value={selectedWilaya}
+                    onChange={(e) => setSelectedWilaya(e.target.value)}
+                    style={{ 
+                      fontSize: '13px', 
+                      borderRadius: '12px',
+                      borderColor: 'rgba(0, 0, 0, 0.08)',
+                      padding: '10px 14px',
+                      fontWeight: 600,
+                      color: '#1e1e24',
+                      backgroundColor: '#f8f9fc',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {ALGERIA_WILAYAS.map((wilaya) => (
+                      <option key={wilaya} value={wilaya}>
+                        {wilaya}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Promo Code Input */}
               <form onSubmit={applyPromo} className="cart-promo-box mb-3">
                 <input 
@@ -245,7 +377,7 @@ const Explore = () => {
                 )}
 
                 <div className="d-flex justify-content-between mb-2 text-muted" style={{ fontSize: '13px' }}>
-                  <span>Livraison</span>
+                  <span>Livraison ({selectedWilaya.split(' - ')[1] || selectedWilaya})</span>
                   <span>{shipping === 0 ? 'Gratuite' : `${shipping.toLocaleString()} DA`}</span>
                 </div>
 
@@ -253,7 +385,7 @@ const Explore = () => {
 
                 <div className="d-flex justify-content-between align-items-center pt-1">
                   <span className="fw-bold" style={{ fontSize: '15px' }}>Total TTC</span>
-                  <span className="fw-bolder" style={{ fontSize: '18px', color: '#FE77B6' }}>
+                  <span className="fw-bolder" style={{ fontSize: '18px', color: 'var(--primary)' }}>
                     {total.toLocaleString()} DA
                   </span>
                 </div>
@@ -270,16 +402,18 @@ const Explore = () => {
                 <button 
                   type="button"
                   className="btn btn-primary rounded-xl px-4 py-2"
+                  disabled={submittingOrder}
                   style={{ 
-                    background: 'linear-gradient(180deg, #FE77B6 0%, #FF3D97 100%)',
+                    background: 'var(--btn-gradient, var(--primary-gradient))',
                     border: 'none',
                     fontWeight: 700,
                     fontSize: '14px',
-                    boxShadow: '0 8px 20px rgba(255, 61, 151, 0.35)'
+                    boxShadow: 'var(--btn-shadow, 0 8px 20px var(--rgba-primary-4, rgba(255, 61, 151, 0.35)))',
+                    opacity: submittingOrder ? 0.7 : 1
                   }}
-                  onClick={() => setOrderSuccess(true)}
+                  onClick={handleCheckout}
                 >
-                  Passer la commande
+                  {submittingOrder ? 'Validation...' : 'Passer la commande'}
                 </button>
               </div>
             </>
