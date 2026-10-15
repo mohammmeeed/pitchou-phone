@@ -52,7 +52,7 @@ function getStoredAttributes(PDO $db, array $defaultCategories, array $defaultLa
     $categories = $defaultCategories;
     if (!empty($rows['attributes_categories'])) {
         $decoded = json_decode($rows['attributes_categories'], true);
-        if (is_array($decoded)) {
+        if (is_array($decoded) && count($decoded) > 0) {
             $categories = array_values(array_filter(array_map('trim', $decoded)));
         }
     }
@@ -60,26 +60,37 @@ function getStoredAttributes(PDO $db, array $defaultCategories, array $defaultLa
     $languages = $defaultLanguages;
     if (!empty($rows['attributes_languages'])) {
         $decoded = json_decode($rows['attributes_languages'], true);
-        if (is_array($decoded)) {
+        if (is_array($decoded) && count($decoded) > 0) {
             $languages = array_values(array_filter(array_map('trim', $decoded)));
         }
     }
 
-    // Fusionner également avec les catégories existantes des produits pour ne rien perdre
-    try {
-        $pStmt = $db->query("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != ''");
-        $prodCats = $pStmt->fetchAll(PDO::FETCH_COLUMN);
-        foreach ($prodCats as $pc) {
-            $pc = trim($pc);
-            if (!empty($pc) && !in_array($pc, $categories, true)) {
-                $categories[] = $pc;
-            }
+    // Dédoublonnage strict insensible à la casse (ex: pas de 'roman' et 'Roman')
+    $seenLower = [];
+    $dedupedCategories = [];
+    foreach ($categories as $cat) {
+        $clean = html_entity_decode(trim($cat), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $lower = mb_strtolower($clean, 'UTF-8');
+        if ($clean !== '' && !isset($seenLower[$lower])) {
+            $seenLower[$lower] = true;
+            $dedupedCategories[] = $clean;
         }
-    } catch (Exception $e) {}
+    }
+
+    $seenLang = [];
+    $dedupedLanguages = [];
+    foreach ($languages as $lang) {
+        $clean = trim($lang);
+        $lower = mb_strtolower($clean, 'UTF-8');
+        if ($clean !== '' && !isset($seenLang[$lower])) {
+            $seenLang[$lower] = true;
+            $dedupedLanguages[] = $clean;
+        }
+    }
 
     return [
-        'categories' => array_values(array_unique($categories)),
-        'languages' => array_values(array_unique($languages))
+        'categories' => $dedupedCategories,
+        'languages' => $dedupedLanguages
     ];
 }
 

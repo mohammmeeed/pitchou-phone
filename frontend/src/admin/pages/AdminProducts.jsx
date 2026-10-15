@@ -612,7 +612,11 @@ export default function AdminProducts() {
       const pCats = Array.isArray(p.categories) && p.categories.length > 0
         ? p.categories
         : (p.category ? p.category.split(',').map((s) => s.trim()) : []);
-      matchesCat = pCats.includes(selectedCategory);
+      const selLower = selectedCategory.toLowerCase().trim();
+      matchesCat = pCats.some((c) => {
+        const cLower = (c || '').toLowerCase().trim();
+        return cLower === selLower || cLower.includes(selLower);
+      });
     }
     return matchesSearch && matchesCat;
   });
@@ -1953,7 +1957,19 @@ export default function AdminProducts() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.45rem',
+                  flexWrap: 'wrap',
+                  maxHeight: '130px',
+                  overflowY: 'auto',
+                  padding: '0.5rem',
+                  borderRadius: '12px',
+                  backgroundColor: '#f8f9fa',
+                  border: '1px solid #ebebeb'
+                }}
+              >
                 {categoriesForFilter.map((cat) => (
                   <button
                     key={cat}
@@ -1963,16 +1979,17 @@ export default function AdminProducts() {
                       setCurrentPage(1);
                     }}
                     style={{
-                      padding: '0.45rem 0.9rem',
-                      fontSize: '0.8rem',
+                      padding: '0.4rem 0.85rem',
+                      fontSize: '0.78rem',
                       fontWeight: 600,
                       borderRadius: '50px',
                       border: '1px solid',
-                      borderColor: selectedCategory === cat ? '#111111' : '#eaeaea',
+                      borderColor: selectedCategory === cat ? '#111111' : '#e0e0e0',
                       backgroundColor: selectedCategory === cat ? '#111111' : '#ffffff',
-                      color: selectedCategory === cat ? '#ffffff' : '#555',
+                      color: selectedCategory === cat ? '#ffffff' : '#444',
                       cursor: 'pointer',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.18s ease',
+                      boxShadow: selectedCategory === cat ? '0 2px 6px rgba(0,0,0,0.2)' : '0 1px 2px rgba(0,0,0,0.03)'
                     }}
                   >
                     {cat}
