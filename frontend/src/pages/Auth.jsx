@@ -62,6 +62,8 @@ const Auth = ({ defaultTab = 'login' }) => {
 
     if (redirectParam === 'checkout') {
       navigate('/explore');
+    } else if (redirectParam === 'chat') {
+      navigate('/chat');
     } else {
       navigate('/home');
     }

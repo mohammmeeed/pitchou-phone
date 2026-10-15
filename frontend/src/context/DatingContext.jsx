@@ -12,6 +12,7 @@ export const initialProfiles = [
     price: 2500,
     video: "/assets/videos/book-trailer.mp4",
     image: "/assets/images/books/book1.jpg",
+    images: ["/assets/images/books/book1.jpg", "/assets/images/books/book2.jpg", "/assets/images/books/book3.jpg"],
     bio: "Une épopée poétique illustrée au cœur des légendes d'automne. Ce grimoire d'exception vous plonge dans un univers médiéval mystique, entre enluminures dorées, contes oubliés et contemplation au coin du feu.",
     location: "Éditions du Grimoire",
     distance: "2 500 DA",
@@ -25,6 +26,7 @@ export const initialProfiles = [
     format: "Recueil Poétique & Dorures",
     price: 1850,
     image: "/assets/images/books/book2.jpg",
+    images: ["/assets/images/books/book2.jpg", "/assets/images/books/book1.jpg"],
     bio: "Un voyage poétique et contemplatif explorant les pensées secrètes et les songes de l'âme. Relié de dorures précieuses, ce chef-d'œuvre invite au calme et à la rêverie littéraire au coin du feu.",
     location: "Éditions Poesis",
     distance: "1 850 DA",
@@ -38,6 +40,7 @@ export const initialProfiles = [
     format: "Roman Historique & Mystère",
     price: 2300,
     image: "/assets/images/books/book2.jpg",
+    images: ["/assets/images/books/book2.jpg", "/assets/images/books/book3.jpg"],
     bio: "Partez à la découverte de secrets enfouis au cœur des bibliothèques sacrées de l'Antiquité. Une quête initiatique captivante qui ravira tous les passionnés d'histoire, d'énigmes et de vieux manuscrits.",
     location: "Éditions Historia",
     distance: "2 300 DA",
@@ -51,6 +54,7 @@ export const initialProfiles = [
     format: "Roman Fantastique Broché",
     price: 2100,
     image: "/assets/images/books/book3.jpg",
+    images: ["/assets/images/books/book3.jpg", "/assets/images/books/book1.jpg"],
     bio: "Plongez au cœur d'une forêt ancestrale magique, où chaque murmure raconte une légende oubliée. Guidé par la lueur d'une bougie, découvrez les secrets millénaires cachés sous le grand chêne.",
     location: "Éditions Sylvestre",
     distance: "2 100 DA",
@@ -64,6 +68,7 @@ export const initialProfiles = [
     format: "Méditation & Poésie",
     price: 1950,
     image: "/assets/images/books/book1.jpg",
+    images: ["/assets/images/books/book1.jpg", "/assets/images/books/book2.jpg"],
     bio: "Méditation poétique sur les mots et la sérénité. Un recueil intime et apaisant qui célèbre la beauté de la solitude et le réconfort de la lecture au calme en toute harmonie.",
     location: "Éditions Sérénité",
     distance: "1 950 DA",
@@ -126,31 +131,10 @@ export const DatingProvider = ({ children }) => {
       const saved = localStorage.getItem('tiktok_shop_favorites');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {}
-    return [
-      {
-        id: 5,
-        name: "The Chronicles of Autumn",
-        author: "Alexander Thorne",
-        school: "Alexander Thorne • 2 500 DA",
-        format: "Édition Vidéo & Reliure Cuir",
-        price: 2500,
-        image: "/assets/images/books/book1.jpg",
-        bio: "Une épopée poétique illustrée au cœur des légendes d'automne."
-      },
-      {
-        id: 1,
-        name: "The Art of Whispers",
-        author: "Éléonore Vance",
-        school: "Éléonore Vance • 1 850 DA",
-        format: "Recueil Poétique & Dorures",
-        price: 1850,
-        image: "/assets/images/books/book2.jpg",
-        bio: "Un voyage poétique et contemplatif explorant les pensées secrètes."
-      }
-    ];
+    return [];
   });
 
   useEffect(() => {
@@ -172,86 +156,42 @@ export const DatingProvider = ({ children }) => {
         const u = JSON.parse(saved);
         if (u && (u.name || u.phone)) {
           return {
-            name: u.name || "mouh",
-            email: u.email || "mohamedguedaoui13@gmail.com",
-            phone: u.phone || "0697037109",
-            gender: "Men",
-            interestedIn: "Livres",
-            lookingFor: "Lectures passionnantes",
+            name: u.name || "",
+            email: u.email || "",
+            phone: u.phone || "",
+            gender: u.gender || "Men",
+            interestedIn: u.interestedIn || "Livres",
+            lookingFor: u.lookingFor || "",
             avatar: u.avatar || null,
-            age: 24,
-            location: u.address || "Alger",
+            age: u.age || 25,
+            location: u.address || "",
           };
         }
       }
     } catch (e) {}
-    return {
-      name: "mouh",
-      email: "mohamedguedaoui13@gmail.com",
-      phone: "0697037109",
-      gender: "Men",
-      interestedIn: "Livres",
-      lookingFor: "Lectures passionnantes",
-      avatar: null,
-      age: 24,
-      location: "Alger",
-    };
+    return null;
   });
 
-  // Synchroniser automatiquement avec les données réelles du compte client
+  // Synchroniser avec les modifications de localStorage
   useEffect(() => {
-    const syncCustomerAccount = async () => {
-      try {
-        const saved = localStorage.getItem('customer_user');
-        let current = null;
-        if (saved) {
-          try { current = JSON.parse(saved); } catch (e) {}
-        }
-
-        // Si aucun compte dans localStorage ou s'il s'agit encore du placeholder "Client TikTok Shop"
-        if (!current || !current.name || current.name === 'Client TikTok Shop' || current.name === 'John Doe') {
-          const res = await fetch('http://localhost:8000/api/customers');
-          if (res.ok) {
-            const json = await res.json();
-            if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
-              const latest = json.data[0];
-              const realUser = {
-                id: latest.id,
-                name: latest.name,
-                phone: latest.phone,
-                email: latest.email,
-                address: latest.address
-              };
-              localStorage.setItem('customer_user', JSON.stringify(realUser));
-              setUserProfile(prev => ({
-                ...prev,
-                name: realUser.name,
-                phone: realUser.phone,
-                email: realUser.email,
-                location: realUser.address
-              }));
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Erreur synchro compte client:', err);
-      }
-    };
-
-    syncCustomerAccount();
-
     const handleStorageChange = () => {
       try {
         const saved = localStorage.getItem('customer_user');
         if (saved) {
           const u = JSON.parse(saved);
-          setUserProfile(prev => ({
-            ...prev,
-            name: u.name || prev.name,
-            phone: u.phone || prev.phone,
-            email: u.email || prev.email,
-            location: u.address || prev.location
-          }));
+          setUserProfile({
+            name: u.name || "",
+            phone: u.phone || "",
+            email: u.email || "",
+            gender: u.gender || "Men",
+            interestedIn: u.interestedIn || "Livres",
+            lookingFor: u.lookingFor || "",
+            avatar: u.avatar || null,
+            age: u.age || 25,
+            location: u.address || ""
+          });
+        } else {
+          setUserProfile(null);
         }
       } catch (e) {}
     };
@@ -260,22 +200,21 @@ export const DatingProvider = ({ children }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
+  const logout = () => {
+    try {
+      localStorage.removeItem('customer_user');
+      localStorage.removeItem('customer_token');
+    } catch (e) {}
+    setUserProfile(null);
+  };
+
   // Panier e-commerce synchronisé avec localStorage
   const [cartItems, setCartItems] = useState(() => {
     try {
       const saved = localStorage.getItem('tiktok_cart');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return [
-      {
-        id: 1,
-        title: "The Chronicles of Autumn",
-        format: "Édition Vidéo & Reliure Cuir",
-        price: 2500,
-        quantity: 1,
-        image: "/assets/images/books/book1.jpg"
-      }
-    ];
+    return [];
   });
 
   useEffect(() => {
@@ -304,7 +243,9 @@ export const DatingProvider = ({ children }) => {
           price: Number(p.price) || 0,
           priceFormatted: `${Number(p.price).toLocaleString('fr-FR')} DA`,
           image: p.image || '/assets/images/books/book1.jpg',
+          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []),
           video: p.video || null,
+          videos: Array.isArray(p.videos) && p.videos.length > 0 ? p.videos : (p.video ? [p.video] : []),
           bio: p.bio || '',
           location: p.location || '',
           distance: `${Number(p.price).toLocaleString('fr-FR')} DA`,
@@ -434,7 +375,8 @@ export const DatingProvider = ({ children }) => {
         addToCart,
         updateQuantity,
         removeItem,
-        clearCart
+        clearCart,
+        logout
       }}
     >
       {children}

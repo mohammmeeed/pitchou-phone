@@ -25,13 +25,53 @@ switch ($method) {
         break;
 }
 
+function formatProduct(array $product): array {
+    // Decode images array
+    $images = [];
+    if (!empty($product['images'])) {
+        $decoded = json_decode($product['images'], true);
+        if (is_array($decoded)) {
+            $images = $decoded;
+        } else {
+            $images = array_filter(array_map('trim', explode(',', $product['images'])));
+        }
+    }
+    if (empty($images) && !empty($product['image'])) {
+        $images = [$product['image']];
+    }
+    $product['images'] = array_values($images);
+    if (empty($product['image']) && !empty($product['images'])) {
+        $product['image'] = $product['images'][0];
+    }
+
+    // Decode videos array
+    $videos = [];
+    if (!empty($product['videos'])) {
+        $decoded = json_decode($product['videos'], true);
+        if (is_array($decoded)) {
+            $videos = $decoded;
+        } else {
+            $videos = array_filter(array_map('trim', explode(',', $product['videos'])));
+        }
+    }
+    if (empty($videos) && !empty($product['video'])) {
+        $videos = [$product['video']];
+    }
+    $product['videos'] = array_values($videos);
+    if (empty($product['video']) && !empty($product['videos'])) {
+        $product['video'] = $product['videos'][0];
+    }
+
+    return $product;
+}
+
 function handleGet(PDO $pdo): void {
     if (isset($_GET['id'])) {
         $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ?");
         $stmt->execute([(int)$_GET['id']]);
         $product = $stmt->fetch();
         if ($product) {
-            echo json_encode(["success" => true, "data" => $product]);
+            echo json_encode(["success" => true, "data" => formatProduct($product)]);
         } else {
             http_response_code(404);
             echo json_encode(["success" => false, "message" => "Produit non trouvé"]);
@@ -52,7 +92,8 @@ function handleGet(PDO $pdo): void {
     $stmt->execute($params);
     $products = $stmt->fetchAll();
 
-    echo json_encode(["success" => true, "data" => $products, "count" => count($products)]);
+    $formatted = array_map('formatProduct', $products);
+    echo json_encode(["success" => true, "data" => $formatted, "count" => count($formatted)]);
 }
 
 function handlePost(PDO $pdo): void {
@@ -68,7 +109,29 @@ function handlePost(PDO $pdo): void {
         ? implode(', ', array_filter($input['languages'])) 
         : trim($input['languages'] ?? '');
 
-    $stmt = $pdo->prepare("INSERT INTO products (name, author, format, price, stock, category, rating, image, video, bio, languages, is_featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    // Multi-images
+    $images = [];
+    if (!empty($input['images'])) {
+        $images = is_array($input['images']) ? $input['images'] : json_decode($input['images'], true) ?? [$input['images']];
+    } elseif (!empty($input['image'])) {
+        $images = [$input['image']];
+    }
+    $images = array_values(array_filter($images));
+    $mainImage = !empty($images) ? $images[0] : ($input['image'] ?? '/assets/images/books/book1.jpg');
+    $imagesJson = !empty($images) ? json_encode($images) : json_encode([$mainImage]);
+
+    // Multi-videos
+    $videos = [];
+    if (!empty($input['videos'])) {
+        $videos = is_array($input['videos']) ? $input['videos'] : json_decode($input['videos'], true) ?? [$input['videos']];
+    } elseif (!empty($input['video'])) {
+        $videos = [$input['video']];
+    }
+    $videos = array_values(array_filter($videos));
+    $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
+    $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
+
+    $stmt = $pdo->prepare("INSERT INTO products (name, author, format, price, stock, category, rating, image, images, video, videos, bio, languages, is_featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         trim($input['name']),
         trim($input['author'] ?? ''),
@@ -77,8 +140,10 @@ function handlePost(PDO $pdo): void {
         (int)($input['stock'] ?? 10),
         trim($input['category'] ?? ''),
         (float)($input['rating'] ?? 5.0),
-        $input['image'] ?? '/assets/images/books/book1.jpg',
-        $input['video'] ?? null,
+        $mainImage,
+        $imagesJson,
+        $mainVideo,
+        $videosJson,
         trim($input['bio'] ?? ''),
         $languages,
         (int)($input['is_featured'] ?? 1)
@@ -107,7 +172,29 @@ function handlePut(PDO $pdo): void {
         ? implode(', ', array_filter($input['languages'])) 
         : trim($input['languages'] ?? '');
 
-    $stmt = $pdo->prepare("UPDATE products SET name = ?, author = ?, format = ?, price = ?, stock = ?, category = ?, image = ?, video = ?, bio = ?, languages = ?, is_featured = ? WHERE id = ?");
+    // Multi-images
+    $images = [];
+    if (isset($input['images'])) {
+        $images = is_array($input['images']) ? $input['images'] : json_decode($input['images'], true) ?? [$input['images']];
+    } elseif (!empty($input['image'])) {
+        $images = [$input['image']];
+    }
+    $images = array_values(array_filter($images));
+    $mainImage = !empty($images) ? $images[0] : ($input['image'] ?? '/assets/images/books/book1.jpg');
+    $imagesJson = !empty($images) ? json_encode($images) : json_encode([$mainImage]);
+
+    // Multi-videos
+    $videos = [];
+    if (isset($input['videos'])) {
+        $videos = is_array($input['videos']) ? $input['videos'] : json_decode($input['videos'], true) ?? [$input['videos']];
+    } elseif (!empty($input['video'])) {
+        $videos = [$input['video']];
+    }
+    $videos = array_values(array_filter($videos));
+    $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
+    $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
+
+    $stmt = $pdo->prepare("UPDATE products SET name = ?, author = ?, format = ?, price = ?, stock = ?, category = ?, image = ?, images = ?, video = ?, videos = ?, bio = ?, languages = ?, is_featured = ? WHERE id = ?");
     $stmt->execute([
         trim($input['name']),
         trim($input['author'] ?? ''),
@@ -115,8 +202,10 @@ function handlePut(PDO $pdo): void {
         (float)$input['price'],
         (int)($input['stock'] ?? 10),
         trim($input['category'] ?? ''),
-        $input['image'] ?? '/assets/images/books/book1.jpg',
-        $input['video'] ?? null,
+        $mainImage,
+        $imagesJson,
+        $mainVideo,
+        $videosJson,
         trim($input['bio'] ?? ''),
         $languages,
         (int)($input['is_featured'] ?? 1),

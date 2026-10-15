@@ -16,10 +16,10 @@ const EditProfile = () => {
   });
 
   const [formData, setFormData] = useState({
-    name: loggedUser?.name || userProfile?.name || "mouh",
-    phone: loggedUser?.phone || userProfile?.phone || "0697037109",
-    email: loggedUser?.email || userProfile?.email || "mohamedguedaoui13@gmail.com",
-    address: loggedUser?.address || userProfile?.location || "Alger",
+    name: loggedUser?.name || userProfile?.name || "",
+    phone: loggedUser?.phone || userProfile?.phone || "",
+    email: loggedUser?.email || userProfile?.email || "",
+    address: loggedUser?.address || userProfile?.location || "",
   });
   const [saving, setSaving] = useState(false);
 

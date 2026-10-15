@@ -17,9 +17,13 @@ export default function AdminProducts() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   // Upload Photo State & Ref
-  const fileInputRef = useRef(null);
+  const imageFilesInputRef = useRef(null);
+  const videoFilesInputRef = useRef(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState('');
+  const [manualImageUrl, setManualImageUrl] = useState('');
+  const [manualVideoUrl, setManualVideoUrl] = useState('');
 
   // Gestion des Attributs (Catégories & Langues)
   const [categoriesList, setCategoriesList] = useState([
@@ -49,7 +53,10 @@ export default function AdminProducts() {
     stock: '15',
     category: '',
     rating: 4.8,
-    image: '/assets/images/books/book1.jpg',
+    image: '',
+    images: [],
+    video: '',
+    videos: [],
     bio: '',
     languages: []
   });
@@ -63,12 +70,6 @@ export default function AdminProducts() {
       return { ...prev, languages: updated };
     });
   };
-
-  const sampleImages = [
-    { label: 'Livre 1 (Couverture 1)', url: '/assets/images/books/book1.jpg' },
-    { label: 'Livre 2 (Couverture 2)', url: '/assets/images/books/book2.jpg' },
-    { label: 'Livre 3 (Couverture 3)', url: '/assets/images/books/book3.jpg' }
-  ];
 
   useEffect(() => {
     loadProducts();
@@ -205,56 +206,220 @@ export default function AdminProducts() {
     setTimeout(() => setToastMessage(''), 3000);
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Multi-Images Upload Handlers
+  const handleImageFilesChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
     setUploadingImage(true);
     setUploadSuccess('');
     setFormError('');
     try {
-      const res = await adminApi.uploadImage(file);
-      if (res && res.success && res.url) {
-        setFormData((prev) => ({ ...prev, image: res.url }));
-        setUploadSuccess(`Photo "${file.name}" chargée avec succès depuis votre appareil !`);
+      const results = await adminApi.uploadMultipleMedia(files);
+      const newUrls = results.filter((r) => r && r.success && r.url).map((r) => r.url);
+      if (newUrls.length > 0) {
+        setFormData((prev) => {
+          const currentImages = Array.isArray(prev.images) ? prev.images : [];
+          const updated = [...currentImages, ...newUrls];
+          return {
+            ...prev,
+            images: updated,
+            image: updated[0] || prev.image
+          };
+        });
+        setUploadSuccess(`${newUrls.length} photo(s) chargée(s) avec succès !`);
       } else {
-        setFormError(res?.error || 'Erreur lors du chargement de la photo');
+        setFormError('Erreur lors du chargement des photos');
       }
     } catch (err) {
-      setFormError('Erreur lors du téléversement du fichier');
+      setFormError('Erreur lors du téléversement des photos');
     } finally {
       setUploadingImage(false);
       if (e.target) e.target.value = '';
     }
   };
 
-  const handleDropImage = async (e) => {
+  const handleDropImages = async (e) => {
     e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setUploadingImage(true);
-      setUploadSuccess('');
-      setFormError('');
-      try {
-        const res = await adminApi.uploadImage(file);
-        if (res && res.success && res.url) {
-          setFormData((prev) => ({ ...prev, image: res.url }));
-          setUploadSuccess(`Photo "${file.name}" chargée avec succès depuis votre appareil !`);
-        } else {
-          setFormError(res?.error || 'Erreur lors du chargement de la photo');
-        }
-      } catch (err) {
-        setFormError('Erreur lors du téléversement');
-      } finally {
-        setUploadingImage(false);
+    const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith('image/'));
+    if (files.length === 0) return;
+
+    setUploadingImage(true);
+    setUploadSuccess('');
+    setFormError('');
+    try {
+      const results = await adminApi.uploadMultipleMedia(files);
+      const newUrls = results.filter((r) => r && r.success && r.url).map((r) => r.url);
+      if (newUrls.length > 0) {
+        setFormData((prev) => {
+          const currentImages = Array.isArray(prev.images) ? prev.images : [];
+          const updated = [...currentImages, ...newUrls];
+          return {
+            ...prev,
+            images: updated,
+            image: updated[0] || prev.image
+          };
+        });
+        setUploadSuccess(`${newUrls.length} photo(s) importée(s) avec succès !`);
       }
+    } catch (err) {
+      setFormError('Erreur lors du téléversement');
+    } finally {
+      setUploadingImage(false);
     }
+  };
+
+  const handleRemoveImage = (indexToRemove) => {
+    setFormData((prev) => {
+      const updated = (prev.images || []).filter((_, i) => i !== indexToRemove);
+      return {
+        ...prev,
+        images: updated,
+        image: updated[0] || ''
+      };
+    });
+  };
+
+  const handleSetPrimaryImage = (indexToPrimary) => {
+    setFormData((prev) => {
+      const list = [...(prev.images || [])];
+      const [item] = list.splice(indexToPrimary, 1);
+      const updated = [item, ...list];
+      return {
+        ...prev,
+        images: updated,
+        image: updated[0] || ''
+      };
+    });
+  };
+
+  const handleAddManualImage = (e) => {
+    if (e) e.preventDefault();
+    const url = manualImageUrl.trim();
+    if (!url) return;
+    setFormData((prev) => {
+      const currentImages = Array.isArray(prev.images) ? prev.images : [];
+      const updated = [...currentImages, url];
+      return {
+        ...prev,
+        images: updated,
+        image: updated[0] || prev.image
+      };
+    });
+    setManualImageUrl('');
+    setUploadSuccess('Photo ajoutée depuis le lien !');
+  };
+
+  // Multi-Videos Upload Handlers
+  const handleVideoFilesChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setUploadingVideo(true);
+    setUploadSuccess('');
+    setFormError('');
+    try {
+      const results = await adminApi.uploadMultipleMedia(files);
+      const newUrls = results.filter((r) => r && r.success && r.url).map((r) => r.url);
+      if (newUrls.length > 0) {
+        setFormData((prev) => {
+          const currentVideos = Array.isArray(prev.videos) ? prev.videos : [];
+          const updated = [...currentVideos, ...newUrls];
+          return {
+            ...prev,
+            videos: updated,
+            video: updated[0] || prev.video
+          };
+        });
+        setUploadSuccess(`${newUrls.length} vidéo(s) chargée(s) avec succès !`);
+      } else {
+        setFormError('Erreur lors du chargement des vidéos');
+      }
+    } catch (err) {
+      setFormError('Erreur lors du téléversement des vidéos');
+    } finally {
+      setUploadingVideo(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleDropVideos = async (e) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith('video/'));
+    if (files.length === 0) return;
+
+    setUploadingVideo(true);
+    setUploadSuccess('');
+    setFormError('');
+    try {
+      const results = await adminApi.uploadMultipleMedia(files);
+      const newUrls = results.filter((r) => r && r.success && r.url).map((r) => r.url);
+      if (newUrls.length > 0) {
+        setFormData((prev) => {
+          const currentVideos = Array.isArray(prev.videos) ? prev.videos : [];
+          const updated = [...currentVideos, ...newUrls];
+          return {
+            ...prev,
+            videos: updated,
+            video: updated[0] || prev.video
+          };
+        });
+        setUploadSuccess(`${newUrls.length} vidéo(s) importée(s) avec succès !`);
+      }
+    } catch (err) {
+      setFormError('Erreur lors du téléversement');
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  const handleRemoveVideo = (indexToRemove) => {
+    setFormData((prev) => {
+      const updated = (prev.videos || []).filter((_, i) => i !== indexToRemove);
+      return {
+        ...prev,
+        videos: updated,
+        video: updated[0] || ''
+      };
+    });
+  };
+
+  const handleSetPrimaryVideo = (indexToPrimary) => {
+    setFormData((prev) => {
+      const list = [...(prev.videos || [])];
+      const [item] = list.splice(indexToPrimary, 1);
+      const updated = [item, ...list];
+      return {
+        ...prev,
+        videos: updated,
+        video: updated[0] || ''
+      };
+    });
+  };
+
+  const handleAddManualVideo = (e) => {
+    if (e) e.preventDefault();
+    const url = manualVideoUrl.trim();
+    if (!url) return;
+    setFormData((prev) => {
+      const currentVideos = Array.isArray(prev.videos) ? prev.videos : [];
+      const updated = [...currentVideos, url];
+      return {
+        ...prev,
+        videos: updated,
+        video: updated[0] || prev.video
+      };
+    });
+    setManualVideoUrl('');
+    setUploadSuccess('Vidéo ajoutée depuis le lien !');
   };
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
     setFormError('');
     setUploadSuccess('');
+    setManualImageUrl('');
+    setManualVideoUrl('');
     setFormData({
       name: '',
       author: '',
@@ -263,7 +428,10 @@ export default function AdminProducts() {
       stock: '15',
       category: '',
       rating: 4.8,
-      image: '/assets/images/books/book1.jpg',
+      image: '',
+      images: [],
+      video: '',
+      videos: [],
       bio: '',
       languages: []
     });
@@ -275,12 +443,44 @@ export default function AdminProducts() {
     setEditingProduct(prod);
     setFormError('');
     setUploadSuccess('');
+    setManualImageUrl('');
+    setManualVideoUrl('');
 
     let parsedLangs = [];
     if (Array.isArray(prod.languages)) {
       parsedLangs = prod.languages;
     } else if (typeof prod.languages === 'string' && prod.languages.trim() !== '') {
       parsedLangs = prod.languages.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+
+    // Parse images array
+    let parsedImages = [];
+    if (Array.isArray(prod.images) && prod.images.length > 0) {
+      parsedImages = prod.images;
+    } else if (typeof prod.images === 'string' && prod.images.trim() !== '') {
+      try {
+        const decoded = JSON.parse(prod.images);
+        if (Array.isArray(decoded)) parsedImages = decoded;
+      } catch (e) {
+        parsedImages = [prod.images];
+      }
+    } else if (prod.image) {
+      parsedImages = [prod.image];
+    }
+
+    // Parse videos array
+    let parsedVideos = [];
+    if (Array.isArray(prod.videos) && prod.videos.length > 0) {
+      parsedVideos = prod.videos;
+    } else if (typeof prod.videos === 'string' && prod.videos.trim() !== '') {
+      try {
+        const decoded = JSON.parse(prod.videos);
+        if (Array.isArray(decoded)) parsedVideos = decoded;
+      } catch (e) {
+        parsedVideos = [prod.videos];
+      }
+    } else if (prod.video) {
+      parsedVideos = [prod.video];
     }
 
     setFormData({
@@ -291,7 +491,10 @@ export default function AdminProducts() {
       stock: prod.stock || '15',
       category: prod.category || '',
       rating: prod.rating || 4.8,
-      image: prod.image || '/assets/images/books/book1.jpg',
+      image: parsedImages[0] || prod.image || '',
+      images: parsedImages,
+      video: parsedVideos[0] || prod.video || '',
+      videos: parsedVideos,
       bio: prod.bio || '',
       languages: parsedLangs
     });
@@ -306,20 +509,22 @@ export default function AdminProducts() {
       return;
     }
 
+    const payload = {
+      ...formData,
+      image: formData.images?.[0] || formData.image || '',
+      images: formData.images || [],
+      video: formData.videos?.[0] || formData.video || null,
+      videos: formData.videos || [],
+      price: parseFloat(formData.price),
+      stock: parseInt(formData.stock, 10) || 0
+    };
+
     try {
       if (editingProduct) {
-        await adminApi.updateProduct(editingProduct.id, {
-          ...formData,
-          price: parseFloat(formData.price),
-          stock: parseInt(formData.stock, 10) || 0
-        });
+        await adminApi.updateProduct(editingProduct.id, payload);
         showToast('Produit mis à jour avec succès !');
       } else {
-        await adminApi.createProduct({
-          ...formData,
-          price: parseFloat(formData.price),
-          stock: parseInt(formData.stock, 10) || 0
-        });
+        await adminApi.createProduct(payload);
         showToast('Nouveau produit ajouté avec succès !');
       }
       setViewMode('list');
@@ -847,20 +1052,29 @@ export default function AdminProducts() {
                       </div>
                     </div>
 
-                    {/* Image de Couverture avec Téléversement depuis l'appareil */}
-                    <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
-                      <label className="form-label-custom" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span>Image de Couverture du Produit</span>
-                        <span style={{ fontSize: '0.78rem', color: '#71717a', fontWeight: 500 }}>
-                          depuis l'appareil ou URL
+                    {/* =========================================================================
+                        SECTION 1 : MULTI-PHOTOS DU PRODUIT
+                        ========================================================================= */}
+                    <div className="form-group-custom" style={{ gridColumn: '1 / -1', borderTop: '1px solid #f0f0f0', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <span style={{ fontSize: '1rem', fontWeight: 700, color: '#18181b' }}>
+                            📸 Galerie Photos du Produit
+                          </span>
+                          <span className="badge-custom bg-soft-primary" style={{ fontWeight: 700 }}>
+                            {formData.images?.length || 0} photo(s)
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.8rem', color: '#71717a' }}>
+                          La première photo sert de <strong>Couverture principale</strong>
                         </span>
-                      </label>
+                      </div>
 
-                      {/* Zone de Téléversement depuis l'appareil */}
+                      {/* Zone de Téléversement Multi-Photos */}
                       <div
                         onDragOver={(e) => e.preventDefault()}
-                        onDrop={handleDropImage}
-                        onClick={() => fileInputRef.current?.click()}
+                        onDrop={handleDropImages}
+                        onClick={() => imageFilesInputRef.current?.click()}
                         style={{
                           border: '2px dashed #d4d4d8',
                           borderRadius: '10px',
@@ -879,9 +1093,10 @@ export default function AdminProducts() {
                       >
                         <input
                           type="file"
-                          ref={fileInputRef}
+                          ref={imageFilesInputRef}
                           accept="image/*"
-                          onChange={handleFileChange}
+                          multiple
+                          onChange={handleImageFilesChange}
                           style={{ display: 'none' }}
                         />
 
@@ -909,94 +1124,415 @@ export default function AdminProducts() {
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111111' }}>
                             {uploadingImage
-                              ? 'Téléversement en cours...'
-                              : 'Recharger une photo depuis votre appareil'}
+                              ? 'Téléversement des photos en cours...'
+                              : 'Ajouter une ou plusieurs photos depuis votre appareil'}
                           </div>
                           <div style={{ fontSize: '0.78rem', color: '#71717a', marginTop: '0.2rem' }}>
-                            Cliquez pour choisir un fichier ou glissez-déposez ici (JPG, PNG, WEBP)
+                            Cliquez ou glissez-déposez ici (Sélection multiple possible • JPG, PNG, WEBP, GIF)
                           </div>
                         </div>
                       </div>
 
-                      {/* Message de succès après upload */}
-                      {uploadSuccess && (
+                      {/* Champ textuel pour ajouter une photo par URL */}
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                          <input
+                            type="text"
+                            className="form-control-custom"
+                            placeholder="Ou coller un lien d'image externe (/uploads/... ou https://...)"
+                            value={manualImageUrl}
+                            onChange={(e) => setManualImageUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddManualImage();
+                              }
+                            }}
+                            style={{ paddingLeft: '2.4rem', fontSize: '0.85rem' }}
+                          />
+                          <i
+                            className="fas fa-link"
+                            style={{
+                              position: 'absolute',
+                              left: '12px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              color: '#a1a1aa',
+                              fontSize: '0.85rem'
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-light-custom"
+                          onClick={handleAddManualImage}
+                          style={{ whiteSpace: 'nowrap', padding: '0.55rem 1rem', fontSize: '0.82rem' }}
+                        >
+                          <i className="fas fa-plus" /> Ajouter photo
+                        </button>
+                      </div>
+
+                      {/* Grille d'aperçu des photos ajoutées */}
+                      {Array.isArray(formData.images) && formData.images.length > 0 ? (
                         <div
                           style={{
-                            padding: '0.5rem 0.85rem',
-                            backgroundColor: '#ecfdf5',
-                            color: '#065f46',
-                            border: '1px solid #a7f3d0',
-                            borderRadius: '6px',
-                            fontSize: '0.82rem',
-                            fontWeight: 600,
-                            marginBottom: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                            gap: '0.85rem',
+                            marginBottom: '1rem'
                           }}
                         >
-                          <i className="fas fa-check-circle" />
-                          <span>{uploadSuccess}</span>
+                          {formData.images.map((imgUrl, idx) => {
+                            const isPrimary = idx === 0;
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  position: 'relative',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  border: isPrimary ? '2.5px solid #111111' : '1px solid #e4e4e7',
+                                  backgroundColor: '#f8fafc',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  boxShadow: isPrimary ? '0 4px 12px rgba(0,0,0,0.15)' : '0 2px 6px rgba(0,0,0,0.05)',
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                <div style={{ height: '140px', width: '100%', overflow: 'hidden', position: 'relative' }}>
+                                  <img
+                                    src={imgUrl}
+                                    alt={`Photo ${idx + 1}`}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    onError={(e) => {
+                                      e.target.src = '/assets/images/books/book1.jpg';
+                                    }}
+                                  />
+                                  {isPrimary && (
+                                    <span
+                                      style={{
+                                        position: 'absolute',
+                                        top: '6px',
+                                        left: '6px',
+                                        backgroundColor: '#111111',
+                                        color: '#ffffff',
+                                        fontSize: '0.65rem',
+                                        fontWeight: 700,
+                                        padding: '2px 7px',
+                                        borderRadius: '4px',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                                      }}
+                                    >
+                                      ★ Couverture
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveImage(idx)}
+                                    title="Supprimer cette photo"
+                                    style={{
+                                      position: 'absolute',
+                                      top: '6px',
+                                      right: '6px',
+                                      width: '24px',
+                                      height: '24px',
+                                      borderRadius: '50%',
+                                      backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '0.7rem'
+                                    }}
+                                  >
+                                    <i className="fas fa-trash-alt" />
+                                  </button>
+                                </div>
+
+                                {!isPrimary && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetPrimaryImage(idx)}
+                                    style={{
+                                      border: 'none',
+                                      background: '#f4f4f5',
+                                      color: '#18181b',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 600,
+                                      padding: '5px',
+                                      cursor: 'pointer',
+                                      borderTop: '1px solid #e4e4e7',
+                                      transition: 'background 0.15s ease'
+                                    }}
+                                    onMouseEnter={(e) => (e.target.style.background = '#e4e4e7')}
+                                    onMouseLeave={(e) => (e.target.style.background = '#f4f4f5')}
+                                  >
+                                    ★ Mettre en couverture
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            padding: '0.85rem',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '0.82rem',
+                            color: '#64748b',
+                            textAlign: 'center',
+                            marginBottom: '1rem'
+                          }}
+                        >
+                          <i className="fas fa-info-circle" style={{ marginRight: '6px' }} />
+                          Aucune photo ajoutée pour l'instant. Ajoutez au moins une photo pour afficher la couverture du produit.
                         </div>
                       )}
+                    </div>
 
-                      {/* Champ textuel pour URL manuelle */}
-                      <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
-                        <input
-                          type="text"
-                          className="form-control-custom"
-                          placeholder="/uploads/... ou URL externe"
-                          value={formData.image}
-                          onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                          style={{ paddingLeft: '2.4rem', fontSize: '0.85rem' }}
-                        />
-                        <i
-                          className="fas fa-link"
-                          style={{
-                            position: 'absolute',
-                            left: '12px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            color: '#a1a1aa',
-                            fontSize: '0.85rem'
-                          }}
-                        />
-                      </div>
-
-                      {/* Échantillons d'images rapides */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.8rem', color: '#777', fontWeight: 500 }}>
-                          Ou choisir parmi les images existantes :
+                    {/* =========================================================================
+                        SECTION 2 : MULTI-VIDÉOS DU PRODUIT (FORMAT TIKTOK / REELS / MP4)
+                        ========================================================================= */}
+                    <div className="form-group-custom" style={{ gridColumn: '1 / -1', borderTop: '1px solid #f0f0f0', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <span style={{ fontSize: '1rem', fontWeight: 700, color: '#18181b' }}>
+                            🎬 Vidéos du Produit (TikTok / Reels / MP4)
+                          </span>
+                          <span className="badge-custom bg-soft-info" style={{ fontWeight: 700 }}>
+                            {formData.videos?.length || 0} vidéo(s)
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.8rem', color: '#71717a' }}>
+                          Affichées en boucle vidéo dans le flux TikTok et la fiche détaillée
                         </span>
-                        {sampleImages.map((s) => (
-                          <button
-                            key={s.url}
-                            type="button"
-                            onClick={() => {
-                              setFormData({ ...formData, image: s.url });
-                              setUploadSuccess('');
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.4rem',
-                              padding: '0.35rem 0.65rem',
-                              borderRadius: '6px',
-                              border: formData.image === s.url ? '2px solid #111111' : '1px solid #ddd',
-                              backgroundColor: formData.image === s.url ? '#f4f4f5' : '#fff',
-                              cursor: 'pointer',
-                              fontSize: '0.8rem'
-                            }}
-                          >
-                            <img
-                              src={s.url}
-                              alt={s.label}
-                              style={{ width: '22px', height: '30px', objectFit: 'cover', borderRadius: '3px' }}
-                            />
-                            {s.label}
-                          </button>
-                        ))}
                       </div>
+
+                      {/* Zone de Téléversement Multi-Vidéos */}
+                      <div
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={handleDropVideos}
+                        onClick={() => videoFilesInputRef.current?.click()}
+                        style={{
+                          border: '2px dashed #93c5fd',
+                          borderRadius: '10px',
+                          padding: '1.25rem',
+                          textAlign: 'center',
+                          backgroundColor: '#f8fafc',
+                          cursor: 'pointer',
+                          marginBottom: '0.85rem',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        <input
+                          type="file"
+                          ref={videoFilesInputRef}
+                          accept="video/*"
+                          multiple
+                          onChange={handleVideoFilesChange}
+                          style={{ display: 'none' }}
+                        />
+
+                        <div
+                          style={{
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '50%',
+                            backgroundColor: '#2563eb',
+                            color: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.2rem',
+                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+                          }}
+                        >
+                          {uploadingVideo ? (
+                            <i className="flaticon-381-refresh" style={{ animation: 'spin 1s linear infinite' }} />
+                          ) : (
+                            <i className="flaticon-381-video-clip" />
+                          )}
+                        </div>
+
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111111' }}>
+                            {uploadingVideo
+                              ? 'Téléversement des vidéos en cours...'
+                              : 'Ajouter une ou plusieurs vidéos depuis votre appareil'}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#71717a', marginTop: '0.2rem' }}>
+                            Cliquez ou glissez-déposez ici (MP4, WebM, MOV • Jusqu'à 100 Mo par fichier)
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Champ textuel pour ajouter une vidéo par URL */}
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                        <div style={{ position: 'relative', flex: 1 }}>
+                          <input
+                            type="text"
+                            className="form-control-custom"
+                            placeholder="Ou coller un lien vidéo (/uploads/... ou https://...)"
+                            value={manualVideoUrl}
+                            onChange={(e) => setManualVideoUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddManualVideo();
+                              }
+                            }}
+                            style={{ paddingLeft: '2.4rem', fontSize: '0.85rem' }}
+                          />
+                          <i
+                            className="fas fa-video"
+                            style={{
+                              position: 'absolute',
+                              left: '12px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              color: '#a1a1aa',
+                              fontSize: '0.85rem'
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-light-custom"
+                          onClick={handleAddManualVideo}
+                          style={{ whiteSpace: 'nowrap', padding: '0.55rem 1rem', fontSize: '0.82rem' }}
+                        >
+                          <i className="fas fa-plus" /> Ajouter vidéo
+                        </button>
+                      </div>
+
+                      {/* Grille d'aperçu des vidéos ajoutées */}
+                      {Array.isArray(formData.videos) && formData.videos.length > 0 ? (
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                            gap: '0.85rem',
+                            marginBottom: '1rem'
+                          }}
+                        >
+                          {formData.videos.map((vidUrl, idx) => {
+                            const isPrimary = idx === 0;
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  position: 'relative',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  border: isPrimary ? '2.5px solid #2563eb' : '1px solid #e4e4e7',
+                                  backgroundColor: '#000000',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  boxShadow: isPrimary ? '0 4px 12px rgba(37, 99, 235, 0.2)' : '0 2px 6px rgba(0,0,0,0.1)'
+                                }}
+                              >
+                                <div style={{ height: '180px', width: '100%', position: 'relative' }}>
+                                  <video
+                                    src={vidUrl}
+                                    controls
+                                    muted
+                                    playsInline
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                  {isPrimary && (
+                                    <span
+                                      style={{
+                                        position: 'absolute',
+                                        top: '6px',
+                                        left: '6px',
+                                        backgroundColor: '#2563eb',
+                                        color: '#ffffff',
+                                        fontSize: '0.65rem',
+                                        fontWeight: 700,
+                                        padding: '2px 7px',
+                                        borderRadius: '4px',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                                        zIndex: 2
+                                      }}
+                                    >
+                                      ★ Vidéo Principale
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveVideo(idx)}
+                                    title="Supprimer cette vidéo"
+                                    style={{
+                                      position: 'absolute',
+                                      top: '6px',
+                                      right: '6px',
+                                      width: '26px',
+                                      height: '26px',
+                                      borderRadius: '50%',
+                                      backgroundColor: 'rgba(239, 68, 68, 0.95)',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '0.75rem',
+                                      zIndex: 2
+                                    }}
+                                  >
+                                    <i className="fas fa-trash-alt" />
+                                  </button>
+                                </div>
+
+                                {!isPrimary && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetPrimaryVideo(idx)}
+                                    style={{
+                                      border: 'none',
+                                      background: '#f4f4f5',
+                                      color: '#18181b',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 600,
+                                      padding: '6px',
+                                      cursor: 'pointer',
+                                      borderTop: '1px solid #e4e4e7'
+                                    }}
+                                  >
+                                    ★ Définir en vidéo principale
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            padding: '0.85rem',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '0.82rem',
+                            color: '#64748b',
+                            textAlign: 'center',
+                            marginBottom: '1rem'
+                          }}
+                        >
+                          <i className="fas fa-video" style={{ marginRight: '6px', color: '#2563eb' }} />
+                          Optionnel : Ajoutez des vidéos de présentation pour captiver vos acheteurs au format TikTok.
+                        </div>
+                      )}
                     </div>
 
                     {/* Description */}

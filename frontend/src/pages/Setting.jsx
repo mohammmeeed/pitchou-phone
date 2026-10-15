@@ -25,7 +25,7 @@ const Setting = () => {
             <div className="card-body pt-1">
               <div className="setting-input d-flex align-items-center gap-2">
                 <i className="icon dz-flex-box feather icon-phone-call text-primary"></i>
-                <span>{userProfile?.phone || "+123 4567 890"}</span>
+                <span>{userProfile?.phone || "Non connecté"}</span>
               </div>
             </div>
           </div>
@@ -37,7 +37,7 @@ const Setting = () => {
             <div className="card-body pt-1">
               <div className="setting-input d-flex align-items-center gap-2">
                 <i className="icon dz-flex-box feather icon-mail text-primary"></i>
-                <span>{userProfile?.email || "yourname@gmail.com"}</span>
+                <span>{userProfile?.email || "Non connecté"}</span>
               </div>
             </div>
           </div>
@@ -51,7 +51,7 @@ const Setting = () => {
             <div className="card-body pt-1">
               <div className="setting-input d-flex align-items-center gap-2">
                 <i className="icon dz-flex-box feather icon-map-pin text-primary"></i>
-                <span>{userProfile?.location || "Montreal, Canada"}</span>
+                <span>{userProfile?.location || "Non renseignée"}</span>
               </div>
             </div>
           </div>
@@ -129,7 +129,7 @@ const Setting = () => {
             Home & Theme Settings
           </Link>
 
-          <Link to="/onboarding" className="btn btn-light w-100 rounded-xl text-danger">
+          <Link to="/login" className="btn btn-light w-100 rounded-xl text-danger">
             Logout
           </Link>
         </div>

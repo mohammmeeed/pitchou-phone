@@ -28,45 +28,139 @@ try {
 
     // 6. Recent Orders (Last 5)
     $recentStmt = $pdo->query("SELECT * FROM orders ORDER BY id DESC LIMIT 5");
-    $recentOrders = $recentStmt->fetchAll();
+    $recentOrders = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 7. Sales Chart (Simulated weekly aggregation based on orders)
-    $weeklyChart = [
-        ["day" => "Lun", "sales" => 4350, "orders" => 2],
-        ["day" => "Mar", "sales" => 6900, "orders" => 3],
-        ["day" => "Mer", "sales" => 8400, "orders" => 4],
-        ["day" => "Jeu", "sales" => 5200, "orders" => 2],
-        ["day" => "Ven", "sales" => 12500, "orders" => 5],
-        ["day" => "Sam", "sales" => 16800, "orders" => 7],
-        ["day" => "Dim", "sales" => 14200, "orders" => 6]
+    // 7. Sales Chart (Real daily aggregation for the current week / last 7 days)
+    $dayNamesFr = [
+        'Mon' => 'Lun',
+        'Tue' => 'Mar',
+        'Wed' => 'Mer',
+        'Thu' => 'Jeu',
+        'Fri' => 'Ven',
+        'Sat' => 'Sam',
+        'Sun' => 'Dim'
     ];
 
-    // 8. Traffic & Real-time visits evolution
+    $weeklyChart = [];
+    $today = new DateTime();
+    
+    // Last 7 days sales
+    for ($i = 6; $i >= 0; $i--) {
+        $d = (clone $today)->modify("-{$i} days");
+        $dStr = $d->format('Y-m-d');
+        $dayShort = $dayNamesFr[$d->format('D')] ?? $d->format('D');
+
+        $salesStmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount), 0) as sales, COUNT(*) as orders_count FROM orders WHERE DATE(created_at) = ? AND status != 'Annulée'");
+        $salesStmt->execute([$dStr]);
+        $dayData = $salesStmt->fetch(PDO::FETCH_ASSOC);
+
+        $weeklyChart[] = [
+            "day" => $dayShort,
+            "date" => $d->format('d M'),
+            "sales" => (float)($dayData['sales'] ?? 0),
+            "orders" => (int)($dayData['orders_count'] ?? 0)
+        ];
+    }
+
+    // 8. Real Traffic & Live Visits evolution from `site_visits` table
+    $ensureTable = $pdo->exec("CREATE TABLE IF NOT EXISTS site_visits (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        session_id VARCHAR(64) NOT NULL,
+        ip_address VARCHAR(45) DEFAULT '127.0.0.1',
+        country_code VARCHAR(5) DEFAULT 'DZ',
+        country_name VARCHAR(50) DEFAULT 'Algérie',
+        city VARCHAR(50) DEFAULT 'Alger',
+        device_type VARCHAR(20) DEFAULT 'mobile',
+        page_path VARCHAR(255) DEFAULT '/',
+        user_agent VARCHAR(500) DEFAULT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_created (created_at),
+        INDEX idx_country (country_code),
+        INDEX idx_device (device_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Helper to build real series for N days up to today
+    $getTrafficSeries = function(int $daysCount, int $step = 1) use ($pdo, $today) {
+        $dates = [];
+        $totalVisits = [];
+        $uniqueVisitors = [];
+
+        // Prepare map of DB data
+        $startDate = (clone $today)->modify("-" . ($daysCount - 1) . " days")->format('Y-m-d 00:00:00');
+        $stmt = $pdo->prepare("SELECT DATE(created_at) as v_date, COUNT(*) as tot, COUNT(DISTINCT session_id) as uniq FROM site_visits WHERE created_at >= ? GROUP BY v_date");
+        $stmt->execute([$startDate]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $dataByDate = [];
+        foreach ($rows as $r) {
+            $dataByDate[$r['v_date']] = [
+                'tot' => (int)$r['tot'],
+                'uniq' => (int)$r['uniq']
+            ];
+        }
+
+        // Loop through required days
+        for ($i = $daysCount - 1; $i >= 0; $i -= $step) {
+            $cur = (clone $today)->modify("-{$i} days");
+            $curDateStr = $cur->format('Y-m-d');
+            $dates[] = $cur->format('d M'); // e.g. "15 Oct"
+            $totalVisits[] = $dataByDate[$curDateStr]['tot'] ?? 0;
+            $uniqueVisitors[] = $dataByDate[$curDateStr]['uniq'] ?? 0;
+        }
+
+        return [
+            "dates" => $dates,
+            "totalVisits" => $totalVisits,
+            "uniqueVisitors" => $uniqueVisitors
+        ];
+    };
+
+    $traffic7 = $getTrafficSeries(7, 1);
+    $traffic14 = $getTrafficSeries(14, 1);
+    $traffic30 = $getTrafficSeries(30, 2); // 15 points evenly spaced
+
+    // Real countries breakdown
+    $totalVisitsCount = (int)$pdo->query("SELECT COUNT(*) FROM site_visits")->fetchColumn();
+    if ($totalVisitsCount === 0) $totalVisitsCount = 1;
+
+    $countryStmt = $pdo->query("SELECT country_code as code, country_name as name, COUNT(*) as visits FROM site_visits GROUP BY country_code, country_name ORDER BY visits DESC LIMIT 5");
+    $countriesRaw = $countryStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $countries = [];
+    foreach ($countriesRaw as $c) {
+        $pct = round(($c['visits'] / $totalVisitsCount) * 100, 1);
+        $countries[] = [
+            "code" => $c['code'],
+            "name" => $c['name'],
+            "visits" => (int)$c['visits'],
+            "percentage" => $pct
+        ];
+    }
+    if (empty($countries)) {
+        $countries = [
+            ["code" => "DZ", "name" => "Algérie", "visits" => 1, "percentage" => 100.0]
+        ];
+    }
+
+    // Real devices breakdown
+    $deviceStmt = $pdo->query("SELECT device_type, COUNT(*) as cnt FROM site_visits GROUP BY device_type");
+    $deviceRows = $deviceStmt->fetchAll(PDO::FETCH_ASSOC);
+    $devices = ["mobile" => 0, "desktop" => 0, "tablet" => 0];
+    foreach ($deviceRows as $dr) {
+        $type = strtolower($dr['device_type']);
+        if (isset($devices[$type])) {
+            $devices[$type] = (int)$dr['cnt'];
+        } else {
+            $devices['mobile'] += (int)$dr['cnt'];
+        }
+    }
+
     $trafficStats = [
-        "7" => [
-            "dates" => ["08 Oct", "09 Oct", "10 Oct", "11 Oct", "12 Oct", "13 Oct", "14 Oct"],
-            "totalVisits" => [112, 110, 34, 26, 17, 3, 2],
-            "uniqueVisitors" => [18, 19, 9, 11, 8, 2, 1]
-        ],
-        "14" => [
-            "dates" => ["01 Oct", "02 Oct", "03 Oct", "04 Oct", "05 Oct", "06 Oct", "07 Oct", "08 Oct", "09 Oct", "10 Oct", "11 Oct", "12 Oct", "13 Oct", "14 Oct"],
-            "totalVisits" => [0, 0, 0, 0, 0, 0, 0, 112, 110, 34, 26, 17, 3, 2],
-            "uniqueVisitors" => [0, 0, 0, 0, 0, 0, 0, 18, 19, 9, 11, 8, 2, 1]
-        ],
-        "30" => [
-            "dates" => ["15 Sep", "18 Sep", "21 Sep", "24 Sep", "27 Sep", "30 Sep", "03 Oct", "06 Oct", "09 Oct", "12 Oct", "14 Oct"],
-            "totalVisits" => [0, 0, 0, 0, 0, 0, 0, 2, 110, 17, 2],
-            "uniqueVisitors" => [0, 0, 0, 0, 0, 0, 0, 1, 19, 8, 1]
-        ],
-        "countries" => [
-            ["code" => "DZ", "name" => "Algérie", "visits" => 282, "percentage" => 98.9],
-            ["code" => "US", "name" => "États-Unis", "visits" => 3, "percentage" => 1.1]
-        ],
-        "devices" => [
-            "mobile" => 65,
-            "desktop" => 211,
-            "tablet" => 9
-        ]
+        "7" => $traffic7,
+        "14" => $traffic14,
+        "30" => $traffic30,
+        "countries" => $countries,
+        "devices" => $devices
     ];
 
     echo json_encode([

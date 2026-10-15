@@ -29,23 +29,23 @@ export default function AdminDashboard() {
   const [trafficPeriod, setTrafficPeriod] = useState('14'); // '7' | '14' | '30'
   const [hoveredPoint, setHoveredPoint] = useState(null);
 
-  // Données de trafic et de pays
+  // Données réelles de trafic et de pays issues de l'API backend
   const currentTraffic = stats?.trafficStats?.[trafficPeriod] || {
-    dates: ["01 Oct", "02 Oct", "03 Oct", "04 Oct", "05 Oct", "06 Oct", "07 Oct", "08 Oct", "09 Oct", "10 Oct", "11 Oct", "12 Oct", "13 Oct", "14 Oct"],
-    totalVisits: [0, 0, 0, 0, 0, 0, 0, 112, 110, 34, 26, 17, 3, 2],
-    uniqueVisitors: [0, 0, 0, 0, 0, 0, 0, 18, 19, 9, 11, 8, 2, 1]
+    dates: [],
+    totalVisits: [],
+    uniqueVisitors: []
   };
 
-  const countriesData = stats?.trafficStats?.countries || [
-    { code: "DZ", name: "Algérie", visits: 282, percentage: 98.9 },
-    { code: "US", name: "États-Unis", visits: 3, percentage: 1.1 }
-  ];
-
+  const countriesData = stats?.trafficStats?.countries || [];
   const devicesData = stats?.trafficStats?.devices || {
-    mobile: 65,
-    desktop: 211,
-    tablet: 9
+    mobile: 0,
+    desktop: 0,
+    tablet: 0
   };
+
+  // Couleurs principales du panneau d'administration (Theme Mediqu / Hospital React)
+  const adminPrimaryColor = '#111111';
+  const adminUniqueColor = '#209f84';
 
   // Calculs géométriques SVG pour les courbes lisses du graphique
   const svgWidth = 720;
@@ -59,10 +59,17 @@ export default function AdminDashboard() {
   const totalVisits = currentTraffic.totalVisits || [];
   const uniqueVisitors = currentTraffic.uniqueVisitors || [];
   const numPoints = dates.length;
-  const maxScaleVal = Math.max(122, ...(totalVisits.length ? totalVisits : [122]));
 
-  // Niveaux de l'axe Y : 122, 81, 40, 0 (exactement comme dans la capture)
-  const gridLevels = [122, 81, 40, 0];
+  // Calcul dynamique de l'échelle selon les données réelles
+  const peakVal = Math.max(10, ...(totalVisits.length ? totalVisits : [10]));
+  const step = peakVal > 200 ? 50 : (peakVal > 80 ? 25 : (peakVal > 30 ? 10 : 5));
+  const maxScaleVal = Math.ceil(peakVal / (step * 3)) * (step * 3) || 120;
+  const gridLevels = [
+    maxScaleVal,
+    Math.round((maxScaleVal * 2) / 3),
+    Math.round(maxScaleVal / 3),
+    0
+  ];
 
   const totalPoints = totalVisits.map((val, idx) => {
     const x = padLeft + (idx / Math.max(1, numPoints - 1)) * (svgWidth - padLeft - padRight);
@@ -221,19 +228,19 @@ export default function AdminDashboard() {
               </h4>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginTop: '0.5rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                  <span style={{ display: 'inline-block', width: '12px', height: '3px', borderRadius: '2px', backgroundColor: '#c29a67' }} />
+                  <span style={{ display: 'inline-block', width: '12px', height: '3px', borderRadius: '2px', backgroundColor: adminPrimaryColor }} />
                   <strong style={{ color: '#18181b' }}>Visites totales</strong>
-                  <span style={{ color: '#888', fontWeight: 400 }}>(toutes sessions & répétitions)</span>
+                  <span style={{ color: '#71717a', fontWeight: 400 }}>(toutes sessions & répétitions)</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                  <span style={{ display: 'inline-block', width: '12px', height: '2.5px', borderRadius: '2px', backgroundColor: '#18181b' }} />
+                  <span style={{ display: 'inline-block', width: '12px', height: '3px', borderRadius: '2px', backgroundColor: adminUniqueColor }} />
                   <strong style={{ color: '#18181b' }}>Visiteurs uniques</strong>
                 </div>
               </div>
             </div>
 
             {/* Sélecteur de période (7 jours, 14 jours, 30 jours) */}
-            <div style={{ display: 'inline-flex', gap: '2px', backgroundColor: '#f5eee5', padding: '3px', borderRadius: '20px' }}>
+            <div style={{ display: 'inline-flex', gap: '2px', backgroundColor: '#f4f4f5', padding: '3px', borderRadius: '20px', border: '1px solid #e4e4e7' }}>
               {['7', '14', '30'].map((p) => {
                 const isActive = trafficPeriod === p;
                 return (
@@ -251,11 +258,11 @@ export default function AdminDashboard() {
                       borderRadius: '16px',
                       fontSize: '0.82rem',
                       fontWeight: isActive ? 600 : 500,
-                      backgroundColor: isActive ? '#b88c5a' : 'transparent',
-                      color: isActive ? '#ffffff' : '#66666e',
+                      backgroundColor: isActive ? adminPrimaryColor : 'transparent',
+                      color: isActive ? '#ffffff' : '#71717a',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      boxShadow: isActive ? '0 2px 6px rgba(184, 140, 90, 0.35)' : 'none'
+                      boxShadow: isActive ? '0 2px 8px rgba(0, 0, 0, 0.22)' : 'none'
                     }}
                   >
                     {p} jours
@@ -273,11 +280,11 @@ export default function AdminDashboard() {
                 onMouseLeave={() => setHoveredPoint(null)}
               >
                 <defs>
-                  {/* Dégradé doux couleur sable/dorée pour la surface des visites totales */}
+                  {/* Dégradé monochrome sleek pour la surface des visites totales */}
                   <linearGradient id="trafficAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#c29a67" stopOpacity="0.32" />
-                    <stop offset="60%" stopColor="#c29a67" stopOpacity="0.12" />
-                    <stop offset="100%" stopColor="#c29a67" stopOpacity="0.0" />
+                    <stop offset="0%" stopColor={adminPrimaryColor} stopOpacity="0.14" />
+                    <stop offset="60%" stopColor={adminPrimaryColor} stopOpacity="0.04" />
+                    <stop offset="100%" stopColor={adminPrimaryColor} stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
 
@@ -316,21 +323,21 @@ export default function AdminDashboard() {
                   fill="url(#trafficAreaGrad)"
                 />
 
-                {/* Courbe lissée des visites totales (Ligne dorée/sable) */}
+                {/* Courbe lissée des visites totales (Ligne principale noir carbone / admin primary) */}
                 <path
                   d={getCurvedPath(totalPoints)}
                   fill="none"
-                  stroke="#c29a67"
+                  stroke={adminPrimaryColor}
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
 
-                {/* Courbe lissée des visiteurs uniques (Ligne noire) */}
+                {/* Courbe lissée des visiteurs uniques (Ligne vert émeraude / admin success) */}
                 <path
                   d={getCurvedPath(uniquePoints)}
                   fill="none"
-                  stroke="#18181b"
+                  stroke={adminUniqueColor}
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -344,8 +351,8 @@ export default function AdminDashboard() {
                     cy={pt.y}
                     r="3.5"
                     fill="#ffffff"
-                    stroke="#c29a67"
-                    strokeWidth="2"
+                    stroke={adminPrimaryColor}
+                    strokeWidth="2.5"
                     style={{ transition: 'all 0.15s ease' }}
                   />
                 ))}
@@ -360,7 +367,7 @@ export default function AdminDashboard() {
                       cy={pt.y}
                       r="3"
                       fill="#ffffff"
-                      stroke="#18181b"
+                      stroke={adminUniqueColor}
                       strokeWidth="2"
                       style={{ transition: 'all 0.15s ease' }}
                     />
@@ -405,16 +412,16 @@ export default function AdminDashboard() {
                       y1={padTop}
                       x2={totalPoints[hoveredPoint].x}
                       y2={padBottom}
-                      stroke="#c29a67"
+                      stroke={adminPrimaryColor}
                       strokeDasharray="3 3"
                       strokeWidth="1.2"
-                      opacity="0.8"
+                      opacity="0.3"
                     />
                     <circle
                       cx={totalPoints[hoveredPoint].x}
                       cy={totalPoints[hoveredPoint].y}
                       r="5.5"
-                      fill="#c29a67"
+                      fill={adminPrimaryColor}
                       stroke="#ffffff"
                       strokeWidth="2.5"
                     />
@@ -443,9 +450,9 @@ export default function AdminDashboard() {
                       textAnchor="middle"
                       fontSize="10"
                     >
-                      <tspan fill="#e5c39b" fontWeight="700">{totalPoints[hoveredPoint].val} visites</tspan>
+                      <tspan fill="#ffffff" fontWeight="700">{totalPoints[hoveredPoint].val} visites</tspan>
                       <tspan fill="#a1a1aa"> • </tspan>
-                      <tspan fill="#ffffff" fontWeight="600">{totalPoints[hoveredPoint].uniqueVal} uniques</tspan>
+                      <tspan fill="#4ade80" fontWeight="600">{totalPoints[hoveredPoint].uniqueVal} uniques</tspan>
                     </text>
                   </g>
                 )}
@@ -472,9 +479,9 @@ export default function AdminDashboard() {
               </h4>
               <span
                 style={{
-                  backgroundColor: '#fbf7f2',
-                  color: '#93734a',
-                  border: '1px solid #f3e6d6',
+                  backgroundColor: '#f4f4f5',
+                  color: '#18181b',
+                  border: '1px solid #e4e4e7',
                   padding: '3px 12px',
                   borderRadius: '20px',
                   fontSize: '0.78rem',
@@ -517,7 +524,7 @@ export default function AdminDashboard() {
                     <div
                       style={{
                         height: '6px',
-                        backgroundColor: '#f3ece3',
+                        backgroundColor: '#f4f4f5',
                         borderRadius: '6px',
                         overflow: 'hidden'
                       }}
@@ -526,7 +533,7 @@ export default function AdminDashboard() {
                         style={{
                           height: '100%',
                           width: `${country.percentage}%`,
-                          backgroundColor: '#c29a67',
+                          backgroundColor: idx === 0 ? adminPrimaryColor : (idx === 1 ? '#2781d5' : '#209f84'),
                           borderRadius: '6px',
                           transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
                         }}
@@ -535,7 +542,7 @@ export default function AdminDashboard() {
 
                     {/* Pourcentage sous la barre aligné à droite */}
                     <div style={{ textAlign: 'right', marginTop: '0.35rem' }}>
-                      <span style={{ fontWeight: 700, color: '#71717a', fontSize: '0.8rem' }}>
+                      <span style={{ fontWeight: 700, color: '#18181b', fontSize: '0.8rem' }}>
                         {country.percentage}%
                       </span>
                     </div>
@@ -598,35 +605,53 @@ export default function AdminDashboard() {
           </div>
           <div className="card-body-custom">
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '180px', paddingTop: '20px', gap: '10px' }}>
-              {stats?.weeklyChart?.map((item, idx) => {
-                const maxSales = 18000;
-                const heightPercent = Math.min(100, Math.round((item.sales / maxSales) * 100));
-                return (
-                  <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#111111', marginBottom: '6px' }}>
-                      {Math.round(item.sales / 1000)}k
+              {(() => {
+                const weeklyData = stats?.weeklyChart || [];
+                const maxSales = Math.max(1000, ...weeklyData.map((w) => w.sales));
+                const peakItem = weeklyData.reduce((prev, cur) => (cur.sales > (prev?.sales || 0) ? cur : prev), null);
+
+                return weeklyData.map((item, idx) => {
+                  const isPeak = peakItem && item.sales === peakItem.sales && item.sales > 0;
+                  const isToday = idx === weeklyData.length - 1;
+                  const heightPercent = item.sales > 0 ? Math.max(12, Math.round((item.sales / maxSales) * 100)) : 6;
+
+                  return (
+                    <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: item.sales > 0 ? '#111111' : '#a1a1aa', marginBottom: '6px' }}>
+                        {item.sales > 0 ? (item.sales >= 1000 ? `${(item.sales / 1000).toFixed(item.sales % 1000 === 0 ? 0 : 1)}k` : item.sales) : '0'}
+                      </div>
+                      <div
+                        style={{
+                          width: '100%',
+                          maxWidth: '28px',
+                          height: `${heightPercent}%`,
+                          background: isPeak
+                            ? 'linear-gradient(180deg, #111111 0%, #333333 100%)'
+                            : (isToday ? '#209f84' : (item.sales > 0 ? '#18181b' : '#e4e4e7')),
+                          borderRadius: '6px 6px 0 0',
+                          transition: 'height 0.4s ease'
+                        }}
+                        title={`${item.day} ${item.date || ''}: ${Number(item.sales).toLocaleString()} DA (${item.orders} commandes)`}
+                      />
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: isToday ? '#111111' : '#71717a', marginTop: '8px' }}>
+                        {item.day}
+                      </div>
                     </div>
-                    <div
-                      style={{
-                        width: '100%',
-                        maxWidth: '28px',
-                        height: `${heightPercent}%`,
-                        background: idx === 5 ? 'linear-gradient(180deg, #111111 0%, #333333 100%)' : '#e4e4e7',
-                        borderRadius: '6px 6px 0 0',
-                        transition: 'height 0.4s ease'
-                      }}
-                      title={`${item.day}: ${item.sales} DA (${item.orders} commandes)`}
-                    />
-                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#666', marginTop: '8px' }}>
-                      {item.day}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
             <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #eaeaea', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
               <div><strong style={{ color: '#209f84' }}>+34%</strong> vs semaine passée</div>
-              <div>Pic des ventes: <strong style={{ color: '#111111' }}>Samedi (16,800 DA)</strong></div>
+              <div>
+                Pic des ventes:{' '}
+                <strong style={{ color: '#111111' }}>
+                  {(() => {
+                    const peak = stats?.weeklyChart?.reduce((prev, cur) => (cur.sales > (prev?.sales || 0) ? cur : prev), null);
+                    return peak && peak.sales > 0 ? `${peak.day} (${Number(peak.sales).toLocaleString()} DA)` : 'En cours';
+                  })()}
+                </strong>
+              </div>
             </div>
           </div>
         </div>

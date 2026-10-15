@@ -26,8 +26,9 @@ const Sidebar = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  const customerName = customerUser?.name || userProfile?.name || "mouh";
-  const customerPhone = customerUser?.phone || userProfile?.phone || "0697037109";
+  const isLoggedIn = !!(customerUser && (customerUser.name || customerUser.phone));
+  const customerName = isLoggedIn ? customerUser.name : "Invité";
+  const customerPhone = isLoggedIn ? (customerUser.phone || "") : "Cliquez pour vous connecter";
 
   const handleNavClick = (item) => {
     if (item.name === "Déconnexion") {
@@ -35,17 +36,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         localStorage.removeItem('customer_user');
         localStorage.removeItem('customer_token');
         if (setUserProfile) {
-          setUserProfile({
-            name: "Client",
-            email: "",
-            phone: "",
-            gender: "Men",
-            interestedIn: "Livres",
-            lookingFor: "Lectures passionnantes",
-            avatar: null,
-            age: 24,
-            location: "Alger",
-          });
+          setUserProfile(null);
         }
         setCustomerUser(null);
       } catch (e) {}
@@ -59,10 +50,11 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: "Mon Panier", path: "/explore", icon: "icon-shopping-cart" },
     { name: "Messagerie", path: "/chat", icon: "icon-message-circle" },
     { name: "Paramètres", path: "/setting", icon: "icon-settings" },
-    { name: "Mon Profil", path: "/profile", icon: "icon-user" },
+    { name: "Mon Profil", path: isLoggedIn ? "/profile" : "/login", icon: "icon-user" },
     { name: "Panneau Admin", path: "/admin", icon: "icon-shield" },
-    { name: "Connexion / Inscription", path: "/auth", icon: "icon-log-in" },
-    { name: "Déconnexion", path: "/auth", icon: "icon-log-out" },
+    ...(isLoggedIn
+      ? [{ name: "Déconnexion", path: "/home", icon: "icon-log-out" }]
+      : [{ name: "Connexion / Inscription", path: "/login", icon: "icon-log-in" }])
   ];
 
   return (
@@ -74,7 +66,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
       <div className={`sidebar ${isOpen ? 'show' : ''}`}>
         <div className="inner-sidebar">
-          <Link to="/profile" onClick={onClose} className="author-box">
+          <Link to={isLoggedIn ? "/profile" : "/login"} onClick={onClose} className="author-box">
             <div 
               className="dz-media" 
               style={{ 
@@ -92,15 +84,17 @@ const Sidebar = ({ isOpen, onClose }) => {
                 boxShadow: 'var(--btn-shadow, 0 4px 12px var(--rgba-primary-3))'
               }}
             >
-              {customerUser?.avatar && !customerUser.avatar.includes('150x150') && !customerUser.avatar.includes('pic1.jpg') ? (
+              {isLoggedIn && customerUser?.avatar && !customerUser.avatar.includes('150x150') && !customerUser.avatar.includes('pic1.jpg') ? (
                 <img src={customerUser.avatar} alt="author-image" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-              ) : (
+              ) : isLoggedIn ? (
                 <span>{(customerName || 'C').charAt(0).toUpperCase()}</span>
+              ) : (
+                <i className="icon feather icon-user" style={{ fontSize: '20px' }}></i>
               )}
             </div>
             <div className="dz-info">
               <h5 className="name">{customerName}</h5>
-              <span>{customerPhone}</span>
+              <span style={{ fontSize: '12px' }}>{customerPhone}</span>
             </div>
           </Link>
 

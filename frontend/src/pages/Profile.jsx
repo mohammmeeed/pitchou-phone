@@ -16,10 +16,11 @@ const Profile = () => {
     return null;
   });
 
-  const customerName = loggedUser?.name || userProfile?.name || "mouh";
-  const customerPhone = loggedUser?.phone || userProfile?.phone || "0697037109";
-  const customerEmail = loggedUser?.email || userProfile?.email || "mohamedguedaoui13@gmail.com";
-  const customerLocation = loggedUser?.address || userProfile?.location || "Alger";
+  const isLoggedIn = !!(loggedUser && (loggedUser.name || loggedUser.phone));
+  const customerName = isLoggedIn ? (loggedUser?.name || userProfile?.name || "Client") : "Invité";
+  const customerPhone = isLoggedIn ? (loggedUser?.phone || userProfile?.phone || "Non renseigné") : "Non connecté";
+  const customerEmail = isLoggedIn ? (loggedUser?.email || userProfile?.email || "Non renseigné") : "Non renseigné";
+  const customerLocation = isLoggedIn ? (loggedUser?.address || userProfile?.location || "Non renseignée") : "Non renseignée";
 
   // Gestion du suivi de commande
   const [showTracking, setShowTracking] = useState(false);
@@ -29,7 +30,7 @@ const Profile = () => {
 
   // Charger les commandes lors de l'ouverture du suivi
   useEffect(() => {
-    if (showTracking) {
+    if (showTracking && customerPhone && customerPhone !== 'Non connecté') {
       fetchOrders(customerPhone);
     }
   }, [showTracking, customerPhone]);
@@ -37,7 +38,7 @@ const Profile = () => {
   const fetchOrders = async (query) => {
     setLoadingOrders(true);
     try {
-      const q = query ? encodeURIComponent(query.trim()) : encodeURIComponent(customerPhone);
+      const q = query ? encodeURIComponent(query.trim()) : (customerPhone && customerPhone !== 'Non connecté' ? encodeURIComponent(customerPhone) : '');
       const res = await fetch(`http://localhost:8000/api/orders?search=${q}`);
       if (res.ok) {
         const json = await res.json();
@@ -54,7 +55,7 @@ const Profile = () => {
     e.preventDefault();
     if (searchQuery.trim()) {
       fetchOrders(searchQuery.trim());
-    } else {
+    } else if (customerPhone && customerPhone !== 'Non connecté') {
       fetchOrders(customerPhone);
     }
   };
@@ -113,24 +114,45 @@ const Profile = () => {
                 </h3>
 
                 <Link 
-                  to="/edit-profile" 
+                  to={isLoggedIn ? "/edit-profile" : "/login"} 
                   className="edit-profile dz-icon" 
-                  title="Modifier le profil"
+                  title={isLoggedIn ? "Modifier le profil" : "Se connecter"}
                   style={{ flexShrink: 0 }}
                 >
-                  <i className="flaticon flaticon-pencil-2"></i>
+                  <i className={`flaticon ${isLoggedIn ? 'flaticon-pencil-2' : 'flaticon-user'}`}></i>
                 </Link>
               </div>
             </div>
+
+            {/* Bannière Mode Invité */}
+            {!isLoggedIn && (
+              <div 
+                className="card style-3 mb-3 p-3 text-center"
+                style={{ 
+                  background: 'linear-gradient(135deg, rgba(37,99,235,0.06), rgba(254,119,182,0.08))', 
+                  border: '1px solid rgba(37,99,235,0.15)', 
+                  borderRadius: '16px' 
+                }}
+              >
+                <div className="mb-2" style={{ fontSize: '24px' }}>👤</div>
+                <h5 className="font-w600 mb-1" style={{ fontSize: '15px' }}>Vous êtes en mode Invité</h5>
+                <p className="text-muted font-12 mb-3">Connectez-vous ou créez un compte pour suivre vos commandes et gérer vos informations.</p>
+                <Link to="/login" className="btn btn-primary btn-sm rounded-xl px-4 py-2 mx-auto" style={{ fontWeight: 600 }}>
+                  Se connecter / S'inscrire
+                </Link>
+              </div>
+            )}
 
             {/* Informations de Compte du Client */}
             <div className="card style-3 mb-2">
               <div className="card-header pb-1 pt-3 px-3 border-0 d-flex align-items-center justify-content-between" style={{ width: '100%' }}>
                 <h6 className="title mb-0 font-14 font-w600 text-dark">Informations du Compte</h6>
-                <Link to="/edit-profile" className="text-primary font-12 font-w600 text-decoration-none d-flex align-items-center gap-1">
-                  <i className="flaticon flaticon-pencil-2 font-12"></i>
-                  <span>Modifier</span>
-                </Link>
+                {isLoggedIn && (
+                  <Link to="/edit-profile" className="text-primary font-12 font-w600 text-decoration-none d-flex align-items-center gap-1">
+                    <i className="flaticon flaticon-pencil-2 font-12"></i>
+                    <span>Modifier</span>
+                  </Link>
+                )}
               </div>
               <div 
                 className="card-body pt-1 pb-3 px-3"

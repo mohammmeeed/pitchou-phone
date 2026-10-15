@@ -32,12 +32,34 @@ const ProfileDetail = () => {
           : `${API_BASE_URL}/products`;
 
         const res = await fetch(targetUrl);
+        if (res.status === 404) {
+          // Le produit avec cet ID n'existe pas ou n'est plus en BDD
+          return;
+        }
         if (!res.ok) throw new Error('Erreur réseau BDD');
         const json = await res.json();
 
         if (isMounted && json && json.success) {
           const raw = id ? json.data : (Array.isArray(json.data) ? json.data[0] : null);
           if (raw) {
+            let parsedImages = [];
+            if (Array.isArray(raw.images)) {
+              parsedImages = raw.images;
+            } else if (typeof raw.images === 'string' && raw.images.trim() !== '') {
+              try { parsedImages = JSON.parse(raw.images); } catch(e) { parsedImages = [raw.images]; }
+            } else if (raw.image) {
+              parsedImages = [raw.image];
+            }
+
+            let parsedVideos = [];
+            if (Array.isArray(raw.videos)) {
+              parsedVideos = raw.videos;
+            } else if (typeof raw.videos === 'string' && raw.videos.trim() !== '') {
+              try { parsedVideos = JSON.parse(raw.videos); } catch(e) { parsedVideos = [raw.videos]; }
+            } else if (raw.video) {
+              parsedVideos = [raw.video];
+            }
+
             setDbProduct({
               id: raw.id,
               name: raw.name,
@@ -48,8 +70,10 @@ const ProfileDetail = () => {
               stock: raw.stock || 10,
               category: raw.category || '',
               rating: raw.rating || 4.8,
-              image: raw.image || '/assets/images/books/book1.jpg',
-              video: raw.video || null,
+              image: parsedImages[0] || raw.image || '/assets/images/books/book1.jpg',
+              images: parsedImages,
+              video: parsedVideos[0] || raw.video || null,
+              videos: parsedVideos,
               bio: raw.bio || '',
               languages: Array.isArray(raw.languages)
                 ? raw.languages
@@ -81,8 +105,34 @@ const ProfileDetail = () => {
       price: 0,
       bio: "",
       image: "/assets/images/books/book1.jpg",
+      images: ["/assets/images/books/book1.jpg"],
+      videos: [],
       languages: []
     };
+
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+
+  // Combiner les vidéos et photos pour une navigation multi-médias
+  const mediaList = React.useMemo(() => {
+    const list = [];
+    const vids = Array.isArray(profile.videos) && profile.videos.length > 0 
+      ? profile.videos 
+      : (profile.video ? [profile.video] : []);
+    const imgs = Array.isArray(profile.images) && profile.images.length > 0 
+      ? profile.images 
+      : (profile.image ? [profile.image] : ['/assets/images/books/book1.jpg']);
+
+    vids.forEach((v) => {
+      if (v) list.push({ type: 'video', url: v });
+    });
+    imgs.forEach((img) => {
+      if (img) list.push({ type: 'image', url: img });
+    });
+
+    return list.length > 0 ? list : [{ type: 'image', url: profile.image || '/assets/images/books/book1.jpg' }];
+  }, [profile]);
+
+  const activeMedia = mediaList[activeMediaIndex] || mediaList[0];
 
   const handleAddToCart = () => {
     addToCart(profile);
@@ -100,13 +150,110 @@ const ProfileDetail = () => {
         <div className="container">
           <div className="detail-area">
             <div className="dz-media-card style-2 recommendation-media-animate">
-              <div className="dz-media">
-                {profile.video ? (
-                  <video src={profile.video} poster={profile.image} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div className="dz-media" style={{ position: 'relative' }}>
+                {activeMedia?.type === 'video' ? (
+                  <video 
+                    key={activeMedia.url} 
+                    src={activeMedia.url} 
+                    poster={profile.image} 
+                    autoPlay 
+                    controls
+                    loop 
+                    muted 
+                    playsInline 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
                 ) : (
-                  <img src={profile.image} alt={profile.name} />
+                  <img key={activeMedia?.url} src={activeMedia?.url || profile.image} alt={profile.name} />
+                )}
+
+                {mediaList.length > 1 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                      backdropFilter: 'blur(6px)',
+                      color: '#ffffff',
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      zIndex: 3
+                    }}
+                  >
+                    <span>{activeMedia?.type === 'video' ? '🎬' : '📸'}</span>
+                    <span>{activeMediaIndex + 1} / {mediaList.length}</span>
+                  </div>
                 )}
               </div>
+
+              {/* Sélecteur de miniatures si plusieurs photos/vidéos */}
+              {mediaList.length > 1 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    overflowX: 'auto',
+                    padding: '10px 14px',
+                    backgroundColor: '#ffffff',
+                    borderBottom: '1px solid #f0f0f0',
+                    scrollbarWidth: 'none'
+                  }}
+                >
+                  {mediaList.map((m, idx) => {
+                    const isActive = idx === activeMediaIndex;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveMediaIndex(idx)}
+                        style={{
+                          position: 'relative',
+                          flexShrink: 0,
+                          width: '54px',
+                          height: '70px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          border: isActive ? '2.5px solid var(--primary, #111111)' : '1px solid #e4e4e7',
+                          padding: 0,
+                          background: '#000',
+                          cursor: 'pointer',
+                          opacity: isActive ? 1 : 0.65,
+                          transition: 'all 0.2s ease',
+                          boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.2)' : 'none'
+                        }}
+                      >
+                        {m.type === 'video' ? (
+                          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                            <video src={m.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
+                            <span
+                              style={{
+                                position: 'absolute',
+                                bottom: '2px',
+                                right: '2px',
+                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                color: '#fff',
+                                fontSize: '9px',
+                                padding: '1px 3px',
+                                borderRadius: '3px'
+                              }}
+                            >
+                              🎬
+                            </span>
+                          </div>
+                        ) : (
+                          <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="dz-content">
                 <div className="left-content">
                   <h4 className="title">

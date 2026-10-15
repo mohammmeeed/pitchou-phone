@@ -1,10 +1,38 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { DatingProvider } from './context/DatingContext';
 
+// Background Visit Tracker for live dynamic traffic analytics in Admin Dashboard
+function VisitTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Only track store visitor pages, avoid polling admin routes
+    if (location.pathname.startsWith('/admin')) return;
+
+    try {
+      let sessId = sessionStorage.getItem('ts_visitor_session');
+      if (!sessId) {
+        sessId = 'sess_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+        sessionStorage.setItem('ts_visitor_session', sessId);
+      }
+
+      fetch('http://localhost:8000/api/track_visit.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          page_path: location.pathname,
+          session_id: sessId
+        })
+      }).catch(() => {});
+    } catch (e) {}
+  }, [location.pathname]);
+
+  return null;
+}
+
 // Pages
-import Onboarding from './pages/Onboarding';
 import Auth from './pages/Auth';
 import Login from './pages/Login';
 import Otp from './pages/Otp';
@@ -45,11 +73,12 @@ function App() {
     <ThemeProvider>
       <DatingProvider>
         <BrowserRouter>
+          <VisitTracker />
           <Routes>
-            {/* Onboarding & Auth */}
-            <Route path="/" element={<Onboarding />} />
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/onboarding.html" element={<Navigate to="/onboarding" replace />} />
+            {/* Main & Auth */}
+            <Route path="/" element={<Home />} />
+            <Route path="/onboarding" element={<Navigate to="/" replace />} />
+            <Route path="/onboarding.html" element={<Navigate to="/" replace />} />
             
             <Route path="/auth" element={<Auth />} />
             <Route path="/login" element={<Login />} />

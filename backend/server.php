@@ -4,20 +4,20 @@
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// Serve static files if they exist
-$filePath = __DIR__ . $uri;
-if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {
-    return false; // serve requested file as-is
-}
-
 // Route API endpoints
-if (preg_match('#^/api/([a-zA-Z0-9_-]+)#', $uri, $matches)) {
+if (preg_match('#^/api/([a-zA-Z0-9_-]+)(?:\.php)?#', $uri, $matches)) {
     $endpoint = $matches[1];
     $apiFile = __DIR__ . '/api/' . $endpoint . '.php';
     if (file_exists($apiFile)) {
         require $apiFile;
         exit();
     }
+}
+
+// Serve static files if they exist (uploads, images, assets)
+$filePath = __DIR__ . $uri;
+if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {
+    return false; // serve requested file as-is
 }
 
 // Fallback response for root

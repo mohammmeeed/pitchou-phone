@@ -482,11 +482,11 @@ export const adminApi = {
     }
   },
 
-  // 7. Upload Photo from Device
-  async uploadImage(file) {
+  // 7. Upload Photo or Video from Device (Single & Multi-files)
+  async uploadMedia(file) {
     try {
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('file', file);
 
       const res = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
@@ -494,7 +494,12 @@ export const adminApi = {
       });
       const data = await res.json();
       if (data && data.success && data.url) {
-        return { success: true, url: data.url };
+        return {
+          success: true,
+          url: data.url,
+          type: data.type || (file.type?.startsWith('video/') ? 'video' : 'image'),
+          filename: data.filename
+        };
       }
       throw new Error(data?.error || 'Erreur lors du téléversement');
     } catch (err) {
@@ -502,7 +507,11 @@ export const adminApi = {
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
-          resolve({ success: true, url: e.target.result });
+          resolve({
+            success: true,
+            url: e.target.result,
+            type: file.type?.startsWith('video/') ? 'video' : 'image'
+          });
         };
         reader.onerror = () => {
           resolve({ success: false, error: 'Impossible de lire le fichier' });
@@ -510,6 +519,22 @@ export const adminApi = {
         reader.readAsDataURL(file);
       });
     }
+  },
+
+  async uploadMultipleMedia(files) {
+    const list = Array.from(files);
+    const results = [];
+    for (const f of list) {
+      const res = await this.uploadMedia(f);
+      if (res && res.success) {
+        results.push(res);
+      }
+    }
+    return results;
+  },
+
+  async uploadImage(file) {
+    return this.uploadMedia(file);
   },
 
   // 8. Paramètres du Système (Boutique, Apparence, SMTP)

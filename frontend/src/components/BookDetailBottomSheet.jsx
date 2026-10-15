@@ -10,6 +10,17 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
   const [isClosing, setIsClosing] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
   const [dbProduct, setDbProduct] = useState(null);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState(0);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Reset de l'index de média à chaque changement de produit ou ouverture
+  useEffect(() => {
+    setActiveMediaIndex(0);
+    setDragOffset(0);
+    setIsDragging(false);
+  }, [card?.id, isOpen]);
 
   // Récupération des informations fraîches du livre depuis la BDD à l'ouverture
   useEffect(() => {
@@ -95,6 +106,131 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
     languages: bookLanguages
   };
 
+  // Construction dynamique de la galerie multi-photos et vidéos
+  const galleryItems = React.useMemo(() => {
+    const items = [];
+
+    // Récupérer la liste des images
+    const rawImages = dbProduct?.images || card?.images;
+    let parsedImages = [];
+    if (Array.isArray(rawImages)) {
+      parsedImages = rawImages;
+    } else if (typeof rawImages === 'string' && rawImages.trim() !== '') {
+      try {
+        const decoded = JSON.parse(rawImages);
+        parsedImages = Array.isArray(decoded) ? decoded : [rawImages];
+      } catch (e) {
+        parsedImages = [rawImages];
+      }
+    } else if (activeBook.image) {
+      parsedImages = [activeBook.image];
+    }
+
+    // Récupérer la liste des vidéos
+    const rawVideos = dbProduct?.videos || card?.videos;
+    let parsedVideos = [];
+    if (Array.isArray(rawVideos)) {
+      parsedVideos = rawVideos;
+    } else if (typeof rawVideos === 'string' && rawVideos.trim() !== '') {
+      try {
+        const decoded = JSON.parse(rawVideos);
+        parsedVideos = Array.isArray(decoded) ? decoded : [rawVideos];
+      } catch (e) {
+        parsedVideos = [rawVideos];
+      }
+    } else if (activeBook.video) {
+      parsedVideos = [activeBook.video];
+    }
+
+    // Ajouter les photos
+    parsedImages.forEach((img) => {
+      if (img && typeof img === 'string' && img.trim() !== '') {
+        items.push({ type: 'image', url: img.trim() });
+      }
+    });
+
+    // Ajouter les vidéos
+    parsedVideos.forEach((vid) => {
+      if (vid && typeof vid === 'string' && vid.trim() !== '') {
+        items.push({ type: 'video', url: vid.trim() });
+      }
+    });
+
+    return items.length > 0 
+      ? items 
+      : [{ type: 'image', url: activeBook.image || '/assets/images/books/book1.jpg' }];
+  }, [dbProduct, card, activeBook.image, activeBook.video]);
+
+  const totalItems = galleryItems.length;
+
+  const handlePrev = (e) => {
+    if (e) e.stopPropagation();
+    if (totalItems <= 1) return;
+    setActiveMediaIndex((prev) => (prev - 1 + totalItems) % totalItems);
+  };
+
+  const handleNext = (e) => {
+    if (e) e.stopPropagation();
+    if (totalItems <= 1) return;
+    setActiveMediaIndex((prev) => (prev + 1) % totalItems);
+  };
+
+  // Gestion Swipe Touch (Mobile)
+  const handleTouchStart = (e) => {
+    if (totalItems <= 1) return;
+    setTouchStartX(e.touches[0].clientX);
+    setIsDragging(true);
+    setDragOffset(0);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging || totalItems <= 1) return;
+    const diff = e.touches[0].clientX - touchStartX;
+    setDragOffset(diff);
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging || totalItems <= 1) return;
+    setIsDragging(false);
+    if (dragOffset < -35) {
+      handleNext();
+    } else if (dragOffset > 35) {
+      handlePrev();
+    }
+    setDragOffset(0);
+  };
+
+  // Gestion Swipe Souris (Desktop)
+  const handleMouseDown = (e) => {
+    if (totalItems <= 1) return;
+    setTouchStartX(e.clientX);
+    setIsDragging(true);
+    setDragOffset(0);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging || totalItems <= 1) return;
+    const diff = e.clientX - touchStartX;
+    setDragOffset(diff);
+  };
+
+  const handleMouseUp = () => {
+    if (!isDragging || totalItems <= 1) return;
+    setIsDragging(false);
+    if (dragOffset < -35) {
+      handleNext();
+    } else if (dragOffset > 35) {
+      handlePrev();
+    }
+    setDragOffset(0);
+  };
+
+  const handleMouseLeave = () => {
+    if (isDragging) {
+      handleMouseUp();
+    }
+  };
+
   const handleClose = () => {
     setIsClosing(true);
     setTimeout(() => {
@@ -145,44 +281,152 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
 
         {/* Scrollable Content */}
         <div className="book-sheet-content">
-          {/* Animated Hero Media Card */}
-          <div className="book-sheet-media-card">
-            {activeBook.video ? (
-              <video 
-                src={activeBook.video} 
-                poster={activeBook.image} 
-                autoPlay 
-                loop 
-                muted 
-                playsInline 
-                className="book-sheet-media"
-              />
-            ) : (
-              <img 
-                src={activeBook.image} 
-                alt={activeBook.name} 
-                className="book-sheet-media"
-                onError={(e) => {
-                  e.target.src = '/assets/images/books/book1.jpg';
-                }}
-              />
+          {/* Animated Hero Media Card with Touch/Mouse Swipe Gallery */}
+          <div 
+            className="book-sheet-media-card"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+            style={{ 
+              userSelect: 'none', 
+              touchAction: 'pan-y',
+              cursor: totalItems > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
+            }}
+          >
+            {/* Slider Track */}
+            <div 
+              className="book-sheet-gallery-track"
+              style={{
+                display: 'flex',
+                width: `${totalItems * 100}%`,
+                height: '100%',
+                transform: `translateX(calc(-${activeMediaIndex * (100 / totalItems)}% + ${dragOffset}px))`,
+                transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)'
+              }}
+            >
+              {galleryItems.map((item, idx) => (
+                <div 
+                  key={idx}
+                  style={{
+                    width: `${100 / totalItems}%`,
+                    height: '100%',
+                    flexShrink: 0,
+                    position: 'relative',
+                    background: '#111827'
+                  }}
+                >
+                  {item.type === 'video' ? (
+                    <video 
+                      src={item.url} 
+                      poster={activeBook.image} 
+                      autoPlay={idx === activeMediaIndex} 
+                      loop 
+                      muted 
+                      controls
+                      playsInline 
+                      className="book-sheet-media"
+                    />
+                  ) : (
+                    <img 
+                      src={item.url} 
+                      alt={`${activeName} - photo ${idx + 1}`} 
+                      className="book-sheet-media"
+                      onError={(e) => {
+                        e.target.src = '/assets/images/books/book1.jpg';
+                      }}
+                      draggable={false}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Badges & Navigation Buttons if multiple media */}
+            {totalItems > 1 && (
+              <>
+                {/* Bouton Précédent (<) */}
+                <button
+                  type="button"
+                  className="book-sheet-gallery-nav prev"
+                  onClick={handlePrev}
+                  aria-label="Photo précédente"
+                >
+                  <i className="feather icon-chevron-left"></i>
+                </button>
+
+                {/* Bouton Suivant (>) */}
+                <button
+                  type="button"
+                  className="book-sheet-gallery-nav next"
+                  onClick={handleNext}
+                  aria-label="Photo suivante"
+                >
+                  <i className="feather icon-chevron-right"></i>
+                </button>
+
+                {/* Dots de pagination */}
+                <div className="book-sheet-gallery-dots">
+                  {galleryItems.map((_, dotIdx) => (
+                    <button
+                      key={dotIdx}
+                      type="button"
+                      className={`book-sheet-dot ${dotIdx === activeMediaIndex ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMediaIndex(dotIdx);
+                      }}
+                      aria-label={`Aller au média ${dotIdx + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
+          {/* Miniatures cliquables sous le grand média */}
+          {totalItems > 1 && (
+            <div className="book-sheet-thumbnails-row">
+              {galleryItems.map((item, thumbIdx) => {
+                const isActive = thumbIdx === activeMediaIndex;
+                return (
+                  <button
+                    key={thumbIdx}
+                    type="button"
+                    onClick={() => setActiveMediaIndex(thumbIdx)}
+                    className={`book-sheet-thumb-btn ${isActive ? 'active' : ''}`}
+                    aria-label={`Afficher média ${thumbIdx + 1}`}
+                  >
+                    {item.type === 'video' ? (
+                      <div className="book-sheet-thumb-video-icon">
+                        <i className="feather icon-play"></i>
+                      </div>
+                    ) : (
+                      <img 
+                        src={item.url} 
+                        alt={`Miniature ${thumbIdx + 1}`} 
+                        className="book-sheet-thumb-img" 
+                        onError={(e) => { e.target.src = '/assets/images/books/book1.jpg'; }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Book Info */}
           <div className="book-sheet-body">
-            <div className="d-flex justify-content-between align-items-start mb-2">
-              <div>
-                <h3 className="book-sheet-title mb-0">{activeName}</h3>
-                {hasAuthor ? (
-                  <span className="text-muted d-block" style={{ fontSize: '13px', marginTop: '3px' }}>
-                    Par {rawAuthor}
-                  </span>
-                ) : null}
-              </div>
-              <div className="book-sheet-price">
-                {price}
-              </div>
+            <div className="mb-2">
+              <h3 className="book-sheet-title mb-0">{activeName}</h3>
+              {hasAuthor ? (
+                <span className="text-muted d-block" style={{ fontSize: '13px', marginTop: '3px' }}>
+                  Par {rawAuthor}
+                </span>
+              ) : null}
             </div>
 
             {/* Badges Catégorie & Format récupérés depuis la BDD (uniquement si renseignés) */}
