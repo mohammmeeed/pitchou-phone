@@ -102,7 +102,13 @@ export const DatingProvider = ({ children }) => {
     return allProfiles.filter((p) => {
       // 1. Catégories
       if (activeFilters.categories && activeFilters.categories.length > 0) {
-        if (!p.category || !activeFilters.categories.includes(p.category)) {
+        const pCats = Array.isArray(p.categories) && p.categories.length > 0
+          ? p.categories
+          : (typeof p.category === 'string' && p.category.trim() !== ''
+              ? p.category.split(',').map((s) => s.trim())
+              : []);
+        const matchesCategory = pCats.some((c) => activeFilters.categories.includes(c));
+        if (!matchesCategory) {
           return false;
         }
       }
@@ -250,6 +256,9 @@ export const DatingProvider = ({ children }) => {
           location: p.location || '',
           distance: `${Number(p.price).toLocaleString('fr-FR')} DA`,
           category: p.category || '',
+          categories: Array.isArray(p.categories) && p.categories.length > 0 
+            ? p.categories 
+            : (typeof p.category === 'string' && p.category.trim() !== '' ? p.category.split(',').map((s) => s.trim()).filter(Boolean) : []),
           stock: p.stock || 0,
           languages: Array.isArray(p.languages)
             ? p.languages

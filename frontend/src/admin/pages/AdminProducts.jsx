@@ -8,6 +8,8 @@ export default function AdminProducts() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tous');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
 
   // In-Page View State: 'list' (Catalogue table) or 'form' (Integrated form card, NO pop-up!)
   const [viewMode, setViewMode] = useState('list');
@@ -52,6 +54,7 @@ export default function AdminProducts() {
     price: '',
     stock: '15',
     category: '',
+    categories: [],
     rating: 4.8,
     image: '',
     images: [],
@@ -60,6 +63,26 @@ export default function AdminProducts() {
     bio: '',
     languages: []
   });
+
+
+  const toggleCategory = (cat) => {
+    setFormData((prev) => {
+      let current = [];
+      if (Array.isArray(prev.categories) && prev.categories.length > 0) {
+        current = prev.categories;
+      } else if (prev.category) {
+        current = prev.category.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+      const updated = current.includes(cat)
+        ? current.filter((c) => c !== cat)
+        : [...current, cat];
+      return {
+        ...prev,
+        categories: updated,
+        category: updated.join(', ')
+      };
+    });
+  };
 
   const toggleLanguage = (lang) => {
     setFormData((prev) => {
@@ -116,9 +139,14 @@ export default function AdminProducts() {
     }
     const updated = categoriesList.map((c) => (c === oldName ? trimmed : c));
     setCategoriesList(updated);
-    if (formData.category === oldName) {
-      setFormData((prev) => ({ ...prev, category: trimmed }));
-    }
+    setFormData((prev) => {
+      const currentCats = (prev.categories || []).map((c) => (c === oldName ? trimmed : c));
+      return {
+        ...prev,
+        categories: currentCats,
+        category: currentCats.join(', ')
+      };
+    });
     if (selectedCategory === oldName) {
       setSelectedCategory(trimmed);
     }
@@ -131,9 +159,14 @@ export default function AdminProducts() {
   const handleDeleteCategory = async (catName) => {
     const updated = categoriesList.filter((c) => c !== catName);
     setCategoriesList(updated);
-    if (formData.category === catName) {
-      setFormData((prev) => ({ ...prev, category: '' }));
-    }
+    setFormData((prev) => {
+      const currentCats = (prev.categories || []).filter((c) => c !== catName);
+      return {
+        ...prev,
+        categories: currentCats,
+        category: currentCats.join(', ')
+      };
+    });
     if (selectedCategory === catName) {
       setSelectedCategory('Tous');
     }
@@ -427,6 +460,7 @@ export default function AdminProducts() {
       price: '',
       stock: '15',
       category: '',
+      categories: [],
       rating: 4.8,
       image: '',
       images: [],
@@ -451,6 +485,21 @@ export default function AdminProducts() {
       parsedLangs = prod.languages;
     } else if (typeof prod.languages === 'string' && prod.languages.trim() !== '') {
       parsedLangs = prod.languages.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+
+    // Parse categories array
+    let parsedCategories = [];
+    if (Array.isArray(prod.categories) && prod.categories.length > 0) {
+      parsedCategories = prod.categories;
+    } else if (typeof prod.categories === 'string' && prod.categories.trim() !== '') {
+      try {
+        const decoded = JSON.parse(prod.categories);
+        if (Array.isArray(decoded)) parsedCategories = decoded;
+      } catch (e) {
+        parsedCategories = prod.categories.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    } else if (prod.category) {
+      parsedCategories = prod.category.split(',').map((s) => s.trim()).filter(Boolean);
     }
 
     // Parse images array
@@ -489,7 +538,8 @@ export default function AdminProducts() {
       format: prod.format || '',
       price: prod.price || '',
       stock: prod.stock || '15',
-      category: prod.category || '',
+      category: parsedCategories.join(', '),
+      categories: parsedCategories,
       rating: prod.rating || 4.8,
       image: parsedImages[0] || prod.image || '',
       images: parsedImages,
@@ -511,6 +561,8 @@ export default function AdminProducts() {
 
     const payload = {
       ...formData,
+      category: (formData.categories || []).join(', ') || formData.category || '',
+      categories: formData.categories || [],
       image: formData.images?.[0] || formData.image || '',
       images: formData.images || [],
       video: formData.videos?.[0] || formData.video || null,
@@ -550,12 +602,26 @@ export default function AdminProducts() {
   const categoriesForFilter = ['Tous', ...categoriesList];
 
   const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.author.toLowerCase().includes(search.toLowerCase());
-    const matchesCat = selectedCategory === 'Tous' || p.category === selectedCategory;
+    const pName = (p.name || '').toLowerCase();
+    const pAuthor = (p.author || '').toLowerCase();
+    const q = (search || '').toLowerCase().trim();
+    const matchesSearch = !q || pName.includes(q) || pAuthor.includes(q);
+
+    let matchesCat = selectedCategory === 'Tous';
+    if (!matchesCat) {
+      const pCats = Array.isArray(p.categories) && p.categories.length > 0
+        ? p.categories
+        : (p.category ? p.category.split(',').map((s) => s.trim()) : []);
+      matchesCat = pCats.includes(selectedCategory);
+    }
     return matchesSearch && matchesCat;
   });
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage) || 1;
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <AdminLayout>
@@ -911,7 +977,7 @@ export default function AdminProducts() {
                     </div>
 
                     {/* Auteur */}
-                    <div className="form-group-custom">
+                    <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
                       <label className="form-label-custom">Auteur / Écrivain (Optionnel)</label>
                       <input
                         type="text"
@@ -922,39 +988,129 @@ export default function AdminProducts() {
                       />
                     </div>
 
-                    {/* Catégorie */}
-                    <div className="form-group-custom">
+                    {/* Catégories du Livre (Sélection par Cases à Cocher / Checkboxes) */}
+                    <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                        <label className="form-label-custom" style={{ margin: 0 }}>Catégorie</label>
-                        <button
-                          type="button"
-                          onClick={() => setViewMode('attributes')}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#fe2c55',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                          }}
-                        >
-                          <i className="fas fa-sliders-h" style={{ fontSize: '0.72rem' }} />
-                          Gérer
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <label className="form-label-custom" style={{ margin: 0 }}>Catégorie(s) du Livre</label>
+                          {(() => {
+                            const currentCats = Array.isArray(formData.categories) && formData.categories.length > 0
+                              ? formData.categories
+                              : (formData.category ? formData.category.split(',').map((s) => s.trim()).filter(Boolean) : []);
+                            if (currentCats.length === 0) return null;
+                            return (
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  background: '#eff6ff',
+                                  color: '#2563eb',
+                                  padding: '0.15rem 0.6rem',
+                                  borderRadius: '9999px',
+                                  border: '1px solid #bfdbfe'
+                                }}
+                              >
+                                {currentCats.length} sélectionnée{currentCats.length > 1 ? 's' : ''}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          {(() => {
+                            const currentCats = Array.isArray(formData.categories) && formData.categories.length > 0
+                              ? formData.categories
+                              : (formData.category ? formData.category.split(',').map((s) => s.trim()).filter(Boolean) : []);
+                            if (currentCats.length === 0) return null;
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setFormData((prev) => ({ ...prev, categories: [], category: '' }))}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#888',
+                                  fontSize: '0.78rem',
+                                  cursor: 'pointer',
+                                  textDecoration: 'underline'
+                                }}
+                              >
+                                Tout désélectionner
+                              </button>
+                            );
+                          })()}
+                          <button
+                            type="button"
+                            onClick={() => setViewMode('attributes')}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#fe2c55',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}
+                          >
+                            <i className="fas fa-sliders-h" style={{ fontSize: '0.72rem' }} />
+                            Gérer
+                          </button>
+                        </div>
                       </div>
-                      <select
-                        className="form-control-custom"
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      >
-                        <option value="">-- Aucune catégorie --</option>
-                        {categoriesList.map((cat) => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
+
+                      {/* Liste directe des Checkboxes (Sans aucun Dropdown) */}
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                        {categoriesList.map((cat) => {
+                          const currentCats = Array.isArray(formData.categories) && formData.categories.length > 0
+                            ? formData.categories
+                            : (formData.category ? formData.category.split(',').map((s) => s.trim()).filter(Boolean) : []);
+                          const isSelected = currentCats.includes(cat);
+
+                          return (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => toggleCategory(cat)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.6rem',
+                                padding: '0.65rem 1.15rem',
+                                borderRadius: '8px',
+                                border: isSelected ? '2px solid #111111' : '1px solid #d4d4d8',
+                                backgroundColor: isSelected ? '#111111' : '#ffffff',
+                                color: isSelected ? '#ffffff' : '#374151',
+                                fontWeight: isSelected ? 600 : 500,
+                                fontSize: '0.88rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                boxShadow: isSelected ? '0 2px 5px rgba(0,0,0,0.1)' : 'none'
+                              }}
+                            >
+                              <span
+                                style={{
+                                  width: '18px',
+                                  height: '18px',
+                                  borderRadius: '4px',
+                                  border: isSelected ? '1.5px solid #34d399' : '1.5px solid #9ca3af',
+                                  backgroundColor: isSelected ? '#34d399' : '#ffffff',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.7rem',
+                                  color: '#111111',
+                                  fontWeight: 900,
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                {isSelected && <i className="fas fa-check" />}
+                              </span>
+                              <span>{cat}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Prix */}
@@ -1604,11 +1760,21 @@ export default function AdminProducts() {
                   />
                 </div>
 
-                {formData.category ? (
-                  <span className="badge-custom bg-soft-primary" style={{ marginBottom: '0.5rem', display: 'inline-block' }}>
-                    {formData.category}
-                  </span>
-                ) : null}
+                {(() => {
+                  const previewCats = Array.isArray(formData.categories) && formData.categories.length > 0
+                    ? formData.categories
+                    : (formData.category ? formData.category.split(',').map((s) => s.trim()).filter(Boolean) : []);
+                  if (previewCats.length === 0) return null;
+                  return (
+                    <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                      {previewCats.map((cat, idx) => (
+                        <span key={idx} className="badge-custom bg-soft-primary" style={{ fontSize: '0.75rem' }}>
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 <h3 style={{ fontSize: '1.15rem', color: '#333', margin: '0.4rem 0 0.2rem' }}>
                   {formData.name || 'Titre du Produit'}
@@ -1766,12 +1932,22 @@ export default function AdminProducts() {
                     className="form-control-custom"
                     placeholder="Rechercher par titre ou auteur..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     style={{ paddingLeft: '2.4rem' }}
                   />
                 </div>
                 {search && (
-                  <button className="btn-light-custom" onClick={() => setSearch('')} style={{ padding: '0.5rem 0.8rem' }}>
+                  <button
+                    className="btn-light-custom"
+                    onClick={() => {
+                      setSearch('');
+                      setCurrentPage(1);
+                    }}
+                    style={{ padding: '0.5rem 0.8rem' }}
+                  >
                     Effacer
                   </button>
                 )}
@@ -1782,7 +1958,10 @@ export default function AdminProducts() {
                   <button
                     key={cat}
                     type="button"
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => {
+                      setSelectedCategory(cat);
+                      setCurrentPage(1);
+                    }}
                     style={{
                       padding: '0.45rem 0.9rem',
                       fontSize: '0.8rem',
@@ -1834,7 +2013,7 @@ export default function AdminProducts() {
                       </td>
                     </tr>
                   ) : (
-                    filteredProducts.map((p) => {
+                    paginatedProducts.map((p) => {
                       const stockNum = parseInt(p.stock, 10);
                       const isConfirmingDelete = deleteConfirmId === p.id;
 
@@ -1870,11 +2049,27 @@ export default function AdminProducts() {
                             </span>
                           </td>
                           <td>
-                            {p.category ? (
-                              <span className="badge-custom bg-soft-info">{p.category}</span>
-                            ) : (
-                              <span style={{ color: '#aaa', fontSize: '0.8rem' }}>—</span>
-                            )}
+                            {(() => {
+                              const cats = Array.isArray(p.categories) && p.categories.length > 0
+                                ? p.categories
+                                : (p.category ? p.category.split(',').map((s) => s.trim()).filter(Boolean) : []);
+                              if (cats.length === 0) {
+                                return <span style={{ color: '#aaa', fontSize: '0.8rem' }}>—</span>;
+                              }
+                              return (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxWidth: '240px' }}>
+                                  {cats.map((cat, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="badge-custom bg-soft-info"
+                                      style={{ fontSize: '0.73rem', whiteSpace: 'nowrap' }}
+                                    >
+                                      {cat}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td>
                             <strong style={{ fontSize: '1rem', color: '#111111' }}>
@@ -1953,6 +2148,66 @@ export default function AdminProducts() {
                 </tbody>
               </table>
             </div>
+
+            {/* Contrôles de Pagination Fluide */}
+            {filteredProducts.length > itemsPerPage && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '1rem 1.5rem',
+                  borderTop: '1px solid #f0f0f0',
+                  flexWrap: 'wrap',
+                  gap: '1rem'
+                }}
+              >
+                <div style={{ fontSize: '0.88rem', color: '#666' }}>
+                  Affichage de <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> à{' '}
+                  <strong>{Math.min(currentPage * itemsPerPage, filteredProducts.length)}</strong> sur{' '}
+                  <strong>{filteredProducts.length.toLocaleString('fr-FR')}</strong> livres
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn-light-custom"
+                    disabled={currentPage <= 1}
+                    onClick={() => {
+                      setCurrentPage((prev) => Math.max(1, prev - 1));
+                      window.scrollTo({ top: 400, behavior: 'smooth' });
+                    }}
+                    style={{
+                      padding: '0.4rem 0.85rem',
+                      fontSize: '0.85rem',
+                      cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+                      opacity: currentPage <= 1 ? 0.5 : 1
+                    }}
+                  >
+                    ← Précédent
+                  </button>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600, padding: '0 0.5rem', color: '#18181b' }}>
+                    Page {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-light-custom"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => {
+                      setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                      window.scrollTo({ top: 400, behavior: 'smooth' });
+                    }}
+                    style={{
+                      padding: '0.4rem 0.85rem',
+                      fontSize: '0.85rem',
+                      cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+                      opacity: currentPage >= totalPages ? 0.5 : 1
+                    }}
+                  >
+                    Suivant →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

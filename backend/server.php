@@ -17,7 +17,23 @@ if (preg_match('#^/api/([a-zA-Z0-9_-]+)(?:\.php)?#', $uri, $matches)) {
 // Serve static files if they exist (uploads, images, assets)
 $filePath = __DIR__ . $uri;
 if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {
-    return false; // serve requested file as-is
+    $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+    $mimes = [
+        'webp' => 'image/webp',
+        'jpg'  => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png'  => 'image/png',
+        'gif'  => 'image/gif',
+        'svg'  => 'image/svg+xml',
+        'mp4'  => 'video/mp4',
+        'webm' => 'video/webm'
+    ];
+    $contentType = $mimes[$ext] ?? (function_exists('mime_content_type') ? mime_content_type($filePath) : 'application/octet-stream');
+    header("Access-Control-Allow-Origin: *");
+    header("Content-Type: " . $contentType);
+    header("Content-Length: " . filesize($filePath));
+    readfile($filePath);
+    exit();
 }
 
 // Fallback response for root

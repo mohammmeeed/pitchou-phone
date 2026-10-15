@@ -88,9 +88,21 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
     ? parseLangs(dbProduct.languages)
     : parseLangs(card?.languages);
 
+  // Catégories multiples
+  const bookCategories = React.useMemo(() => {
+    const raw = dbProduct?.categories || card?.categories;
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw.filter(Boolean);
+    }
+    if (rawCategory && rawCategory !== '-- Aucune catégorie --') {
+      return rawCategory.split(',').map((s) => s.trim()).filter((s) => s && s !== '-- Aucune catégorie --');
+    }
+    return [];
+  }, [dbProduct, card, rawCategory]);
+
   // Filtre strict : ne pas afficher si le champ est vide ou s'il contient des libellés temporaires
   const hasAuthor = rawAuthor !== '' && rawAuthor.toLowerCase() !== 'auteur';
-  const hasCategory = rawCategory !== '' && rawCategory !== '-- Aucune catégorie --';
+  const hasCategory = bookCategories.length > 0;
   const hasFormat = rawFormat !== '' && rawFormat.toLowerCase() !== 'format';
   const hasBio = rawBio !== '';
 
@@ -432,8 +444,9 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
             {/* Badges Catégorie & Format récupérés depuis la BDD (uniquement si renseignés) */}
             {(hasCategory || hasFormat) ? (
               <div className="d-flex align-items-center gap-2 flex-wrap mb-3">
-                {hasCategory ? (
+                {bookCategories.map((cat) => (
                   <span 
+                    key={cat}
                     style={{ 
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -448,9 +461,9 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
                     }}
                   >
                     <i className="feather icon-bookmark text-primary" style={{ fontSize: '12px' }}></i>
-                    {rawCategory}
+                    {cat}
                   </span>
-                ) : null}
+                ))}
                 {hasFormat ? (
                   <span 
                     style={{ 

@@ -32,7 +32,14 @@ const Filter = () => {
   }, []);
 
   const categoriesList = useMemo(() => {
-    const fromProducts = allProducts.map((p) => p.category).filter(Boolean);
+    const fromProducts = allProducts.flatMap((p) => {
+      if (Array.isArray(p.categories)) return p.categories;
+      if (typeof p.categories === 'string' && p.categories.trim() !== '') {
+        try { return JSON.parse(p.categories); } catch(e) { return p.categories.split(',').map((s) => s.trim()); }
+      }
+      if (typeof p.category === 'string') return p.category.split(',').map((s) => s.trim());
+      return [];
+    }).filter(Boolean);
     const combined = Array.from(new Set([...defaultCategories, ...fromProducts]));
     return combined.filter((c) => c && c.trim() !== '');
   }, [allProducts, defaultCategories]);

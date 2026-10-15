@@ -62,6 +62,21 @@ function formatProduct(array $product): array {
         $product['video'] = $product['videos'][0];
     }
 
+    // Decode categories array
+    $categories = [];
+    if (!empty($product['categories'])) {
+        $decoded = json_decode($product['categories'], true);
+        if (is_array($decoded)) {
+            $categories = $decoded;
+        } else {
+            $categories = array_filter(array_map('trim', explode(',', $product['categories'])));
+        }
+    } elseif (!empty($product['category'])) {
+        $categories = array_filter(array_map('trim', explode(',', $product['category'])));
+    }
+    $product['categories'] = array_values($categories);
+    $product['category'] = !empty($product['categories']) ? implode(', ', $product['categories']) : ($product['category'] ?? '');
+
     return $product;
 }
 
@@ -109,6 +124,17 @@ function handlePost(PDO $pdo): void {
         ? implode(', ', array_filter($input['languages'])) 
         : trim($input['languages'] ?? '');
 
+    // Multi-categories
+    $categories = [];
+    if (!empty($input['categories'])) {
+        $categories = is_array($input['categories']) ? $input['categories'] : (json_decode($input['categories'], true) ?? [$input['categories']]);
+    } elseif (!empty($input['category'])) {
+        $categories = is_array($input['category']) ? $input['category'] : array_map('trim', explode(',', $input['category']));
+    }
+    $categories = array_values(array_filter($categories));
+    $categoriesStr = implode(', ', $categories);
+    $categoriesJson = !empty($categories) ? json_encode($categories, JSON_UNESCAPED_UNICODE) : null;
+
     // Multi-images
     $images = [];
     if (!empty($input['images'])) {
@@ -131,14 +157,15 @@ function handlePost(PDO $pdo): void {
     $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
     $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
 
-    $stmt = $pdo->prepare("INSERT INTO products (name, author, format, price, stock, category, rating, image, images, video, videos, bio, languages, is_featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO products (name, author, format, price, stock, category, categories, rating, image, images, video, videos, bio, languages, is_featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         trim($input['name']),
         trim($input['author'] ?? ''),
         trim($input['format'] ?? ''),
         (float)$input['price'],
         (int)($input['stock'] ?? 10),
-        trim($input['category'] ?? ''),
+        $categoriesStr,
+        $categoriesJson,
         (float)($input['rating'] ?? 5.0),
         $mainImage,
         $imagesJson,
@@ -172,6 +199,17 @@ function handlePut(PDO $pdo): void {
         ? implode(', ', array_filter($input['languages'])) 
         : trim($input['languages'] ?? '');
 
+    // Multi-categories
+    $categories = [];
+    if (isset($input['categories'])) {
+        $categories = is_array($input['categories']) ? $input['categories'] : (json_decode($input['categories'], true) ?? [$input['categories']]);
+    } elseif (!empty($input['category'])) {
+        $categories = is_array($input['category']) ? $input['category'] : array_map('trim', explode(',', $input['category']));
+    }
+    $categories = array_values(array_filter($categories));
+    $categoriesStr = implode(', ', $categories);
+    $categoriesJson = !empty($categories) ? json_encode($categories, JSON_UNESCAPED_UNICODE) : null;
+
     // Multi-images
     $images = [];
     if (isset($input['images'])) {
@@ -194,14 +232,15 @@ function handlePut(PDO $pdo): void {
     $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
     $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
 
-    $stmt = $pdo->prepare("UPDATE products SET name = ?, author = ?, format = ?, price = ?, stock = ?, category = ?, image = ?, images = ?, video = ?, videos = ?, bio = ?, languages = ?, is_featured = ? WHERE id = ?");
+    $stmt = $pdo->prepare("UPDATE products SET name = ?, author = ?, format = ?, price = ?, stock = ?, category = ?, categories = ?, image = ?, images = ?, video = ?, videos = ?, bio = ?, languages = ?, is_featured = ? WHERE id = ?");
     $stmt->execute([
         trim($input['name']),
         trim($input['author'] ?? ''),
         trim($input['format'] ?? ''),
         (float)$input['price'],
         (int)($input['stock'] ?? 10),
-        trim($input['category'] ?? ''),
+        $categoriesStr,
+        $categoriesJson,
         $mainImage,
         $imagesJson,
         $mainVideo,
