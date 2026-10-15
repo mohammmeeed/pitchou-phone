@@ -270,10 +270,10 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
             </span>
           </div>
 
-          <div className="d-flex align-items-center gap-2">
+          <div className="d-flex align-items-center">
             <button
               type="button"
-              className="card-add-to-cart-btn flex-grow-1"
+              className="card-add-to-cart-btn w-100"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -297,52 +297,6 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
                 <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
               </svg>
               <span>AJOUTER AU PANIER</span>
-            </button>
-
-            {/* Bouton Favoris / Swipe Droit */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (isCardFavorited) {
-                  if (removeFromLiked) removeFromLiked(card.id);
-                } else {
-                  if (isCurrent) {
-                    startSlide('to-right');
-                  } else if (addToLiked) {
-                    addToLiked(card);
-                  }
-                }
-              }}
-              style={{
-                width: '46px',
-                height: '46px',
-                borderRadius: '14px',
-                background: isCardFavorited ? 'var(--primary, #ff4458)' : 'rgba(255, 255, 255, 0.95)',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                flexShrink: 0,
-                boxShadow: isCardFavorited ? 'var(--btn-shadow, 0 4px 14px var(--rgba-primary-4))' : '0 4px 14px rgba(0,0,0,0.18)',
-                transition: 'all 0.25s ease'
-              }}
-              title={isCardFavorited ? 'En favoris (cliquer pour retirer)' : 'Mettre en favoris'}
-            >
-              <svg 
-                width="22" 
-                height="22" 
-                viewBox="0 0 24 24" 
-                fill={isCardFavorited ? '#ffffff' : 'var(--primary, #ff4458)'} 
-                stroke={isCardFavorited ? '#ffffff' : 'var(--primary, #ff4458)'} 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-              </svg>
             </button>
           </div>
         </div>
