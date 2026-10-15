@@ -85,20 +85,28 @@ body::-webkit-scrollbar-thumb:hover,
 
 /* Only the Home page card deck stays pinned to screen without extra vertical page scroll */
 .page-wrapper.overflow-hidden {
-  height: 100vh !important;
-  max-height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
   overflow: hidden !important;
 }
 
-/* Home Card Area: stretches from header to bottom navbar to fill remaining width & height */
+/* Home Card Area: stretches from header to bottom navbar with safe clearance */
 .home-card-wrapper {
   position: absolute !important;
   top: 60px !important;
-  bottom: 65px !important;
+  bottom: calc(94px + env(safe-area-inset-bottom, 0px)) !important;
   left: 0 !important;
   right: 0 !important;
-  margin: 0 !important;
-  padding: 6px 10px 8px 10px !important;
+  margin: 0 auto !important;
+  max-width: 600px !important;
+  padding: 4px 10px 6px 10px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -177,13 +185,12 @@ body::-webkit-scrollbar-thumb:hover,
 }
 
 /* Card Content: overlaid INSIDE at the bottom of the card */
-/* Card Content: overlaid INSIDE at the bottom of the card */
 .dzSwipe_card .dz-content {
   position: absolute !important;
   left: 0 !important;
   bottom: 0 !important;
   width: 100% !important;
-  padding: 20px 18px 24px 18px !important;
+  padding: 16px 16px 16px 16px !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
@@ -217,10 +224,10 @@ body::-webkit-scrollbar-thumb:hover,
 .dzSwipe_card .dz-content .title,
 .dzSwipe_card .dz-content .title a {
   color: #ffffff !important;
-  font-size: 22px !important;
+  font-size: 20px !important;
   font-weight: 700 !important;
   line-height: 1.25 !important;
-  margin-bottom: 4px !important;
+  margin-bottom: 3px !important;
   text-decoration: none !important;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6) !important;
   display: block !important;
@@ -232,12 +239,12 @@ body::-webkit-scrollbar-thumb:hover,
   display: flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
-  margin: 6px 0 14px 0 !important;
+  margin: 3px 0 10px 0 !important;
 }
 
 .card-price-value {
   color: #ffffff !important;
-  font-size: 27px !important;
+  font-size: 25px !important;
   font-weight: 800 !important;
   letter-spacing: -0.5px !important;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7) !important;
@@ -251,13 +258,13 @@ body::-webkit-scrollbar-thumb:hover,
   color: #000000 !important;
   border: none !important;
   border-radius: 9999px !important;
-  padding: 13px 18px !important;
+  padding: 12px 18px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 10px !important;
   cursor: pointer !important;
-  font-size: 14.5px !important;
+  font-size: 14px !important;
   font-weight: 800 !important;
   letter-spacing: 0.6px !important;
   text-transform: uppercase !important;
@@ -274,6 +281,46 @@ body::-webkit-scrollbar-thumb:hover,
 
 .card-add-to-cart-btn:active {
   transform: scale(0.98) !important;
+}
+
+@media (max-width: 576px) {
+  .home-card-wrapper {
+    top: 56px !important;
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 2px 8px 4px 8px !important;
+  }
+  .dzSwipe_card .dz-content {
+    padding: 14px 14px 18px 14px !important;
+  }
+  .dzSwipe_card .dz-content .title,
+  .dzSwipe_card .dz-content .title a {
+    font-size: 18px !important;
+  }
+  .card-price-value {
+    font-size: 23px !important;
+  }
+  .card-add-to-cart-btn {
+    padding: 12px 14px !important;
+    font-size: 13.5px !important;
+    margin-bottom: 4px !important;
+  }
+}
+
+@media (max-height: 680px) {
+  .home-card-wrapper {
+    top: 52px !important;
+    bottom: calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .dzSwipe_card .dz-content {
+    padding: 10px 12px 14px 12px !important;
+  }
+  .card-price-wrap {
+    margin: 2px 0 6px 0 !important;
+  }
+  .card-add-to-cart-btn {
+    padding: 10px 14px !important;
+    margin-bottom: 2px !important;
+  }
 }
 
 .card-add-to-cart-btn span {

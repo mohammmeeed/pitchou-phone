@@ -51,7 +51,6 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: "Messagerie", path: "/chat", icon: "icon-message-circle" },
     { name: "Paramètres", path: "/setting", icon: "icon-settings" },
     { name: "Mon Profil", path: isLoggedIn ? "/profile" : "/login", icon: "icon-user" },
-    { name: "Panneau Admin", path: "/admin", icon: "icon-shield" },
     ...(isLoggedIn
       ? [{ name: "Déconnexion", path: "/home", icon: "icon-log-out" }]
       : [{ name: "Connexion / Inscription", path: "/login", icon: "icon-log-in" }])
@@ -137,7 +136,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               </li>
             </ul>
             <div className="app-info">
-              <h6 className="name">Dating Kit</h6>
+              <h6 className="name">LeerBook</h6>
               <span className="ver-info">App Version 1.2</span>
             </div>
           </div>

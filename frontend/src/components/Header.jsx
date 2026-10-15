@@ -27,7 +27,7 @@ const Header = ({
     return localStorage.getItem('shop_logo_image') || '';
   });
   const [shopLogoText, setShopLogoText] = React.useState(() => {
-    return localStorage.getItem('shop_logo_text') || 'TikTok Shop';
+    return localStorage.getItem('shop_logo_text') || 'LeerBook';
   });
 
   React.useEffect(() => {
@@ -37,7 +37,7 @@ const Header = ({
     };
     window.addEventListener('shop_logo_changed', handleLogoChange);
 
-    fetch('http://localhost:8000/api/parameters')
+    fetch('/api/parameters')
       .then(res => res.json())
       .then(data => {
         if (data?.settings?.logo_image !== undefined) {

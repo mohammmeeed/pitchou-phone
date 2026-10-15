@@ -1,7 +1,7 @@
 // frontend/src/admin/services/adminApi.js
 // Communication service with PHP backend at http://localhost:8000/api
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = '/api';
 
 // Fallback mock data in case PHP backend is not yet started or during development
 const FALLBACK_STATS = {
@@ -144,9 +144,13 @@ export const adminApi = {
       });
       const data = await res.json();
       if (data.success && data.user) {
-        localStorage.setItem('admin_token', data.token || 'tk_admin_' + Date.now());
-        localStorage.setItem('admin_user', JSON.stringify(data.user));
-        return { success: true, user: data.user };
+        if (data.user.role === 'admin') {
+          localStorage.setItem('admin_token', data.token || 'tk_admin_' + Date.now());
+          localStorage.setItem('admin_user', JSON.stringify(data.user));
+          return { success: true, user: data.user };
+        } else {
+          return { success: false, message: "Accès refusé : Ce compte n'a pas les privilèges administrateur." };
+        }
       }
       return { success: false, message: data.message || 'Identifiants invalides' };
     } catch (err) {

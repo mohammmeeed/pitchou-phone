@@ -39,7 +39,7 @@ const Profile = () => {
     setLoadingOrders(true);
     try {
       const q = query ? encodeURIComponent(query.trim()) : (customerPhone && customerPhone !== 'Non connecté' ? encodeURIComponent(customerPhone) : '');
-      const res = await fetch(`http://localhost:8000/api/orders?search=${q}`);
+      const res = await fetch(`/api/orders?search=${q}`);
       if (res.ok) {
         const json = await res.json();
         setOrders(json.data || []);

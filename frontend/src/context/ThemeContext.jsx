@@ -108,7 +108,7 @@ export const ThemeProvider = ({ children }) => {
     // 2. Fetch active settings from PHP backend API
     const fetchBackendSettings = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/parameters');
+        const res = await fetch('/api/parameters');
         if (res.ok) {
           const data = await res.json();
           const serverColor = data?.settings?.accent_color;

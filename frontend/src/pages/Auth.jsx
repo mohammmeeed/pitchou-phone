@@ -33,7 +33,7 @@ const Auth = ({ defaultTab = 'login' }) => {
     if (pendingOrderStr) {
       try {
         const pending = JSON.parse(pendingOrderStr);
-        await fetch('http://localhost:8000/api/orders', {
+        await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -84,7 +84,7 @@ const Auth = ({ defaultTab = 'login' }) => {
 
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/auth', {
+      const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -153,7 +153,7 @@ const Auth = ({ defaultTab = 'login' }) => {
 
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/customers', {
+      const res = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

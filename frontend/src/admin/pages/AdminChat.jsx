@@ -31,7 +31,7 @@ export default function AdminChat() {
     "Bonjour ! Votre commande est bien confirmée.",
     "Votre colis a été expédié avec Yalidine Express.",
     "Ce livre est actuellement en stock avec livraison rapide.",
-    "Merci beaucoup pour votre confiance sur TikTok Shop !"
+    "Merci beaucoup pour votre confiance sur LeerBook !"
   ];
 
   useEffect(() => {
@@ -149,7 +149,7 @@ export default function AdminChat() {
         <div className="page-title-wrap">
           <h1>Messagerie & Chat Clients</h1>
           <p className="breadcrumb-sub">
-            Échangez en temps réel avec vos clients et acheteurs TikTok Shop
+            Échangez en temps réel avec vos clients et acheteurs LeerBook
           </p>
         </div>
         <div className="page-actions">

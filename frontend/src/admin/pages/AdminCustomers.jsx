@@ -203,7 +203,7 @@ export default function AdminCustomers() {
                             </div>
                             <div>
                               <div style={{ fontWeight: 600, color: '#333' }}>{c.name}</div>
-                              <small style={{ color: '#888' }}>Client TikTok Shop</small>
+                              <small style={{ color: '#888' }}>Client LeerBook</small>
                             </div>
                           </div>
                         )}

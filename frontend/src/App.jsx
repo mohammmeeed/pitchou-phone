@@ -18,7 +18,7 @@ function VisitTracker() {
         sessionStorage.setItem('ts_visitor_session', sessId);
       }
 
-      fetch('http://localhost:8000/api/track_visit.php', {
+      fetch('/api/track_visit.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -67,6 +67,16 @@ import AdminChat from './admin/pages/AdminChat';
 import AdminParameter from './admin/pages/AdminParameter';
 import AdminLogin from './admin/pages/AdminLogin';
 import AdminAccount from './admin/pages/AdminAccount';
+import { adminApi } from './admin/services/adminApi';
+
+// Route protégée pour l'administration : accès strictement restreint aux administrateurs connectés
+function AdminProtectedRoute({ children }) {
+  const isAuth = adminApi.isAuthenticated();
+  if (!isAuth) {
+    return <Navigate to="/admin/login" replace />;
+  }
+  return children;
+}
 
 function App() {
   return (
@@ -153,14 +163,14 @@ function App() {
 
             {/* Admin Panel (Hospital React / Mediqu Design System) */}
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/products" element={<AdminProducts />} />
-            <Route path="/admin/orders" element={<AdminOrders />} />
-            <Route path="/admin/customers" element={<AdminCustomers />} />
-            <Route path="/admin/chat" element={<AdminChat />} />
-            <Route path="/admin/parameter" element={<AdminParameter />} />
-            <Route path="/admin/account" element={<AdminAccount />} />
+            <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
+            <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
+            <Route path="/admin/products" element={<AdminProtectedRoute><AdminProducts /></AdminProtectedRoute>} />
+            <Route path="/admin/orders" element={<AdminProtectedRoute><AdminOrders /></AdminProtectedRoute>} />
+            <Route path="/admin/customers" element={<AdminProtectedRoute><AdminCustomers /></AdminProtectedRoute>} />
+            <Route path="/admin/chat" element={<AdminProtectedRoute><AdminChat /></AdminProtectedRoute>} />
+            <Route path="/admin/parameter" element={<AdminProtectedRoute><AdminParameter /></AdminProtectedRoute>} />
+            <Route path="/admin/account" element={<AdminProtectedRoute><AdminAccount /></AdminProtectedRoute>} />
 
             {/* Fallback 404 */}
             <Route path="/error" element={<ErrorPage />} />

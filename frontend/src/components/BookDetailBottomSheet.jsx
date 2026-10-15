@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = '/api';
 
 const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
   const navigate = useNavigate();

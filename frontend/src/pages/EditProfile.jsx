@@ -49,7 +49,7 @@ const EditProfile = () => {
 
     if (loggedUser?.id) {
       try {
-        await fetch('http://localhost:8000/api/customers', {
+        await fetch('/api/customers', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

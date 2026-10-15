@@ -21,7 +21,7 @@ export default function AdminParameter() {
   // État global des paramètres
   const [settings, setSettings] = useState({
     // Boutique & Devise
-    store_name: 'TikTok Shop Algérie',
+    store_name: 'LeerBook',
     currency: 'DA (Dinar Algérien)',
     delivery_cost: '500',
     admin_phone: '0550 12 34 56',
@@ -31,7 +31,7 @@ export default function AdminParameter() {
     theme_mode: 'light', // light | dark | auto
     accent_color: '#fe2c55', // Rouge TikTok
     logo_image: '', // URL du logo de la boutique
-    logo_text: 'TikTok Shop Algérie',
+    logo_text: 'LeerBook',
     top_banner_enabled: '1',
     top_banner_text: '🔥 Livraison Express 58 Wilayas | Paiement sécurisé à la réception !',
     catalog_layout: 'grid-3',
@@ -44,7 +44,7 @@ export default function AdminParameter() {
     smtp_encryption: 'tls', // tls | ssl | none
     smtp_username: 'contact@tiktokshop.dz',
     smtp_password: '',
-    smtp_from_name: 'TikTok Shop Algérie',
+    smtp_from_name: 'LeerBook',
     smtp_reply_to: 'support@tiktokshop.dz',
     smtp_notify_customer: '1',
     smtp_notify_admin: '1'
@@ -308,8 +308,7 @@ export default function AdminParameter() {
           { id: 'all', label: 'Tous les Paramètres', icon: 'flaticon-381-controls-3' },
           { id: 'store', label: 'Boutique & Devise', icon: 'flaticon-381-box' },
           { id: 'appearance', label: 'Apparence & Design', icon: 'flaticon-381-layer-1' },
-          { id: 'smtp', label: 'Configuration SMTP', icon: 'flaticon-381-send' },
-          { id: 'system', label: 'État du Système', icon: 'flaticon-381-network' }
+          { id: 'smtp', label: 'Configuration SMTP', icon: 'flaticon-381-send' }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -363,7 +362,7 @@ export default function AdminParameter() {
                     className="form-control-custom"
                     value={settings.store_name}
                     onChange={(e) => setSettings({ ...settings, store_name: e.target.value })}
-                    placeholder="Ex: TikTok Shop Algérie"
+                    placeholder="Ex: LeerBook"
                   />
                 </div>
 
@@ -444,9 +443,6 @@ export default function AdminParameter() {
                 <i className="flaticon-381-layer-1" style={{ color: '#111111' }} />
                 Apparence de la Boutique
               </h4>
-              <span className="badge-custom bg-soft-info" style={{ fontWeight: 700 }}>
-                DESIGN
-              </span>
             </div>
 
             <div className="card-body-custom" style={{ padding: '1.5rem' }}>
@@ -652,91 +648,8 @@ export default function AdminParameter() {
                       className="form-control-custom"
                       value={settings.logo_text}
                       onChange={(e) => setSettings({ ...settings, logo_text: e.target.value })}
-                      placeholder="Ex: TikTok Shop Algérie"
+                      placeholder="Ex: LeerBook"
                     />
-                  </div>
-                </div>
-
-                {/* Bannière d'Annonce Top Bar */}
-                <div style={{ padding: '1rem', backgroundColor: '#fafafa', borderRadius: '10px', border: '1px solid #f0f0f0', marginBottom: '1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
-                    <label style={{ fontWeight: 700, color: '#27272a', margin: 0, fontSize: '0.85rem' }}>
-                      Bannière d'Annonce Supérieure (Top Bar)
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <input
-                        type="checkbox"
-                        id="top_banner_enabled"
-                        checked={String(settings.top_banner_enabled) === '1'}
-                        onChange={(e) => setSettings({ ...settings, top_banner_enabled: e.target.checked ? '1' : '0' })}
-                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                      />
-                      <label htmlFor="top_banner_enabled" style={{ fontSize: '0.8rem', color: '#52525b', cursor: 'pointer', margin: 0 }}>
-                        Afficher
-                      </label>
-                    </div>
-                  </div>
-
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value={settings.top_banner_text}
-                    onChange={(e) => setSettings({ ...settings, top_banner_text: e.target.value })}
-                    placeholder="Texte de promotion ou d'alerte..."
-                    disabled={String(settings.top_banner_enabled) !== '1'}
-                    style={{
-                      backgroundColor: String(settings.top_banner_enabled) === '1' ? '#ffffff' : '#f4f4f5',
-                      fontSize: '0.82rem'
-                    }}
-                  />
-
-                  {String(settings.top_banner_enabled) === '1' && (
-                    <div
-                      style={{
-                        marginTop: '0.65rem',
-                        padding: '0.45rem 0.75rem',
-                        borderRadius: '6px',
-                        backgroundColor: settings.accent_color || '#fe2c55',
-                        color: '#ffffff',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        textAlign: 'center'
-                      }}
-                    >
-                      {settings.top_banner_text || 'Aperçu du bandeau d’annonce...'}
-                    </div>
-                  )}
-                </div>
-
-                {/* Disposition Catalogue */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block', fontSize: '0.88rem' }}>
-                    Disposition du Catalogue Client
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-                    {[
-                      { id: 'grid-2', label: '2 Colonnes' },
-                      { id: 'grid-3', label: '3 Colonnes (Défaut)' },
-                      { id: 'grid-4', label: '4 Colonnes' }
-                    ].map((lay) => (
-                      <button
-                        key={lay.id}
-                        type="button"
-                        onClick={() => setSettings({ ...settings, catalog_layout: lay.id })}
-                        style={{
-                          padding: '0.5rem',
-                          borderRadius: '6px',
-                          border: `1px solid ${settings.catalog_layout === lay.id ? '#111111' : '#e4e4e7'}`,
-                          backgroundColor: settings.catalog_layout === lay.id ? '#111111' : '#ffffff',
-                          color: settings.catalog_layout === lay.id ? '#ffffff' : '#52525b',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {lay.label}
-                      </button>
-                    ))}
                   </div>
                 </div>
 
@@ -1021,67 +934,6 @@ export default function AdminParameter() {
           </div>
         )}
 
-        {/* CARTE 4 : ÉTAT DU SYSTÈME & BACKEND */}
-        {(activeTab === 'all' || activeTab === 'system') && (
-          <div className="admin-card">
-            <div className="card-header-custom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                <i className="flaticon-381-network" style={{ color: '#111111' }} />
-                État du Backend PHP & Base de Données
-              </h4>
-              <span className="badge-custom bg-soft-success" style={{ fontWeight: 700 }}>
-                EN LIGNE
-              </span>
-            </div>
-
-            <div className="card-body-custom" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.88rem' }}>
-                <div style={{ padding: '1rem', background: '#f5faf9', borderRadius: '8px', border: '1px solid #d4f0ea' }}>
-                  <div style={{ fontWeight: 700, color: '#209f84', marginBottom: '0.25rem' }}>
-                    <i className="fas fa-server me-2" /> Serveur PHP 8.0 Actif
-                  </div>
-                  <div style={{ color: '#555' }}>
-                    URL API : <code>http://localhost:8000/api</code>
-                  </div>
-                </div>
-
-                <div style={{ padding: '1rem', background: '#f4f4f5', borderRadius: '8px', border: '1px solid #e4e4e7' }}>
-                  <div style={{ fontWeight: 700, color: '#111111', marginBottom: '0.25rem' }}>
-                    <i className="fas fa-database me-2" /> Base de Données MySQL (XAMPP / Port 3306)
-                  </div>
-                  <div style={{ color: '#555' }}>
-                    Base : <code>tiktok_shop</code> (UTF8mb4)
-                  </div>
-                  <div style={{ color: '#777', fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                    Script SQL : <code>backend/database/tiktok_shop.sql</code>
-                  </div>
-                </div>
-
-                <div style={{ padding: '1rem', background: '#f4f8fd', borderRadius: '8px', border: '1px solid #d6e8fb' }}>
-                  <div style={{ fontWeight: 700, color: '#2781d5', marginBottom: '0.25rem' }}>
-                    <i className="fas fa-shield-alt me-2" /> Compte Administrateur Actif
-                  </div>
-                  <div style={{ color: '#555' }}>
-                    Identifiant : <code>{settings.admin_email}</code>
-                  </div>
-                </div>
-
-                <div style={{ padding: '1rem', background: '#fdf6ed', borderRadius: '8px', border: '1px solid #fae2cb' }}>
-                  <div style={{ fontWeight: 700, color: '#c05621', marginBottom: '0.25rem' }}>
-                    <i className="fas fa-envelope me-2" /> Passerelle Email SMTP
-                  </div>
-                  <div style={{ color: '#555' }}>
-                    Statut : {String(settings.smtp_enabled) === '1' ? 'Opérationnel' : 'Inactif'} ({settings.smtp_host}:{settings.smtp_port})
-                  </div>
-                </div>
-
-                <div style={{ marginTop: '0.5rem', color: '#888', fontSize: '0.8rem' }}>
-                  <i className="fas fa-info-circle me-1" /> Respect des règles de sécurité : cette interface est conforme aux directives Mediqu Design System.
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
       </div>
     </AdminLayout>

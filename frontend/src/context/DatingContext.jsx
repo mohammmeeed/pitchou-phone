@@ -150,7 +150,7 @@ export const DatingProvider = ({ children }) => {
   }, [likedList]);
 
   const [matches, setMatches] = useState([
-    { id: 1, name: "Support TikTok Shop", image: "/assets/images/user/pic1.jpg", lastMsg: "Bonjour ! Comment pouvons-nous vous aider ?", time: "À l'instant", active: true },
+    { id: 1, name: "Support", image: "/assets/images/user/pic1.jpg", lastMsg: "Bonjour ! Comment pouvons-nous vous aider ?", time: "À l'instant", active: true },
     { id: 2, name: "Service Livraison", image: "/assets/images/user/pic2.jpg", lastMsg: "Votre colis est bien pris en charge avec Yalidine.", time: "1h", active: false },
     { id: 3, name: "Conseiller Client", image: "/assets/images/user/pic3.jpg", lastMsg: "Ce livre est bien disponible en stock.", time: "Hier", active: false }
   ]);
@@ -236,7 +236,7 @@ export const DatingProvider = ({ children }) => {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/products');
+      const res = await fetch('/api/products');
       if (!res.ok) throw new Error('API non joignable');
       const json = await res.json();
       if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {

@@ -67,7 +67,7 @@ const Explore = () => {
     setSubmittingOrder(true);
     try {
       const summary = cartItems.map(item => `${item.quantity}x ${item.title}`).join(', ');
-      await fetch('http://localhost:8000/api/orders', {
+      await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,7 +132,7 @@ const Explore = () => {
               </div>
               <h4 className="fw-bold mb-2">Commande confirmée !</h4>
               <p className="text-muted mb-4">
-                Merci pour votre achat sur TikTok Shop. Vos livres sont en cours de préparation.
+                Merci pour votre achat sur LeerBook. Vos livres sont en cours de préparation.
               </p>
               <Link to="/home" className="btn btn-primary rounded-xl px-4 py-2">
                 Retour à l'accueil
@@ -153,46 +153,6 @@ const Explore = () => {
             </div>
           ) : (
             <>
-              {/* Shipping Progress Banner */}
-              <div className="cart-shipping-banner mb-3 p-3 rounded-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <div className="d-flex align-items-center gap-2">
-                    <div 
-                      style={{
-                        width: '26px',
-                        height: '26px',
-                        borderRadius: '7px',
-                        background: 'linear-gradient(135deg, rgba(254, 44, 85, 0.15) 0%, rgba(255, 61, 151, 0.15) 100%)',
-                        color: '#fe2c55',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <i className="icon feather icon-truck" style={{ fontSize: '14px', strokeWidth: 2 }}></i>
-                    </div>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937' }}>
-                      {subtotal >= freeShippingThreshold 
-                        ? 'Félicitations ! Livraison gratuite offerte.' 
-                        : `Ajoutez ${(freeShippingThreshold - subtotal).toLocaleString()} DA pour la livraison gratuite`}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: 700 }}>
-                    {Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100))}%
-                  </span>
-                </div>
-                <div className="progress" style={{ height: '6px', borderRadius: '10px' }}>
-                  <div 
-                    className="progress-bar" 
-                    role="progressbar" 
-                    style={{ 
-                      width: `${Math.min(100, (subtotal / freeShippingThreshold) * 100)}%`,
-                      background: 'var(--primary-gradient)' 
-                    }}
-                  ></div>
-                </div>
-              </div>
 
               {/* Items List */}
               <div className="cart-items-list mb-3">
@@ -337,28 +297,6 @@ const Explore = () => {
                 </div>
               </div>
 
-              {/* Promo Code Input */}
-              <form onSubmit={applyPromo} className="cart-promo-box mb-3">
-                <input 
-                  type="text" 
-                  className="form-control border-0" 
-                  placeholder="Code promo (ex: TIKTOK10)" 
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value)}
-                  style={{ fontSize: '13px', background: 'transparent' }}
-                />
-                <button type="submit" className="btn btn-sm btn-dark rounded-xl px-3">
-                  Appliquer
-                </button>
-              </form>
-              {promoMessage && (
-                <div 
-                  className={`small mb-3 px-2 ${discountPercent > 0 ? 'text-success' : 'text-danger'}`}
-                  style={{ fontSize: '12px', fontWeight: 600 }}
-                >
-                  {promoMessage}
-                </div>
-              )}
 
               {/* Summary Box */}
               <div className="cart-summary-box mb-4">

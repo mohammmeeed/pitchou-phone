@@ -11,24 +11,45 @@ export default function AdminLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Vérifier la session administrateur
+  const [shopLogo, setShopLogo] = useState(() => localStorage.getItem('shop_logo_image') || '');
+  const [shopLogoText, setShopLogoText] = useState(() => localStorage.getItem('shop_logo_text') || 'LeerBook');
+
+  // Vérifier la session administrateur et charger le logo du site
   useEffect(() => {
-    // Si aucun jeton n'existe, si c'est la toute première visite on pré-initialise pour fluidité
+    // Si non connecté, redirection immédiate vers la page de connexion admin
     if (!adminApi.isAuthenticated()) {
-      // Si l'utilisateur s'est explicitement déconnecté, redirection vers /admin/login
-      const wasLoggedOut = sessionStorage.getItem('admin_explicit_logout');
-      if (wasLoggedOut) {
-        navigate('/admin/login');
-        return;
-      }
-      // Première initialisation session locale
-      localStorage.setItem('admin_token', 'tk_admin_active');
+      navigate('/admin/login', { replace: true });
+      return;
     }
 
-    // Charger les infos à jour depuis l'API backend
+    // Charger les infos administrateur depuis l'API backend
     adminApi.getAdminProfile().then((data) => {
       if (data) setCurrentAdmin(data);
     });
+
+    // Écouter les modifications du logo depuis Paramètres du Site
+    const handleLogoChange = (e) => {
+      if (e?.detail?.logo !== undefined) setShopLogo(e.detail.logo);
+      if (e?.detail?.text !== undefined) setShopLogoText(e.detail.text);
+    };
+    window.addEventListener('shop_logo_changed', handleLogoChange);
+
+    // Charger les paramètres du site (logo et nom de la boutique)
+    fetch('/api/parameters')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.settings?.logo_image !== undefined) {
+          setShopLogo(data.settings.logo_image);
+          localStorage.setItem('shop_logo_image', data.settings.logo_image || '');
+        }
+        if (data?.settings?.logo_text) {
+          setShopLogoText(data.settings.logo_text);
+          localStorage.setItem('shop_logo_text', data.settings.logo_text);
+        }
+      })
+      .catch(() => {});
+
+    return () => window.removeEventListener('shop_logo_changed', handleLogoChange);
   }, [navigate]);
 
   const handleLogout = () => {
@@ -103,6 +124,11 @@ export default function AdminLayout({ children }) {
     return location.pathname.startsWith(path);
   };
 
+  // Ne rien afficher si non connecté (la redirection est déclenchée par useEffect ou ProtectedRoute)
+  if (!adminApi.isAuthenticated()) {
+    return null;
+  }
+
   return (
     <div className="mediqu-admin">
       <div className="admin-shell">
@@ -110,12 +136,36 @@ export default function AdminLayout({ children }) {
         <aside className={`admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
           <div className="sidebar-header">
             <Link to="/admin" className="sidebar-brand">
-              <div className="brand-icon">
-                <i className="flaticon-381-heart" />
+              <div
+                className="brand-icon"
+                style={{
+                  background: shopLogo ? '#ffffff' : 'linear-gradient(135deg, #111111 0%, #2b2b2b 100%)',
+                  padding: shopLogo ? '4px' : '0',
+                  border: shopLogo ? '1px solid #ebebeb' : 'none',
+                  overflow: 'hidden'
+                }}
+              >
+                {shopLogo ? (
+                  <img
+                    src={shopLogo}
+                    alt={shopLogoText || 'Logo'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      borderRadius: '6px'
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <i className="flaticon-381-heart" />
+                )}
               </div>
               {!isCollapsed && (
                 <div className="brand-text">
-                  <h2>Mediqu</h2>
+                  <h2 style={{ textTransform: 'capitalize' }}>{shopLogoText || 'LeerBook'}</h2>
                   <span>Admin E-Commerce</span>
                 </div>
               )}
@@ -278,31 +328,6 @@ export default function AdminLayout({ children }) {
                 <span>Boutique en Direct</span>
               </Link>
 
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.4rem 0.8rem',
-                  background: '#f2f4fa',
-                  borderRadius: '8px',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  color: '#392540'
-                }}
-              >
-                <span
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: '#209f84',
-                    display: 'inline-block'
-                  }}
-                />
-                Port 8000 (PHP)
-              </div>
-
               {/* Bouton Déconnexion Topbar */}
               <button
                 type="button"
@@ -322,7 +347,7 @@ export default function AdminLayout({ children }) {
                 <span>Déconnexion</span>
               </button>
             </div>
-          </header>ne 
+          </header> 
 
           {/* Children Page View */}
           <main className="admin-content-body">

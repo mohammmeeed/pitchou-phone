@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 import { useTheme } from '../context/ThemeContext';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = '/api';
 
 const Chat = () => {
   const navigate = useNavigate();
@@ -158,7 +158,7 @@ const Chat = () => {
 
   return (
     <div className="page-wrapper">
-      {/* Header Support TikTok Shop - Modern Clean */}
+      {/* Header Support - Modern Clean */}
       <header className="header header-fixed bg-white border-bottom" style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
         <div className="container">
           <div className="header-content">
@@ -167,7 +167,7 @@ const Chat = () => {
                 <i className="icon feather icon-chevron-left"></i>
               </Link>
               <h5 className="title mb-0 font-w600" style={{ fontSize: '17px', color: '#111' }}>
-                Support TikTok Shop
+                Support
               </h5>
             </div>
             <div className="mid-content"></div>
@@ -204,9 +204,9 @@ const Chat = () => {
               <div className="chat-content">
                 <div className="message-item">
                   <div className="bubble">
-                    Bonjour ! 👋 Bienvenue sur le support client TikTok Shop. Posez-nous vos questions sur vos commandes, produits et livraisons ici.
+                    Bonjour ! 👋 Bienvenue sur le support client LeerBook. Posez-nous vos questions sur vos commandes, livres et livraisons ici.
                   </div>
-                  <div className="message-time">Support TikTok Shop</div>
+                  <div className="message-time">Support</div>
                 </div>
               </div>
             )}
