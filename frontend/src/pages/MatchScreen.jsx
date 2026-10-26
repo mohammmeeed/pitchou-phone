@@ -53,7 +53,7 @@ const MatchScreen = () => {
             <Link to="/chat" className="btn btn-lg btn-gradient w-100 dz-flex-box rounded-xl m-b10">
               Say Hello
             </Link>
-            <Link to="/home" className="btn btn-lg btn-light w-100 dz-flex-box border-0 rounded-xl">
+            <Link to="/" className="btn btn-lg btn-light w-100 dz-flex-box border-0 rounded-xl">
               Keep Swiping
             </Link>
           </div>

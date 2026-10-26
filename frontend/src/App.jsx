@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { DatingProvider } from './context/DatingContext';
+import F12Blocker from './components/F12Blocker';
 
 // Background Visit Tracker for live dynamic traffic analytics in Admin Dashboard
 function VisitTracker() {
@@ -18,12 +19,19 @@ function VisitTracker() {
         sessionStorage.setItem('ts_visitor_session', sessId);
       }
 
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      const language = navigator.language || navigator.userLanguage || '';
+      const screenWidth = window.screen?.width || window.innerWidth || 0;
+
       fetch('/api/track_visit.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           page_path: location.pathname,
-          session_id: sessId
+          session_id: sessId,
+          timezone,
+          language,
+          screen_width: screenWidth
         })
       }).catch(() => {});
     } catch (e) {}
@@ -64,6 +72,7 @@ import AdminProducts from './admin/pages/AdminProducts';
 import AdminOrders from './admin/pages/AdminOrders';
 import AdminCustomers from './admin/pages/AdminCustomers';
 import AdminChat from './admin/pages/AdminChat';
+import AdminCashflow from './admin/pages/AdminCashflow';
 import AdminParameter from './admin/pages/AdminParameter';
 import AdminLogin from './admin/pages/AdminLogin';
 import AdminAccount from './admin/pages/AdminAccount';
@@ -83,6 +92,7 @@ function App() {
     <ThemeProvider>
       <DatingProvider>
         <BrowserRouter>
+          <F12Blocker />
           <VisitTracker />
           <Routes>
             {/* Main & Auth */}
@@ -121,39 +131,58 @@ function App() {
             <Route path="/recent-pics" element={<RecentPics />} />
             <Route path="/recent-pics.html" element={<Navigate to="/recent-pics" replace />} />
 
-            {/* Main App */}
-            <Route path="/home" element={<Home />} />
-            <Route path="/home.html" element={<Navigate to="/home" replace />} />
+            {/* Main App - Redirection /home vers / */}
+            <Route path="/home" element={<Navigate to="/" replace />} />
+            <Route path="/home.html" element={<Navigate to="/" replace />} />
 
-            <Route path="/explore" element={<Explore />} />
-            <Route path="/explore.html" element={<Navigate to="/explore" replace />} />
-
-            <Route path="/filter" element={<Filter />} />
-            <Route path="/filter.html" element={<Navigate to="/filter" replace />} />
-
+            {/* Catégories & Livres (Clean SEO-friendly URLs: /categories, /categories/:category, /favoris) */}
+            <Route path="/categories" element={<Wishlist />} />
+            <Route path="/categories/:category" element={<Wishlist />} />
+            <Route path="/category/:category" element={<Wishlist />} />
             <Route path="/wishlist" element={<Wishlist />} />
-            <Route path="/wishlist.html" element={<Navigate to="/wishlist" replace />} />
+            <Route path="/wishlist/:category" element={<Wishlist />} />
+            <Route path="/wishlist.html" element={<Navigate to="/categories" replace />} />
+            <Route path="/favoris" element={<Wishlist defaultCategory="__favorites__" />} />
 
+            {/* Panier & Commandes (/panier au lieu de /explore) */}
+            <Route path="/panier" element={<Explore />} />
+            <Route path="/cart" element={<Navigate to="/panier" replace />} />
+            <Route path="/explore" element={<Navigate to="/panier" replace />} />
+            <Route path="/explore.html" element={<Navigate to="/panier" replace />} />
+
+            {/* Fiche Produit / Livre (/livre/:id au lieu de /profile-detail?id=...) */}
+            <Route path="/livre/:id" element={<ProfileDetail />} />
+            <Route path="/produit/:id" element={<ProfileDetail />} />
+            <Route path="/book/:id" element={<ProfileDetail />} />
+            <Route path="/profile-detail" element={<ProfileDetail />} />
+            <Route path="/profile-detail.html" element={<Navigate to="/categories" replace />} />
+
+            {/* Filtre & Recherche */}
+            <Route path="/recherche" element={<Filter />} />
+            <Route path="/filter" element={<Filter />} />
+            <Route path="/filter.html" element={<Navigate to="/recherche" replace />} />
+
+            {/* Chat & Support */}
             <Route path="/chat-list" element={<Navigate to="/chat" replace />} />
             <Route path="/chat-list.html" element={<Navigate to="/chat" replace />} />
-
             <Route path="/chat" element={<Chat />} />
             <Route path="/chat.html" element={<Navigate to="/chat" replace />} />
 
-            <Route path="/match-screen" element={<Navigate to="/home" replace />} />
-            <Route path="/match-screen.html" element={<Navigate to="/home" replace />} />
+            <Route path="/match-screen" element={<Navigate to="/" replace />} />
+            <Route path="/match-screen.html" element={<Navigate to="/" replace />} />
 
+            {/* Compte & Profil */}
+            <Route path="/compte" element={<Profile />} />
+            <Route path="/commandes" element={<Profile />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/profile.html" element={<Navigate to="/profile" replace />} />
-
-            <Route path="/profile-detail" element={<ProfileDetail />} />
-            <Route path="/profile-detail.html" element={<Navigate to="/profile-detail" replace />} />
+            <Route path="/profile.html" element={<Navigate to="/compte" replace />} />
 
             <Route path="/edit-profile" element={<EditProfile />} />
             <Route path="/edit-profile.html" element={<Navigate to="/edit-profile" replace />} />
 
             <Route path="/setting" element={<Setting />} />
             <Route path="/setting.html" element={<Navigate to="/setting" replace />} />
+            <Route path="/parametres" element={<Setting />} />
 
             <Route path="/home-setting" element={<HomeSetting />} />
             <Route path="/home-setting.html" element={<Navigate to="/home-setting" replace />} />
@@ -167,6 +196,8 @@ function App() {
             <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
             <Route path="/admin/products" element={<AdminProtectedRoute><AdminProducts /></AdminProtectedRoute>} />
             <Route path="/admin/orders" element={<AdminProtectedRoute><AdminOrders /></AdminProtectedRoute>} />
+            <Route path="/admin/cashflow" element={<AdminProtectedRoute><AdminCashflow /></AdminProtectedRoute>} />
+            <Route path="/admin/journal" element={<Navigate to="/admin/cashflow" replace />} />
             <Route path="/admin/customers" element={<AdminProtectedRoute><AdminCustomers /></AdminProtectedRoute>} />
             <Route path="/admin/chat" element={<AdminProtectedRoute><AdminChat /></AdminProtectedRoute>} />
             <Route path="/admin/parameter" element={<AdminProtectedRoute><AdminParameter /></AdminProtectedRoute>} />

@@ -7,8 +7,8 @@ import { adminApi } from '../services/adminApi';
 import '../admin.css';
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('admin@tiktokshop.dz');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -42,11 +42,6 @@ export default function AdminLogin() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = () => {
-    setEmail('admin@tiktokshop.dz');
-    setPassword('admin123');
   };
 
   return (
@@ -157,7 +152,7 @@ export default function AdminLogin() {
                   type="text"
                   className="form-control-custom"
                   style={{ width: '100%', paddingLeft: '2.5rem' }}
-                  placeholder="admin@tiktokshop.dz ou nom"
+                  placeholder="Nom d'utilisateur ou email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="username"
@@ -194,7 +189,7 @@ export default function AdminLogin() {
                   type="password"
                   className="form-control-custom"
                   style={{ width: '100%', paddingLeft: '2.5rem' }}
-                  placeholder="Votre mot de passe"
+                  placeholder="Mot de passe"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
@@ -221,36 +216,6 @@ export default function AdminLogin() {
               <span>{loading ? 'Connexion en cours...' : 'Se Connecter'}</span>
             </button>
           </form>
-
-          {/* Raccourci Connexion Rapide */}
-          <div
-            style={{
-              marginTop: '1.5rem',
-              paddingTop: '1.25rem',
-              borderTop: '1px solid #f4f4f5',
-              textAlign: 'center'
-            }}
-          >
-            <div style={{ fontSize: '0.8rem', color: '#71717a', marginBottom: '0.5rem' }}>
-              Accès démo prédéfini :
-            </div>
-            <button
-              type="button"
-              onClick={handleQuickLogin}
-              style={{
-                background: '#f4f4f5',
-                border: '1px solid #e4e4e7',
-                borderRadius: '6px',
-                padding: '0.4rem 0.8rem',
-                fontSize: '0.78rem',
-                color: '#18181b',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
-              Remplir (admin@tiktokshop.dz / admin123)
-            </button>
-          </div>
         </div>
 
         {/* Footer retour à la boutique */}
@@ -263,7 +228,7 @@ export default function AdminLogin() {
           }}
         >
           <Link
-            to="/home"
+            to="/"
             style={{
               color: '#71717a',
               textDecoration: 'none',

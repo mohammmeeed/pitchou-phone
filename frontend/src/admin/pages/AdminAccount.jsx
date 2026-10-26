@@ -7,12 +7,11 @@ import AdminLayout from '../AdminLayout';
 import { adminApi } from '../services/adminApi';
 
 export default function AdminAccount() {
-  const [profile, setProfile] = useState({
-    id: 1,
-    name: 'Super Admin',
-    email: 'admin@tiktokshop.dz',
-    phone: '0550123456',
-    role: 'admin'
+  const [profile, setProfile] = useState(() => adminApi.getCurrentAdmin() || {
+    name: '',
+    email: '',
+    phone: '',
+    role: ''
   });
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -194,44 +193,6 @@ export default function AdminAccount() {
               ? 'Ajoutez un nouvel administrateur avec accès complet au panneau de gestion'
               : 'Modifiez vos informations de connexion, votre adresse email et votre mot de passe'}
           </p>
-        </div>
-        <div className="page-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {activeTab === 'create' ? (
-            <button
-              type="button"
-              className="btn-light-custom"
-              onClick={() => {
-                setActiveTab('profile');
-                setCreateFeedback(null);
-              }}
-              style={{ padding: '0.65rem 1.25rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              <i className="flaticon-381-back-1" />
-              <span>← Retour à Mon Profil</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn-primary-custom"
-              onClick={() => {
-                setActiveTab('create');
-                setCreateFeedback(null);
-              }}
-              style={{ padding: '0.65rem 1.25rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              <i className="flaticon-381-user-8" />
-              <span>+ Créer un Compte Admin</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="btn-light-custom"
-            onClick={handleLogout}
-            style={{ color: '#f72b50', borderColor: '#fed7d7' }}
-          >
-            <i className="flaticon-381-exit" /> Se Déconnecter
-          </button>
         </div>
       </div>
 

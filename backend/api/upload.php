@@ -26,14 +26,15 @@ if (!file_exists($backendUploadDir)) {
 // Extensions autorisées
 $allowedImageExts = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'avif'];
 $allowedVideoExts = ['mp4', 'webm', 'mov', 'ogg', 'm4v', 'quicktime'];
+$allowedDocExts = ['pdf', 'doc', 'docx', 'txt', 'csv', 'xlsx', 'xls'];
 
 // Helper pour traiter un fichier individuel
-function processUploadFile($file, $frontendDir, $backendDir, $allowedImageExts, $allowedVideoExts) {
+function processUploadFile($file, $frontendDir, $backendDir, $allowedImageExts, $allowedVideoExts, $allowedDocExts = ['pdf', 'doc', 'docx', 'txt']) {
     if ($file['error'] !== UPLOAD_ERR_OK) {
         return ['success' => false, 'error' => 'Erreur de téléversement (code: ' . $file['error'] . ')'];
     }
 
-    // Limite de taille : 100 Mo (idéal pour vidéos courtes et photos HD)
+    // Limite de taille : 100 Mo (idéal pour vidéos courtes, photos HD et justificatifs PDF)
     if ($file['size'] > 100 * 1024 * 1024) {
         return ['success' => false, 'error' => 'Le fichier dépasse la taille maximale de 100 Mo.'];
     }
@@ -41,20 +42,25 @@ function processUploadFile($file, $frontendDir, $backendDir, $allowedImageExts, 
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     $isVideo = in_array($ext, $allowedVideoExts);
     $isImage = in_array($ext, $allowedImageExts);
+    $isDoc = in_array($ext, $allowedDocExts);
 
-    if (!$isVideo && !$isImage) {
+    if (!$isVideo && !$isImage && !$isDoc) {
         // Fallback par détection mime
         $mime = $file['type'] ?? '';
         if (strpos($mime, 'video/') === 0) {
             $isVideo = true;
             $ext = 'mp4';
+        } else if (strpos($mime, 'pdf') !== false || $mime === 'application/pdf') {
+            $isDoc = true;
+            $ext = 'pdf';
         } else {
             $isImage = true;
             $ext = 'jpg';
         }
     }
 
-    $prefix = $isVideo ? 'prod_vid_' : 'prod_img_';
+    $prefix = $isVideo ? 'prod_vid_' : ($isDoc ? 'facture_doc_' : 'prod_img_');
+    $fileType = $isVideo ? 'video' : ($isDoc ? 'document' : 'image');
     $filename = $prefix . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
     $targetFrontend = $frontendDir . DIRECTORY_SEPARATOR . $filename;
     $targetBackend = $backendDir . DIRECTORY_SEPARATOR . $filename;
@@ -64,7 +70,7 @@ function processUploadFile($file, $frontendDir, $backendDir, $allowedImageExts, 
         return [
             'success' => true,
             'url' => '/uploads/' . $filename,
-            'type' => $isVideo ? 'video' : 'image',
+            'type' => $fileType,
             'filename' => $filename,
             'name' => $file['name'],
             'size' => $file['size']

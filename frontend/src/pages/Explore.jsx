@@ -1,23 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
 import { useDating } from '../context/DatingContext';
-
-const ALGERIA_WILAYAS = [
-  "01 - Adrar", "02 - Chlef", "03 - Laghouat", "04 - Oum El Bouaghi", "05 - Batna",
-  "06 - Béjaïa", "07 - Biskra", "08 - Béchar", "09 - Blida", "10 - Bouira",
-  "11 - Tamanrasset", "12 - Tébessa", "13 - Tlemcen", "14 - Tiaret", "15 - Tizi Ouzou",
-  "16 - Alger", "17 - Djelfa", "18 - Jijel", "19 - Sétif", "20 - Saïda",
-  "21 - Skikda", "22 - Sidi Bel Abbès", "23 - Annaba", "24 - Guelma", "25 - Constantine",
-  "26 - Médéa", "27 - Mostaganem", "28 - M'Sila", "29 - Mascara", "30 - Ouargla",
-  "31 - Oran", "32 - El Bayadh", "33 - Illizi", "34 - Bordj Bou Arreridj", "35 - Boumerdès",
-  "36 - El Tarf", "37 - Tindouf", "38 - Tissemsilt", "39 - El Oued", "40 - Khenchela",
-  "41 - Souk Ahras", "42 - Tipaza", "43 - Mila", "44 - Aïn Defla", "45 - Naâma",
-  "46 - Aïn Témouchent", "47 - Ghardaïa", "48 - Relizane", "49 - Timimoun", "50 - Bordj Badji Mokhtar",
-  "51 - Ouled Djellal", "52 - Béni Abbès", "53 - In Salah", "54 - In Guezzam", "55 - Touggourt",
-  "56 - Djanet", "57 - El M'Ghair", "58 - El Meniaa"
-];
+import { getCommunesByWilaya } from '../data/algeriaCities';
 
 const Explore = () => {
   const navigate = useNavigate();
@@ -28,7 +14,103 @@ const Explore = () => {
   const [promoMessage, setPromoMessage] = useState('');
   const [orderSuccess, setOrderSuccess] = useState(() => searchParams.get('order_success') === 'true');
   const [submittingOrder, setSubmittingOrder] = useState(false);
-  const [selectedWilaya, setSelectedWilaya] = useState('16 - Alger');
+
+  // Helper pour matcher la wilaya du client connecté avec la liste
+  const matchCustomerWilaya = (rawTarget, list) => {
+    if (!rawTarget || !Array.isArray(list) || list.length === 0) return null;
+    const clean = String(rawTarget).toLowerCase().trim();
+
+    const exact = list.find((w) => {
+      const name = typeof w === 'object' ? w.name : w;
+      return name.toLowerCase() === clean;
+    });
+    if (exact) return typeof exact === 'object' ? exact.name : exact;
+
+    const partial = list.find((w) => {
+      const name = typeof w === 'object' ? w.name : w;
+      const wilayaOnly = name.split(' - ')[1] || name;
+      return (
+        clean.includes(name.toLowerCase()) ||
+        clean.includes(wilayaOnly.toLowerCase()) ||
+        name.toLowerCase().includes(clean)
+      );
+    });
+    if (partial) return typeof partial === 'object' ? partial.name : partial;
+
+    return null;
+  };
+
+  const [deliveryType, setDeliveryType] = useState('bureau'); // 'bureau' | 'domicile'
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [selectedCommune, setSelectedCommune] = useState(() => {
+    try {
+      const saved = localStorage.getItem('customer_user');
+      if (saved) {
+        const u = JSON.parse(saved);
+        if (u?.commune) return u.commune;
+      }
+    } catch (e) {}
+    return '';
+  });
+
+  const [wilayasList, setWilayasList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tiktok_shop_wilayas');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  const [selectedWilaya, setSelectedWilaya] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('customer_user');
+      const savedWilayas = localStorage.getItem('tiktok_shop_wilayas');
+      const list = savedWilayas ? JSON.parse(savedWilayas) : [];
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        const target = u?.wilaya || u?.address || '';
+        const matched = matchCustomerWilaya(target, list);
+        if (matched) return matched;
+      }
+      if (Array.isArray(list) && list.length > 0) {
+        return typeof list[0] === 'object' ? list[0].name : list[0];
+      }
+    } catch (e) {}
+    return '';
+  });
+
+  const availableCommunes = selectedWilaya ? getCommunesByWilaya(selectedWilaya) : [];
+
+  useEffect(() => {
+    fetch('/api/attributes')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.wilayas)) {
+          setWilayasList(data.wilayas);
+          try {
+            localStorage.setItem('tiktok_shop_wilayas', JSON.stringify(data.wilayas));
+          } catch (e) {}
+
+          const logged = getLoggedInUser();
+          const clientTarget = logged?.wilaya || logged?.address || '';
+          const matched = matchCustomerWilaya(clientTarget, data.wilayas);
+
+          if (matched) {
+            setSelectedWilaya(matched);
+          } else if (data.wilayas.length > 0) {
+            setSelectedWilaya((prev) => prev || (data.wilayas[0].name || ''));
+          }
+
+          if (logged?.commune) {
+            setSelectedCommune((prev) => prev || logged.commune);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const getLoggedInUser = () => {
     try {
@@ -49,11 +131,24 @@ const Explore = () => {
     if (cartItems.length === 0) return;
 
     const loggedUser = getLoggedInUser();
+    const fullAddress = deliveryType === 'bureau'
+      ? `Bureau (Stopdesk) : ${selectedWilaya}`
+      : `Domicile : ${selectedWilaya}${selectedCommune ? ` - ${selectedCommune}` : ''}${deliveryAddress.trim() ? ` (${deliveryAddress.trim()})` : ''}`;
+
+    const deliveryNotes = deliveryType === 'bureau'
+      ? `Mode: En Bureau (Stopdesk) | Wilaya: ${selectedWilaya}`
+      : `Mode: À Domicile | Wilaya: ${selectedWilaya} | Commune: ${selectedCommune || 'Non précisée'} | Adresse: ${deliveryAddress.trim() || 'Non précisée'}`;
+
     // Si l'utilisateur n'est pas connecté, enregistrer la commande en attente et rediriger vers la page login
     if (!loggedUser) {
       const summary = cartItems.map(item => `${item.quantity}x ${item.title}`).join(', ');
       localStorage.setItem('pending_order', JSON.stringify({
+        customer_address: fullAddress,
+        delivery_type: deliveryType,
         wilaya: selectedWilaya,
+        commune: selectedCommune,
+        address_details: deliveryAddress.trim(),
+        notes: deliveryNotes,
         subtotal: subtotal,
         shipping_fee: shipping,
         total_amount: total,
@@ -74,7 +169,12 @@ const Explore = () => {
           customer_name: loggedUser.name || userProfile?.name || 'Client',
           customer_phone: loggedUser.phone || userProfile?.phone || '',
           customer_email: loggedUser.email || userProfile?.email || '',
-          customer_address: selectedWilaya,
+          customer_address: fullAddress,
+          delivery_type: deliveryType,
+          wilaya: selectedWilaya,
+          commune: selectedCommune,
+          address_details: deliveryAddress.trim(),
+          notes: deliveryNotes,
           subtotal: subtotal,
           shipping_fee: shipping,
           total_amount: total,
@@ -110,7 +210,19 @@ const Explore = () => {
 
   const freeShippingThreshold = 5000;
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : 500;
+  const currentWilayaObj = wilayasList.find((w) => (typeof w === 'object' ? w.name : w) === selectedWilaya);
+  const wilayaFee = (() => {
+    if (!currentWilayaObj || typeof currentWilayaObj !== 'object') return 500;
+    if (deliveryType === 'bureau') {
+      return currentWilayaObj.price_bureau !== undefined
+        ? Number(currentWilayaObj.price_bureau)
+        : Math.max(250, Number(currentWilayaObj.price || 500) - 200);
+    }
+    return currentWilayaObj.price_domicile !== undefined
+      ? Number(currentWilayaObj.price_domicile)
+      : Number(currentWilayaObj.price || 500);
+  })();
+  const shipping = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : wilayaFee;
   const discountAmount = Math.round(subtotal * (discountPercent / 100));
   const total = Math.max(0, subtotal - discountAmount + shipping);
   const totalItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -120,7 +232,7 @@ const Explore = () => {
       <Header 
         title={`Mon Panier ${totalItemsCount > 0 ? `(${totalItemsCount})` : ''}`} 
         showBack={true} 
-        backUrl="/home" 
+        backUrl="/" 
       />
 
       <div className="page-content space-top p-b100">
@@ -134,7 +246,7 @@ const Explore = () => {
               <p className="text-muted mb-4">
                 Merci pour votre achat sur LeerBook. Vos livres sont en cours de préparation.
               </p>
-              <Link to="/home" className="btn btn-primary rounded-xl px-4 py-2">
+              <Link to="/" className="btn btn-primary rounded-xl px-4 py-2">
                 Retour à l'accueil
               </Link>
             </div>
@@ -147,7 +259,7 @@ const Explore = () => {
               <p className="text-muted mb-4" style={{ fontSize: '13px' }}>
                 Parcourez nos vidéos pour découvrir et ajouter des livres coups de cœur !
               </p>
-              <Link to="/home" className="btn btn-primary rounded-xl px-4 py-2">
+              <Link to="/" className="btn btn-primary rounded-xl px-4 py-2">
                 Explorer les livres
               </Link>
             </div>
@@ -246,9 +358,9 @@ const Explore = () => {
                 </div>
               )}
 
-              {/* Wilaya de livraison */}
-              <div className="cart-summary-box mb-3" style={{ padding: '14px 16px' }}>
-                <div className="d-flex align-items-center gap-2 mb-2">
+              {/* Mode & Wilaya de livraison */}
+              <div className="cart-summary-box mb-3" style={{ padding: '15px 16px' }}>
+                <div className="d-flex align-items-center gap-2 mb-3">
                   <div 
                     style={{
                       width: '28px',
@@ -266,17 +378,69 @@ const Explore = () => {
                     <i className="icon feather icon-map-pin"></i>
                   </div>
                   <div>
-                    <h6 className="mb-0 fw-bold" style={{ fontSize: '13px', color: '#1e1e24' }}>Wilaya de livraison</h6>
-                    <span className="text-muted" style={{ fontSize: '11px' }}>Choisissez votre wilaya de destination</span>
+                    <h6 className="mb-0 fw-bold" style={{ fontSize: '13px', color: '#1e1e24' }}>Mode & Wilaya de livraison</h6>
+                    <span className="text-muted" style={{ fontSize: '11px' }}>Choisissez votre type et lieu de livraison</span>
                   </div>
                 </div>
 
-                <div className="position-relative">
+                {/* Sélecteur de type de livraison : Bureau ou Domicile */}
+                <div className="d-flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryType('bureau')}
+                    className="btn flex-fill d-flex align-items-center justify-content-center gap-2 py-2 px-3"
+                    style={{
+                      borderRadius: '12px',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      border: deliveryType === 'bureau' ? '1.5px solid var(--primary)' : '1px solid rgba(0,0,0,0.08)',
+                      backgroundColor: deliveryType === 'bureau' ? 'rgba(254, 119, 182, 0.12)' : '#f8f9fc',
+                      color: deliveryType === 'bureau' ? 'var(--primary)' : '#4b5563'
+                    }}
+                  >
+                    <i className="icon feather icon-briefcase" style={{ fontSize: '14px' }}></i>
+                    <span>Au Bureau</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryType('domicile')}
+                    className="btn flex-fill d-flex align-items-center justify-content-center gap-2 py-2 px-3"
+                    style={{
+                      borderRadius: '12px',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      border: deliveryType === 'domicile' ? '1.5px solid var(--primary)' : '1px solid rgba(0,0,0,0.08)',
+                      backgroundColor: deliveryType === 'domicile' ? 'rgba(254, 119, 182, 0.12)' : '#f8f9fc',
+                      color: deliveryType === 'domicile' ? 'var(--primary)' : '#4b5563'
+                    }}
+                  >
+                    <i className="icon feather icon-home" style={{ fontSize: '14px' }}></i>
+                    <span>À Domicile</span>
+                  </button>
+                </div>
+
+                {/* Wilaya de destination */}
+                <div className="mb-2">
+                  <label htmlFor="wilaya-select" className="form-label text-muted mb-1" style={{ fontSize: '11px', fontWeight: 600 }}>
+                    {deliveryType === 'bureau' ? 'Wilaya (Retrait au bureau)' : 'Wilaya de livraison'}
+                  </label>
                   <select 
                     id="wilaya-select"
                     className="form-select"
                     value={selectedWilaya}
-                    onChange={(e) => setSelectedWilaya(e.target.value)}
+                    onChange={(e) => {
+                      const newW = e.target.value;
+                      setSelectedWilaya(newW);
+                      const comms = getCommunesByWilaya(newW);
+                      if (comms.length > 0 && !comms.includes(selectedCommune)) {
+                        setSelectedCommune(comms[0]);
+                      }
+                    }}
                     style={{ 
                       fontSize: '13px', 
                       borderRadius: '12px',
@@ -288,15 +452,95 @@ const Explore = () => {
                       cursor: 'pointer'
                     }}
                   >
-                    {ALGERIA_WILAYAS.map((wilaya) => (
-                      <option key={wilaya} value={wilaya}>
-                        {wilaya}
-                      </option>
-                    ))}
+                    {wilayasList.length === 0 ? (
+                      <option value="">Aucune wilaya configurée</option>
+                    ) : (
+                      wilayasList.map((w) => {
+                        const name = typeof w === 'object' ? w.name : w;
+                        const bPrice = typeof w === 'object' && w.price_bureau !== undefined
+                          ? w.price_bureau
+                          : (typeof w === 'object' && w.price ? Math.max(250, w.price - 200) : 350);
+                        const dPrice = typeof w === 'object' && w.price_domicile !== undefined
+                          ? w.price_domicile
+                          : (typeof w === 'object' && w.price !== undefined ? w.price : 500);
+                        const displayPrice = deliveryType === 'bureau' ? bPrice : dPrice;
+                        return (
+                          <option key={name} value={name}>
+                            {name} ({deliveryType === 'bureau' ? 'Bureau' : 'Domicile'}: {displayPrice} DA)
+                          </option>
+                        );
+                      })
+                    )}
                   </select>
                 </div>
-              </div>
 
+                {/* Si Bureau : affichage de la Wilaya seulement + note informative */}
+                {deliveryType === 'bureau' ? (
+                  <div 
+                    className="d-flex align-items-center gap-2 mt-2 px-3 py-2 rounded-3"
+                    style={{ background: '#f8f9fc', border: '1px dashed rgba(0,0,0,0.1)', fontSize: '11.5px', color: '#6b7280' }}
+                  >
+                    <i className="icon feather icon-info text-primary" style={{ fontSize: '13px' }}></i>
+                    <span>Votre colis sera livré au bureau / agence de transport de votre wilaya.</span>
+                  </div>
+                ) : (
+                  /* Si Domicile : affichage de la Wilaya + Commune + Champ Adresse */
+                  <div className="mt-3 pt-2" style={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                    {/* Commune */}
+                    <div className="mb-2">
+                      <label htmlFor="commune-select" className="form-label text-muted mb-1" style={{ fontSize: '11px', fontWeight: 600 }}>
+                        Commune
+                      </label>
+                      <select
+                        id="commune-select"
+                        className="form-select"
+                        value={selectedCommune}
+                        onChange={(e) => setSelectedCommune(e.target.value)}
+                        style={{
+                          fontSize: '13px',
+                          borderRadius: '12px',
+                          borderColor: 'rgba(0, 0, 0, 0.08)',
+                          padding: '10px 14px',
+                          fontWeight: 500,
+                          color: '#1e1e24',
+                          backgroundColor: '#f8f9fc',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">Sélectionnez votre commune</option>
+                        {availableCommunes.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Champ Adresse */}
+                    <div>
+                      <label htmlFor="address-input" className="form-label text-muted mb-1" style={{ fontSize: '11px', fontWeight: 600 }}>
+                        Adresse exacte de votre domicile
+                      </label>
+                      <input
+                        id="address-input"
+                        type="text"
+                        className="form-control"
+                        placeholder="N° rue, quartier, bâtiment, appartement..."
+                        value={deliveryAddress}
+                        onChange={(e) => setDeliveryAddress(e.target.value)}
+                        style={{
+                          fontSize: '13px',
+                          borderRadius: '12px',
+                          borderColor: 'rgba(0, 0, 0, 0.08)',
+                          padding: '10px 14px',
+                          backgroundColor: '#f8f9fc',
+                          color: '#1e1e24'
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Summary Box */}
               <div className="cart-summary-box mb-4">
@@ -315,14 +559,14 @@ const Explore = () => {
                 )}
 
                 <div className="d-flex justify-content-between mb-2 text-muted" style={{ fontSize: '13px' }}>
-                  <span>Livraison ({selectedWilaya.split(' - ')[1] || selectedWilaya})</span>
+                  <span>Livraison ({deliveryType === 'bureau' ? 'Bureau' : 'Domicile'} - {selectedWilaya.split(' - ')[1] || selectedWilaya})</span>
                   <span>{shipping === 0 ? 'Gratuite' : `${shipping.toLocaleString()} DA`}</span>
                 </div>
 
                 <hr className="my-2" style={{ opacity: 0.1 }} />
 
                 <div className="d-flex justify-content-between align-items-center pt-1">
-                  <span className="fw-bold" style={{ fontSize: '15px' }}>Total TTC</span>
+                  <span className="fw-bold" style={{ fontSize: '15px' }}>Total</span>
                   <span className="fw-bolder" style={{ fontSize: '18px', color: 'var(--primary)' }}>
                     {total.toLocaleString()} DA
                   </span>

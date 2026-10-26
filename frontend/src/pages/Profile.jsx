@@ -4,11 +4,37 @@ import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
 import { useDating } from '../context/DatingContext';
 
+export const cleanAddress = (addr, wilaya = '', commune = '') => {
+  if (!addr || typeof addr !== 'string') return "Non renseignée";
+  let cleaned = addr.trim();
+
+  // Détection des duplications de type "A - B - A - B"
+  const parts = cleaned.split(' - ').map(s => s.trim()).filter(Boolean);
+  if (parts.length >= 2 && parts.length % 2 === 0) {
+    const half = parts.length / 2;
+    const firstHalf = parts.slice(0, half).join(' - ');
+    const secondHalf = parts.slice(half).join(' - ');
+    if (firstHalf === secondHalf) {
+      cleaned = firstHalf;
+    }
+  }
+
+  // Détection si wilaya et commune sont déjà dans l'adresse
+  if (wilaya && commune) {
+    const pattern = `${wilaya} - ${commune}`;
+    if (cleaned === `${pattern} - ${pattern}`) {
+      cleaned = pattern;
+    }
+  }
+
+  return cleaned || "Non renseignée";
+};
+
 const Profile = () => {
-  const { userProfile } = useDating();
+  const { userProfile, setUserProfile } = useDating();
 
   // Données du compte client (depuis le stockage local ou le contexte)
-  const [loggedUser] = useState(() => {
+  const [loggedUser, setLoggedUser] = useState(() => {
     try {
       const saved = localStorage.getItem('customer_user');
       if (saved) return JSON.parse(saved);
@@ -20,43 +46,98 @@ const Profile = () => {
   const customerName = isLoggedIn ? (loggedUser?.name || userProfile?.name || "Client") : "Invité";
   const customerPhone = isLoggedIn ? (loggedUser?.phone || userProfile?.phone || "Non renseigné") : "Non connecté";
   const customerEmail = isLoggedIn ? (loggedUser?.email || userProfile?.email || "Non renseigné") : "Non renseigné";
-  const customerLocation = isLoggedIn ? (loggedUser?.address || userProfile?.location || "Non renseignée") : "Non renseignée";
+  
+  const rawLocation = loggedUser?.address || userProfile?.location || (loggedUser?.wilaya && loggedUser?.commune ? `${loggedUser.wilaya} - ${loggedUser.commune}` : loggedUser?.wilaya) || "Non renseignée";
+  const customerLocation = isLoggedIn ? cleanAddress(rawLocation, loggedUser?.wilaya, loggedUser?.commune) : "Non renseignée";
+
+  // Auto-réparation de l'adresse du client en localStorage si elle était dupliquée
+  useEffect(() => {
+    if (loggedUser && loggedUser.address && customerLocation !== "Non renseignée" && loggedUser.address !== customerLocation) {
+      const repaired = { ...loggedUser, address: customerLocation };
+      try {
+        localStorage.setItem('customer_user', JSON.stringify(repaired));
+        setLoggedUser(repaired);
+        if (setUserProfile) {
+          setUserProfile(prev => prev ? { ...prev, address: customerLocation, location: customerLocation } : prev);
+        }
+      } catch (e) {}
+    }
+  }, [loggedUser, customerLocation, setUserProfile]);
 
   // Gestion du suivi de commande
   const [showTracking, setShowTracking] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
-  // Charger les commandes lors de l'ouverture du suivi
+  // Charger automatiquement uniquement les commandes de ce client lors de l'ouverture du suivi
   useEffect(() => {
-    if (showTracking && customerPhone && customerPhone !== 'Non connecté') {
-      fetchOrders(customerPhone);
+    if (showTracking) {
+      if (isLoggedIn) {
+        fetchClientOrders();
+      } else {
+        setOrders([]);
+      }
     }
-  }, [showTracking, customerPhone]);
+  }, [showTracking, isLoggedIn, customerPhone, customerEmail, customerName]);
 
-  const fetchOrders = async (query) => {
+  const fetchClientOrders = async () => {
     setLoadingOrders(true);
     try {
-      const q = query ? encodeURIComponent(query.trim()) : (customerPhone && customerPhone !== 'Non connecté' ? encodeURIComponent(customerPhone) : '');
-      const res = await fetch(`/api/orders?search=${q}`);
+      const phone = customerPhone && customerPhone !== 'Non renseigné' && customerPhone !== 'Non connecté' ? customerPhone.trim() : '';
+      const email = customerEmail && customerEmail !== 'Non renseigné' && customerEmail !== 'Non connecté' ? customerEmail.trim() : '';
+      const name = customerName && customerName !== 'Client' && customerName !== 'Invité' ? customerName.trim() : '';
+
+      let queryParam = '';
+      if (phone) {
+        queryParam = `phone=${encodeURIComponent(phone)}`;
+      } else if (email) {
+        queryParam = `email=${encodeURIComponent(email)}`;
+      } else if (name) {
+        queryParam = `search=${encodeURIComponent(name)}`;
+      }
+
+      if (!queryParam) {
+        setOrders([]);
+        setLoadingOrders(false);
+        return;
+      }
+
+      const res = await fetch(`/api/orders?${queryParam}`);
       if (res.ok) {
         const json = await res.json();
-        setOrders(json.data || []);
+        const allFetched = json.data || [];
+
+        // Filtrage strict côté client : afficher UNIQUEMENT les commandes de ce client
+        const normalize = (num) => (num || '').replace(/[\s\-\.\(\)\+]/g, '').replace(/^213/, '0').replace(/^00213/, '0');
+        const phoneNorm = normalize(phone);
+        const emailNorm = email.toLowerCase();
+        const nameNorm = name.toLowerCase();
+
+        const clientOrders = allFetched.filter(ord => {
+          const ordPhone = normalize(ord.customer_phone || '');
+          const ordEmail = (ord.customer_email || '').trim().toLowerCase();
+          const ordName = (ord.customer_name || '').trim().toLowerCase();
+
+          if (phoneNorm && ordPhone) {
+            if (ordPhone === phoneNorm || ordPhone.endsWith(phoneNorm) || phoneNorm.endsWith(ordPhone)) {
+              return true;
+            }
+          }
+          if (emailNorm && ordEmail) {
+            if (ordEmail === emailNorm) return true;
+          }
+          if (nameNorm && ordName) {
+            if (ordName === nameNorm) return true;
+          }
+          return false;
+        });
+
+        setOrders(clientOrders);
       }
     } catch (err) {
-      console.warn('Erreur chargement commandes:', err);
+      console.warn('Erreur chargement commandes client:', err);
     } finally {
       setLoadingOrders(false);
-    }
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      fetchOrders(searchQuery.trim());
-    } else if (customerPhone && customerPhone !== 'Non connecté') {
-      fetchOrders(customerPhone);
     }
   };
 
@@ -78,11 +159,10 @@ const Profile = () => {
   return (
     <div className="page-wrapper">
       <Header 
-        title="Profile" 
+        title="Profil" 
         showBack={true} 
-        backUrl="/home"
-        showFilter={true}
-        filterUrl="/filter"
+        backUrl="/"
+        showFilter={false}
         bgWhite={true}
         borderZero={true}
       />
@@ -216,15 +296,15 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* Edit Profile */}
+            {/* Modifier Profil */}
             <div className="card style-3 mb-2">
               <div className="card-body" style={{ width: '100%' }}>
                 <Link to="/edit-profile" className="d-flex align-items-center justify-content-between text-dark text-decoration-none" style={{ width: '100%' }}>
                   <div className="d-flex align-items-center gap-3">
                     <i className="flaticon flaticon-pencil-2 text-primary font-20"></i>
                     <div>
-                      <h6 className="mb-0 font-14">Edit Profile</h6>
-                      <span className="font-12 text-muted">Update bio, pictures and interests</span>
+                      <h6 className="mb-0 font-14">Modifier Profil</h6>
+                      <span className="font-12 text-muted">Modifier vos informations personnelles</span>
                     </div>
                   </div>
                   <i className="icon feather icon-chevron-right text-muted"></i>
@@ -271,41 +351,31 @@ const Profile = () => {
 
             {/* Contenu défilable */}
             <div className="p-3" style={{ overflowY: 'auto', flex: 1 }}>
-              {/* Formulaire de recherche de commande */}
-              <form onSubmit={handleSearchSubmit} className="mb-3">
-                <div className="input-group">
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="N° de commande (#CMD-...) ou tél"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ fontSize: '13px', borderRadius: '10px 0 0 10px' }}
-                  />
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary"
-                    style={{ borderRadius: '0 10px 10px 0', fontSize: '13px', fontWeight: 600 }}
-                  >
-                    Chercher
-                  </button>
+              {/* État de connexion & chargement */}
+              {!isLoggedIn ? (
+                <div className="text-center py-4">
+                  <i className="icon feather icon-user-x text-muted" style={{ fontSize: '40px', opacity: 0.4 }}></i>
+                  <h6 className="mt-2 mb-1 font-14">Non connecté</h6>
+                  <p className="font-12 text-muted mb-3">
+                    Veuillez vous connecter pour consulter vos commandes.
+                  </p>
+                  <Link to="/login" className="btn btn-primary btn-sm px-4" style={{ borderRadius: '8px' }}>
+                    Se connecter
+                  </Link>
                 </div>
-              </form>
-
-              {/* État de chargement */}
-              {loadingOrders ? (
+              ) : loadingOrders ? (
                 <div className="text-center py-4">
                   <div className="spinner-border text-primary" role="status">
                     <span className="visually-hidden">Chargement...</span>
                   </div>
-                  <p className="font-12 text-muted mt-2">Recherche de vos commandes...</p>
+                  <p className="font-12 text-muted mt-2">Chargement de vos commandes...</p>
                 </div>
               ) : orders.length === 0 ? (
                 <div className="text-center py-4">
                   <i className="icon feather icon-package text-muted" style={{ fontSize: '40px', opacity: 0.4 }}></i>
                   <h6 className="mt-2 mb-1 font-14">Aucune commande trouvée</h6>
                   <p className="font-12 text-muted">
-                    Vérifiez le numéro de commande ou passez votre premier achat !
+                    Vous n'avez pas encore passé de commande avec ce compte.
                   </p>
                 </div>
               ) : (

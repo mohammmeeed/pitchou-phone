@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useDating } from '../context/DatingContext';
+import { ALGERIA_CITIES, getCommunesByWilaya } from '../data/algeriaCities';
 
 const EditProfile = () => {
   const navigate = useNavigate();
@@ -15,35 +16,103 @@ const EditProfile = () => {
     return null;
   });
 
+  // Extraction initiale de la Wilaya et Commune existante
+  const parseInitialLocation = () => {
+    const rawWilaya = loggedUser?.wilaya || '';
+    const rawCommune = loggedUser?.commune || '';
+    const rawAddress = loggedUser?.address || userProfile?.location || '';
+
+    let matchedWilaya = '';
+    let matchedCommune = rawCommune;
+
+    if (rawWilaya) {
+      const city = ALGERIA_CITIES.find(
+        (c) =>
+          c.name.toLowerCase() === rawWilaya.toLowerCase() ||
+          c.wilaya.toLowerCase() === rawWilaya.toLowerCase() ||
+          c.code === rawWilaya
+      );
+      if (city) matchedWilaya = city.name;
+    }
+
+    if (!matchedWilaya && rawAddress) {
+      for (const city of ALGERIA_CITIES) {
+        if (
+          rawAddress.toLowerCase().includes(city.wilaya.toLowerCase()) ||
+          rawAddress.toLowerCase().includes(city.name.toLowerCase())
+        ) {
+          matchedWilaya = city.name;
+          break;
+        }
+      }
+    }
+
+    if (matchedWilaya && !matchedCommune && rawAddress) {
+      const communes = getCommunesByWilaya(matchedWilaya);
+      for (const com of communes) {
+        if (rawAddress.toLowerCase().includes(com.toLowerCase())) {
+          matchedCommune = com;
+          break;
+        }
+      }
+    }
+
+    return {
+      wilaya: matchedWilaya,
+      commune: matchedCommune
+    };
+  };
+
+  const initialLoc = parseInitialLocation();
+
   const [formData, setFormData] = useState({
     name: loggedUser?.name || userProfile?.name || "",
     phone: loggedUser?.phone || userProfile?.phone || "",
     email: loggedUser?.email || userProfile?.email || "",
-    address: loggedUser?.address || userProfile?.location || "",
   });
+
+  const [selectedWilaya, setSelectedWilaya] = useState(initialLoc.wilaya);
+  const [selectedCommune, setSelectedCommune] = useState(initialLoc.commune);
   const [saving, setSaving] = useState(false);
+
+  const availableCommunes = selectedWilaya ? getCommunesByWilaya(selectedWilaya) : [];
+
+  const handleWilayaChange = (e) => {
+    const newWilaya = e.target.value;
+    setSelectedWilaya(newWilaya);
+    setSelectedCommune('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+
+    const fullAddress = selectedWilaya && selectedCommune
+      ? `${selectedWilaya} - ${selectedCommune}`
+      : (selectedWilaya || '');
 
     const updatedUser = {
       ...(loggedUser || {}),
       name: formData.name.trim(),
       phone: formData.phone.trim(),
       email: formData.email.trim(),
-      address: formData.address.trim()
+      wilaya: selectedWilaya,
+      commune: selectedCommune,
+      address: fullAddress
     };
 
     localStorage.setItem('customer_user', JSON.stringify(updatedUser));
 
     if (setUserProfile) {
-      setUserProfile(prev => ({
+      setUserProfile((prev) => ({
         ...prev,
         name: updatedUser.name,
         phone: updatedUser.phone,
         email: updatedUser.email,
-        location: updatedUser.address
+        wilaya: selectedWilaya,
+        commune: selectedCommune,
+        location: fullAddress,
+        address: fullAddress
       }));
     }
 
@@ -57,7 +126,9 @@ const EditProfile = () => {
             name: updatedUser.name,
             phone: updatedUser.phone,
             email: updatedUser.email,
-            address: updatedUser.address
+            wilaya: selectedWilaya,
+            commune: selectedCommune,
+            address: fullAddress
           })
         });
       } catch (err) {
@@ -127,16 +198,57 @@ const EditProfile = () => {
                   />
                 </div>
 
+                {/* Wilaya (Liste Déroulante) */}
                 <div style={{ width: '100%' }}>
-                  <label className="form-label font-w600 font-13 text-muted mb-1 d-block">Wilaya / Adresse de Livraison</label>
-                  <input 
-                    type="text" 
+                  <label className="form-label font-w600 font-13 text-muted mb-1 d-block">Wilaya</label>
+                  <select 
                     className="form-control w-100" 
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="Ex: Alger, Oran, Constantine..."
-                    style={{ height: '48px', borderRadius: '12px', fontSize: '14px' }}
-                  />
+                    required
+                    value={selectedWilaya}
+                    onChange={handleWilayaChange}
+                    style={{ 
+                      height: '48px', 
+                      borderRadius: '12px', 
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      backgroundColor: '#ffffff'
+                    }}
+                  >
+                    <option value="">Sélectionnez la wilaya</option>
+                    {ALGERIA_CITIES.map((c) => (
+                      <option key={c.code} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Commune (Liste Déroulante) */}
+                <div style={{ width: '100%' }}>
+                  <label className="form-label font-w600 font-13 text-muted mb-1 d-block">Commune</label>
+                  <select 
+                    className="form-control w-100" 
+                    required
+                    disabled={!selectedWilaya}
+                    value={selectedCommune}
+                    onChange={(e) => setSelectedCommune(e.target.value)}
+                    style={{ 
+                      height: '48px', 
+                      borderRadius: '12px', 
+                      fontSize: '14px',
+                      cursor: selectedWilaya ? 'pointer' : 'not-allowed',
+                      backgroundColor: selectedWilaya ? '#ffffff' : '#f8f9fa'
+                    }}
+                  >
+                    <option value="">
+                      {selectedWilaya ? 'Sélectionnez la commune' : 'Choisissez une wilaya'}
+                    </option>
+                    {availableCommunes.map((comm) => (
+                      <option key={comm} value={comm}>
+                        {comm}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

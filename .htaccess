@@ -1,0 +1,36 @@
+#+PHPVersion
+#=php80
+AddHandler x-httpd-php80 .php
+#-PHPVersion
+
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # 1. Sécurité : Bloquer l'accès direct aux configurations sensibles
+    RewriteRule ^backend/config - [F,L]
+    RewriteRule ^backend/database - [F,L]
+    RewriteRule \.(sql|env|log)$ - [F,L]
+
+    # 2. Routage API vers le dossier backend/api/
+    # /api/track_visit.php -> backend/api/track_visit.php
+    RewriteRule ^api/(.*)\.php$ backend/api/$1.php [L,QSA]
+    # /api/products -> backend/api/products.php
+    RewriteRule ^api/(.*)$ backend/api/$1.php [L,QSA]
+
+    # 3. Fichiers et dossiers réels existants (assets, uploads, favicon, index.html)
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 4. Routage React SPA (toutes les pages /admin, /wishlist, /explore vers index.html)
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+# En-têtes de sécurité
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>

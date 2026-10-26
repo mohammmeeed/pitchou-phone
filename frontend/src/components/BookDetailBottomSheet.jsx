@@ -256,7 +256,7 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
     setAddedToCart(true);
     setTimeout(() => {
       handleClose();
-      navigate('/explore');
+      navigate('/panier');
     }, 800);
   };
 

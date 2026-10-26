@@ -8,7 +8,7 @@ const HomeSetting = () => {
 
   return (
     <div className="page-wrapper">
-      <Header title="Theme Settings" showBack={true} backUrl="/home" bgWhite={true} />
+      <Header title="Theme Settings" showBack={true} backUrl="/" bgWhite={true} />
 
       <div className="page-content overflow-hidden space-top p-b60">
         <div className="container">

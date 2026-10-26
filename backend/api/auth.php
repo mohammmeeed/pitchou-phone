@@ -23,25 +23,14 @@ if (empty($email) || empty($password)) {
     exit();
 }
 
-// Check database first by email, phone, or 'admin'
-$stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? OR phone = ? OR (role = 'admin' AND ? = 'admin') LIMIT 1");
-$stmt->execute([$email, $email, $email]);
+// Check database first by email, phone, name, or 'leerbook' / 'admin'
+$stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? OR phone = ? OR name = ? OR (role = 'admin' AND (? = 'admin' OR ? = 'leerbook')) LIMIT 1");
+$stmt->execute([$email, $email, $email, $email, $email]);
 $user = $stmt->fetch();
 
 $isValidPassword = false;
-if ($user) {
-    if (password_verify($password, $user['password']) || $password === 'admin123' || $password === 'password') {
-        $isValidPassword = true;
-    }
-} else if (($email === 'admin@tiktokshop.dz' || $email === 'admin' || $email === '0550000000') && ($password === 'admin123' || $password === 'password')) {
+if ($user && password_verify($password, $user['password'])) {
     $isValidPassword = true;
-    $user = [
-        "id" => 1,
-        "name" => "Super Admin",
-        "email" => "admin@tiktokshop.dz",
-        "phone" => "0550123456",
-        "role" => "admin"
-    ];
 }
 
 if ($isValidPassword && $user) {

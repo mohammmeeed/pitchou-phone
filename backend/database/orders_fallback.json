@@ -1,0 +1,40 @@
+[
+    {
+        "id": 1,
+        "order_number": "#CMD-5119",
+        "customer_name": "Test Bureau Client",
+        "customer_phone": "0555112233",
+        "customer_email": "testbureau@example.com",
+        "customer_address": "Bureau (Stopdesk) : 01 - Adrar",
+        "delivery_type": "bureau",
+        "wilaya": "01 - Adrar",
+        "commune": "",
+        "address_details": "",
+        "subtotal": 2500,
+        "shipping_fee": 1000,
+        "total_amount": 3500,
+        "items_summary": "1x The Chronicles of Autumn",
+        "status": "En attente",
+        "notes": "Mode: En Bureau (Stopdesk) | Wilaya: 01 - Adrar",
+        "created_at": "2026-10-26 11:05:41"
+    },
+    {
+        "id": 2,
+        "order_number": "#CMD-6207",
+        "customer_name": "Test Domicile Client",
+        "customer_phone": "0777445566",
+        "customer_email": "testdomicile@example.com",
+        "customer_address": "Domicile : 16 - Alger - Bab El Oued (Rue Didouche)",
+        "delivery_type": "domicile",
+        "wilaya": "16 - Alger",
+        "commune": "Bab El Oued",
+        "address_details": "Rue Didouche Mourad, n 14",
+        "subtotal": 2500,
+        "shipping_fee": 600,
+        "total_amount": 3100,
+        "items_summary": "1x The Chronicles of Autumn",
+        "status": "En attente",
+        "notes": "Mode: À Domicile | Wilaya: 16 - Alger | Commune: Bab El Oued | Adresse: Rue Didouche Mourad, n 14",
+        "created_at": "2026-10-26 11:05:43"
+    }
+]

@@ -2,10 +2,15 @@
 // Messagerie & Chat avec les clients (Hospital React / Mediqu Design System)
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import AdminLayout from '../AdminLayout';
 import { adminApi } from '../services/adminApi';
 
 export default function AdminChat() {
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const targetCustomerId = searchParams.get('customer_id');
+
   const [conversations, setConversations] = useState([]);
   const [activeCustomerId, setActiveCustomerId] = useState(null);
   const [activeCustomer, setActiveCustomer] = useState(null);
@@ -36,7 +41,7 @@ export default function AdminChat() {
 
   useEffect(() => {
     loadConversations();
-  }, []);
+  }, [targetCustomerId]);
 
   // Polling automatique toutes les 3 secondes pour recevoir les nouveaux messages et conversations
   useEffect(() => {
@@ -53,7 +58,19 @@ export default function AdminChat() {
     try {
       const data = await adminApi.getConversations();
       if (Array.isArray(data)) {
-        setConversations(data);
+        setConversations((prev) => {
+          // Si une nouvelle discussion non encore enregistrée est en cours, la conserver en tête
+          const pendingNew = prev.find((c) => c.is_new);
+          if (pendingNew) {
+            const existsInFresh = data.some(
+              (c) => parseInt(c.customer_id, 10) === parseInt(pendingNew.customer_id, 10)
+            );
+            if (!existsInFresh) {
+              return [pendingNew, ...data];
+            }
+          }
+          return data;
+        });
       }
     } catch (e) {}
   };
@@ -62,9 +79,66 @@ export default function AdminChat() {
     setLoading(true);
     try {
       const data = await adminApi.getConversations();
-      setConversations(data);
-      if (data.length > 0 && !activeCustomerId) {
-        selectConversation(data[0].customer_id);
+      
+      if (targetCustomerId) {
+        const targetIdNum = parseInt(targetCustomerId, 10);
+        const existingConv = data.find((c) => parseInt(c.customer_id, 10) === targetIdNum);
+
+        if (existingConv) {
+          // Si la discussion existe déjà, on l'affiche directement
+          setConversations(data);
+          setActiveCustomerId(existingConv.customer_id);
+          setActiveCustomer({
+            id: existingConv.customer_id,
+            name: existingConv.customer_name,
+            phone: existingConv.customer_phone,
+            email: existingConv.customer_email,
+            address: existingConv.customer_address
+          });
+          await fetchMessages(existingConv.customer_id, true);
+        } else {
+          // Si la discussion n'existe pas, on crée une nouvelle discussion
+          let customerData = location.state?.customer;
+
+          if (!customerData || parseInt(customerData.id, 10) !== targetIdNum) {
+            try {
+              const res = await adminApi.getCustomerMessages(targetIdNum);
+              if (res && res.customer) {
+                customerData = res.customer;
+              }
+            } catch (e) {}
+          }
+
+          const newCustomer = customerData || {
+            id: targetIdNum,
+            name: `Client #${targetIdNum}`,
+            phone: '',
+            email: '',
+            address: ''
+          };
+
+          const newConv = {
+            customer_id: targetIdNum,
+            customer_name: newCustomer.name || `Client #${targetIdNum}`,
+            customer_phone: newCustomer.phone || '',
+            customer_email: newCustomer.email || '',
+            customer_address: newCustomer.address || '',
+            last_message: 'Nouvelle discussion',
+            last_message_time: '',
+            last_sender: 'system',
+            is_new: true
+          };
+
+          setConversations([newConv, ...data]);
+          setActiveCustomerId(targetIdNum);
+          setActiveCustomer(newCustomer);
+          setMessages([]);
+        }
+      } else {
+        setConversations(data);
+        if (data.length > 0 && !activeCustomerId) {
+          selectConversation(data[0].customer_id);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -75,6 +149,18 @@ export default function AdminChat() {
 
   const selectConversation = async (customerId) => {
     setActiveCustomerId(customerId);
+    const existing = conversations.find(
+      (c) => parseInt(c.customer_id, 10) === parseInt(customerId, 10)
+    );
+    if (existing) {
+      setActiveCustomer({
+        id: existing.customer_id,
+        name: existing.customer_name,
+        phone: existing.customer_phone,
+        email: existing.customer_email,
+        address: existing.customer_address
+      });
+    }
     await fetchMessages(customerId, true);
   };
 
@@ -83,7 +169,9 @@ export default function AdminChat() {
       const res = await adminApi.getCustomerMessages(customerId);
       if (res && res.success) {
         setMessages(res.messages || []);
-        setActiveCustomer(res.customer || null);
+        if (res.customer) {
+          setActiveCustomer(res.customer);
+        }
         if (scroll) {
           setTimeout(scrollToBottom, 50);
         }
@@ -120,7 +208,7 @@ export default function AdminChat() {
     setTimeout(scrollToBottom, 30);
 
     try {
-      await adminApi.sendMessage(activeCustomerId, textToSend, 'admin');
+      await adminApi.sendMessage(activeCustomerId, textToSend, 'admin', activeCustomer);
       // Rafraîchir conversations pour mettre à jour le dernier message
       const updatedConvs = await adminApi.getConversations();
       setConversations(updatedConvs);
@@ -134,6 +222,36 @@ export default function AdminChat() {
 
   const handleQuickReply = (text) => {
     setInputText(text);
+  };
+
+  const handleDeleteConversation = async (customerId) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette discussion ?')) {
+      return;
+    }
+    try {
+      const res = await adminApi.deleteConversation(customerId);
+      if (res && res.success) {
+        setMessages([]);
+        await loadConversations();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!window.confirm('Supprimer ce message ?')) {
+      return;
+    }
+    try {
+      const res = await adminApi.deleteMessage(messageId);
+      if (res && res.success) {
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        refreshConversationsSilent();
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const filteredConversations = conversations.filter((c) =>
@@ -291,8 +409,18 @@ export default function AdminChat() {
                         >
                           {conv.customer_name}
                         </span>
-                        <span style={{ fontSize: '0.72rem', color: '#999', flexShrink: 0, marginLeft: '0.5rem' }}>
-                          {conv.last_message_time ? conv.last_message_time.split(' ')[1]?.substring(0, 5) : ''}
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            color: conv.is_new ? '#209f84' : '#999',
+                            fontWeight: conv.is_new ? 700 : 400,
+                            flexShrink: 0,
+                            marginLeft: '0.5rem'
+                          }}
+                        >
+                          {conv.last_message_time
+                            ? conv.last_message_time.split(' ')[1]?.substring(0, 5)
+                            : (conv.is_new ? 'Nouveau' : '')}
                         </span>
                       </div>
 
@@ -393,6 +521,24 @@ export default function AdminChat() {
                   >
                     <i className="fas fa-phone-alt" /> Appeler
                   </a>
+                  <button
+                    type="button"
+                    className="btn-light-custom"
+                    onClick={() => handleDeleteConversation(activeCustomer.id)}
+                    title="Supprimer cette discussion"
+                    style={{
+                      padding: '0.45rem 0.85rem',
+                      fontSize: '0.82rem',
+                      color: '#f72b50',
+                      borderColor: 'rgba(247, 43, 80, 0.25)',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}
+                  >
+                    <i className="fas fa-trash" /> Supprimer la discussion
+                  </button>
                 </div>
               </div>
 
@@ -464,6 +610,22 @@ export default function AdminChat() {
                           >
                             <span>{timeStr}</span>
                             {isAdmin && <i className="fas fa-check-double" style={{ fontSize: '0.65rem' }} />}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMessage(m.id)}
+                              title="Supprimer ce message"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: isAdmin ? 'rgba(255,255,255,0.7)' : '#999999',
+                                cursor: 'pointer',
+                                padding: '0 2px',
+                                fontSize: '0.68rem',
+                                marginLeft: '0.25rem'
+                              }}
+                            >
+                              <i className="fas fa-trash-alt" />
+                            </button>
                           </div>
                         </div>
                       </div>

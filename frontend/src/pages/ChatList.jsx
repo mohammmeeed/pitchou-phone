@@ -10,7 +10,7 @@ const ChatList = () => {
 
   return (
     <div className="page-wrapper">
-      <Header title="New Matches" showBack={true} backUrl="/home" />
+      <Header title="New Matches" showBack={true} backUrl="/" />
 
       <div className="page-content space-top p-b60">
         <div className="container">

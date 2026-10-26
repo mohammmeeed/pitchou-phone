@@ -163,7 +163,7 @@ const Chat = () => {
         <div className="container">
           <div className="header-content">
             <div className="left-content">
-              <Link to="/home" className="back-btn me-2">
+              <Link to="/" className="back-btn me-2">
                 <i className="icon feather icon-chevron-left"></i>
               </Link>
               <h5 className="title mb-0 font-w600" style={{ fontSize: '17px', color: '#111' }}>

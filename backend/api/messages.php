@@ -43,7 +43,7 @@ switch ($method) {
                 'messages' => $messages
             ], JSON_UNESCAPED_UNICODE);
         } else {
-            // Récupérer la liste de toutes les conversations avec le dernier message
+            // Récupérer uniquement les discussions réelles existantes (qui contiennent des messages)
             $stmt = $db->query("
                 SELECT 
                     c.id AS customer_id,
@@ -51,14 +51,14 @@ switch ($method) {
                     c.phone AS customer_phone,
                     c.email AS customer_email,
                     c.address AS customer_address,
-                    COALESCE(m.message, 'Aucun message pour le moment') AS last_message,
-                    COALESCE(m.created_at, c.created_at) AS last_message_time,
-                    COALESCE(m.sender, 'system') AS last_sender
+                    m.message AS last_message,
+                    m.created_at AS last_message_time,
+                    m.sender AS last_sender
                 FROM customers c
-                LEFT JOIN messages m ON m.id = (
+                INNER JOIN messages m ON m.id = (
                     SELECT id FROM messages WHERE customer_id = c.id ORDER BY id DESC LIMIT 1
                 )
-                ORDER BY last_message_time DESC
+                ORDER BY m.created_at DESC
             ");
             $conversations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -86,6 +86,20 @@ switch ($method) {
         $sender = in_array($data['sender'] ?? '', ['admin', 'customer']) ? $data['sender'] : 'admin';
         $message = trim($data['message']);
 
+        // S'assurer que le client existe dans la table customers pour respecter la clé étrangère
+        $cCheck = $db->prepare("SELECT id FROM customers WHERE id = ?");
+        $cCheck->execute([$customerId]);
+        if (!$cCheck->fetch()) {
+            $cName = trim($data['customer_name'] ?? ('Client #' . $customerId));
+            $cPhone = trim($data['customer_phone'] ?? ('05' . str_pad((string)$customerId, 8, '0', STR_PAD_LEFT)));
+            $cEmail = trim($data['customer_email'] ?? '');
+            $cAddr = trim($data['customer_address'] ?? 'Alger');
+            try {
+                $insC = $db->prepare("INSERT INTO customers (id, name, phone, email, address) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)");
+                $insC->execute([$customerId, $cName, $cPhone, $cEmail, $cAddr]);
+            } catch (Exception $e) {}
+        }
+
         $stmt = $db->prepare("
             INSERT INTO messages (customer_id, sender, message, created_at)
             VALUES (?, ?, ?, NOW())
@@ -102,6 +116,40 @@ switch ($method) {
             'message' => 'Message envoyé avec succès',
             'data' => $inserted
         ], JSON_UNESCAPED_UNICODE);
+        break;
+
+    case 'DELETE':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?? [];
+        $customerId = isset($_GET['customer_id']) ? intval($_GET['customer_id']) : intval($data['customer_id'] ?? 0);
+        $messageId = isset($_GET['id']) ? intval($_GET['id']) : intval($data['id'] ?? 0);
+
+        if ($customerId) {
+            $stmt = $db->prepare("DELETE FROM messages WHERE customer_id = ?");
+            $stmt->execute([$customerId]);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Discussion supprimée avec succès'
+            ], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        if ($messageId) {
+            $stmt = $db->prepare("DELETE FROM messages WHERE id = ?");
+            $stmt->execute([$messageId]);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Message supprimé avec succès'
+            ], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => 'customer_id ou id de message manquant.'
+        ], JSON_UNESCAPED_UNICODE);
+        exit();
         break;
 
     default:

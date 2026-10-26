@@ -34,7 +34,11 @@
     <link rel="stylesheet" class="main-css" type="text/css" href="/assets/css/style.css" />
   </head>
   <body class="header-large">
-    <div id="root"></div>
+    <div id="root">
+      <div id="initial-preloader" style="position:fixed;inset:0;z-index:999999;background-color:#ffffff;display:flex;align-items:center;justify-content:center;">
+        <img src="/animated-logo.gif" alt="Chargement..." style="width:180px;max-width:65vw;height:auto;object-fit:contain;" />
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

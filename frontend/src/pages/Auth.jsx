@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
+import { ALGERIA_CITIES, getCommunesByWilaya } from '../data/algeriaCities';
 
 const Auth = ({ defaultTab = 'login' }) => {
   const navigate = useNavigate();
@@ -16,17 +17,26 @@ const Auth = ({ defaultTab = 'login' }) => {
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
 
-  // Register state (nom complet + email + telephone facultatif + mot de passe)
+  // Register state (nom complet + email + telephone + mot de passe + wilaya + commune)
   const [regFullName, setRegFullName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
+  const [regWilaya, setRegWilaya] = useState('');
+  const [regCommune, setRegCommune] = useState('');
+
+  const availableCommunes = regWilaya ? getCommunesByWilaya(regWilaya) : [];
 
   // Status
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [accountExistsModal, setAccountExistsModal] = useState({
+    isOpen: false,
+    phone: '',
+    message: ''
+  });
 
   const completeOrderOrRedirect = async (userObj) => {
     const pendingOrderStr = localStorage.getItem('pending_order');
@@ -40,7 +50,12 @@ const Auth = ({ defaultTab = 'login' }) => {
             customer_name: userObj?.name || regFullName.trim() || 'Client',
             customer_phone: userObj?.phone || loginPhone.trim() || regPhone.trim(),
             customer_email: userObj?.email || regEmail.trim() || '',
-            customer_address: pending.wilaya || 'Alger',
+            customer_address: pending.customer_address || pending.wilaya || ((regWilaya && regCommune) ? `${regWilaya} - ${regCommune}` : (regWilaya || 'Alger')),
+            delivery_type: pending.delivery_type || 'bureau',
+            wilaya: pending.wilaya || regWilaya || '',
+            commune: pending.commune || regCommune || '',
+            address_details: pending.address_details || '',
+            notes: pending.notes || '',
             subtotal: pending.subtotal !== undefined ? pending.subtotal : pending.total_amount,
             shipping_fee: pending.shipping_fee !== undefined ? pending.shipping_fee : 0,
             total_amount: pending.total_amount,
@@ -55,17 +70,17 @@ const Auth = ({ defaultTab = 'login' }) => {
       if (clearCart) clearCart();
       setSuccessMsg('Compte validé ! Votre commande a été enregistrée avec succès.');
       setTimeout(() => {
-        navigate('/explore?order_success=true');
+        navigate('/panier?order_success=true');
       }, 900);
       return;
     }
 
     if (redirectParam === 'checkout') {
-      navigate('/explore');
+      navigate('/panier');
     } else if (redirectParam === 'chat') {
       navigate('/chat');
     } else {
-      navigate('/home');
+      navigate('/');
     }
   };
 
@@ -146,6 +161,14 @@ const Auth = ({ defaultTab = 'login' }) => {
       setErrorMsg('Veuillez renseigner votre numéro de téléphone.');
       return;
     }
+    if (!regWilaya) {
+      setErrorMsg('Veuillez sélectionner votre wilaya.');
+      return;
+    }
+    if (!regCommune) {
+      setErrorMsg('Veuillez sélectionner votre commune.');
+      return;
+    }
     if (!regPassword || regPassword.length < 4) {
       setErrorMsg('Le mot de passe doit comporter au moins 4 caractères.');
       return;
@@ -153,6 +176,7 @@ const Auth = ({ defaultTab = 'login' }) => {
 
     setIsLoading(true);
     try {
+      const fullAddress = `${regWilaya} - ${regCommune}`;
       const res = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -161,26 +185,49 @@ const Auth = ({ defaultTab = 'login' }) => {
           email: regEmail.trim(),
           phone: regPhone.trim(),
           password: regPassword,
-          address: 'Alger'
+          address: fullAddress,
+          wilaya: regWilaya,
+          commune: regCommune
         })
       });
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        if (data.code === 'ACCOUNT_EXISTS' || res.status === 409 || (data.message && data.message.toLowerCase().includes('déjà associé'))) {
+          setAccountExistsModal({
+            isOpen: true,
+            phone: regPhone.trim(),
+            message: data.message || 'Ce numéro de téléphone est déjà associé à un compte existant.'
+          });
+          setIsLoading(false);
+          return;
+        }
         throw new Error(data.message || 'Erreur lors de l’enregistrement');
       }
+
 
       const registeredUser = data.data || {
         name: regFullName.trim(),
         email: regEmail.trim(),
-        phone: regPhone.trim()
+        phone: regPhone.trim(),
+        password: regPassword,
+        address: fullAddress,
+        wilaya: regWilaya,
+        commune: regCommune
       };
+      if (!registeredUser.password) registeredUser.password = regPassword;
+      if (!registeredUser.address) registeredUser.address = fullAddress;
+      if (!registeredUser.wilaya) registeredUser.wilaya = regWilaya;
+      if (!registeredUser.commune) registeredUser.commune = regCommune;
 
       setUserProfile(prev => ({
         ...prev,
         name: regFullName.trim(),
         email: regEmail.trim(),
         phone: regPhone.trim(),
+        address: fullAddress,
+        wilaya: regWilaya,
+        commune: regCommune
       }));
 
       try {
@@ -501,6 +548,76 @@ const Auth = ({ defaultTab = 'login' }) => {
                         </span>
                       </div>
                     </div>
+
+                    {/* Wilaya (Liste déroulante) */}
+                    <div className="auth-grid-item">
+                      <label className="form-label font-14 font-w600 text-dark mb-2">
+                        Wilaya
+                      </label>
+                      <div className="input-group input-group-icon">
+                        <div className="input-group-text">
+                          <div className="input-icon">
+                            <i className="icon feather icon-map-pin"></i>
+                          </div>
+                        </div>
+                        <select 
+                          className="form-control font-14" 
+                          value={regWilaya}
+                          onChange={(e) => {
+                            setRegWilaya(e.target.value);
+                            setRegCommune('');
+                          }}
+                          required
+                          style={{ 
+                            height: '50px', 
+                            cursor: 'pointer',
+                            backgroundColor: '#ffffff'
+                          }}
+                        >
+                          <option value="">Sélectionnez la wilaya</option>
+                          {ALGERIA_CITIES.map((c) => (
+                            <option key={c.code} value={c.name}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Commune (Liste déroulante) */}
+                    <div className="auth-grid-item">
+                      <label className="form-label font-14 font-w600 text-dark mb-2">
+                        Commune
+                      </label>
+                      <div className="input-group input-group-icon">
+                        <div className="input-group-text">
+                          <div className="input-icon">
+                            <i className="icon feather icon-navigation"></i>
+                          </div>
+                        </div>
+                        <select 
+                          className="form-control font-14" 
+                          value={regCommune}
+                          onChange={(e) => setRegCommune(e.target.value)}
+                          required
+                          disabled={!regWilaya}
+                          style={{ 
+                            height: '50px', 
+                            cursor: regWilaya ? 'pointer' : 'not-allowed',
+                            backgroundColor: regWilaya ? '#ffffff' : '#f8f9fa'
+                          }}
+                        >
+                          <option value="">
+                            {regWilaya ? 'Sélectionnez la commune' : 'Choisissez une wilaya'}
+                          </option>
+                          {availableCommunes.map((commune) => (
+                            <option key={commune} value={commune}>
+                              {commune}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Bouton Créer un compte */}
@@ -533,6 +650,140 @@ const Auth = ({ defaultTab = 'login' }) => {
           </div>
         </div>
       </div>
+
+      {/* Pop-up Moderne : Compte Déjà Existant */}
+      {accountExistsModal.isOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999999,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setAccountExistsModal({ isOpen: false, phone: '', message: '' })}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              maxWidth: '380px',
+              width: '100%',
+              padding: '28px 22px 22px',
+              textAlign: 'center',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Bouton Fermer "×" */}
+            <button
+              type="button"
+              onClick={() => setAccountExistsModal({ isOpen: false, phone: '', message: '' })}
+              style={{
+                position: 'absolute',
+                top: '14px',
+                right: '14px',
+                background: '#f4f4f5',
+                border: 'none',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '18px',
+                color: '#71717a'
+              }}
+            >
+              &times;
+            </button>
+
+            {/* Icône Alert / Compte existant */}
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: '#fff1f2',
+                color: '#fe2c55',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                fontSize: '28px'
+              }}
+            >
+              <i className="feather icon-alert-circle"></i>
+            </div>
+
+            <h4 style={{ fontWeight: 800, fontSize: '1.2rem', color: '#18181b', marginBottom: '8px' }}>
+              Compte Déjà Existant
+            </h4>
+
+            <p style={{ fontSize: '0.88rem', color: '#71717a', lineHeight: '1.45', marginBottom: '12px' }}>
+              Un compte existe déjà avec ce numéro de téléphone :
+            </p>
+
+            <div
+              style={{
+                backgroundColor: '#f4f4f5',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                fontWeight: 700,
+                fontSize: '1.05rem',
+                color: '#111827',
+                marginBottom: '14px',
+                letterSpacing: '0.5px'
+              }}
+            >
+              {accountExistsModal.phone || regPhone}
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: '#71717a', marginBottom: '22px' }}>
+              Veuillez vous connecter pour accéder à votre profil et suivre vos commandes.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-lg btn-gradient w-100 btn-shadow rounded-xl"
+                style={{ height: '48px', fontSize: '14px', fontWeight: 700 }}
+                onClick={() => {
+                  setLoginPhone(accountExistsModal.phone || regPhone.trim());
+                  setActiveTab('login');
+                  setErrorMsg('');
+                  setAccountExistsModal({ isOpen: false, phone: '', message: '' });
+                }}
+              >
+                Se connecter avec ce numéro
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  height: '42px',
+                  backgroundColor: '#f4f4f5',
+                  color: '#52525b',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+                onClick={() => setAccountExistsModal({ isOpen: false, phone: '', message: '' })}
+              >
+                Changer de numéro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

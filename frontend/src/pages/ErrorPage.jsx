@@ -5,7 +5,7 @@ import Header from '../components/Header';
 const ErrorPage = () => {
   return (
     <div className="page-wrapper">
-      <Header title="Not Found" showBack={true} backUrl="/home" />
+      <Header title="Not Found" showBack={true} backUrl="/" />
 
       <div className="page-content space-top text-center">
         <div className="container">
@@ -22,7 +22,7 @@ const ErrorPage = () => {
             <img src="/assets/images/error.png" alt="404" className="img-fluid" style={{ maxHeight: '220px' }} />
           </div>
 
-          <Link to="/home" className="btn btn-lg btn-gradient w-100 dz-flex-box rounded-xl mt-3">
+          <Link to="/" className="btn btn-lg btn-gradient w-100 dz-flex-box rounded-xl mt-3">
             Back to Home
           </Link>
         </div>

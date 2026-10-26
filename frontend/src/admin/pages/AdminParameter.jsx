@@ -8,7 +8,7 @@ import { adminApi } from '../services/adminApi';
 import { applyThemeColor } from '../../context/ThemeContext';
 
 export default function AdminParameter() {
-  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'store' | 'appearance' | 'smtp' | 'system'
+  const [activeTab, setActiveTab] = useState('store'); // 'store' | 'appearance' | 'smtp'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState(null); // { type: 'success' | 'error', text: string }
@@ -21,33 +21,37 @@ export default function AdminParameter() {
   // État global des paramètres
   const [settings, setSettings] = useState({
     // Boutique & Devise
-    store_name: 'LeerBook',
-    currency: 'DA (Dinar Algérien)',
-    delivery_cost: '500',
-    admin_phone: '0550 12 34 56',
-    admin_email: 'admin@tiktokshop.dz',
+    store_name: '',
+    currency: '',
+    delivery_cost: '',
+    admin_phone: '',
+    admin_email: '',
 
     // Apparence
-    theme_mode: 'light', // light | dark | auto
-    accent_color: '#fe2c55', // Rouge TikTok
-    logo_image: '', // URL du logo de la boutique
-    logo_text: 'LeerBook',
+    theme_mode: 'light',
+    accent_color: '#fe2c55',
+    logo_image: '',
+    logo_text: '',
     top_banner_enabled: '1',
-    top_banner_text: '🔥 Livraison Express 58 Wilayas | Paiement sécurisé à la réception !',
+    top_banner_text: '',
     catalog_layout: 'grid-3',
+    category_card_style: 'home_card',
     products_per_page: '12',
 
     // Configuration SMTP
-    smtp_enabled: '1',
-    smtp_host: 'smtp.gmail.com',
-    smtp_port: '587',
-    smtp_encryption: 'tls', // tls | ssl | none
-    smtp_username: 'contact@tiktokshop.dz',
+    smtp_enabled: '0',
+    smtp_host: '',
+    smtp_port: '',
+    smtp_encryption: 'tls',
+    smtp_username: '',
     smtp_password: '',
-    smtp_from_name: 'LeerBook',
-    smtp_reply_to: 'support@tiktokshop.dz',
-    smtp_notify_customer: '1',
-    smtp_notify_admin: '1'
+    smtp_from_name: '',
+    smtp_reply_to: '',
+    smtp_notify_customer: '0',
+    smtp_notify_admin: '0',
+
+    // Protection F12
+    block_f12: '0'
   });
 
   const logoFileInputRef = React.useRef(null);
@@ -160,6 +164,13 @@ export default function AdminParameter() {
         try {
           localStorage.setItem('shop_logo_image', settings.logo_image || '');
           localStorage.setItem('shop_logo_text', settings.logo_text || '');
+          if (settings.category_card_style) {
+            localStorage.setItem('category_card_style', String(settings.category_card_style));
+          }
+          if (settings.block_f12 !== undefined) {
+            localStorage.setItem('block_f12', String(settings.block_f12));
+            window.dispatchEvent(new CustomEvent('block_f12_changed', { detail: String(settings.block_f12) }));
+          }
         } catch (e) {}
         window.dispatchEvent(new CustomEvent('shop_logo_changed', { detail: { logo: settings.logo_image, text: settings.logo_text } }));
       } else {
@@ -210,6 +221,32 @@ export default function AdminParameter() {
       });
     } finally {
       setSmtpTesting(false);
+    }
+  };
+
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+
+  const handleSendTestEmail = async () => {
+    const target = settings.admin_email || settings.smtp_username;
+    if (!target) {
+      showToast('Veuillez renseigner un email administrateur');
+      return;
+    }
+    setSendingTestEmail(true);
+    setSmtpTestResult(null);
+    try {
+      const res = await adminApi.sendTestEmail(target);
+      setSmtpTestResult({
+        success: Boolean(res?.success),
+        message: res?.message || (res?.success ? 'Email envoyé !' : 'Échec de l\'envoi')
+      });
+    } catch (err) {
+      setSmtpTestResult({
+        success: false,
+        message: "Erreur lors de l'envoi de l'email de test"
+      });
+    } finally {
+      setSendingTestEmail(false);
     }
   };
 
@@ -270,26 +307,6 @@ export default function AdminParameter() {
             Configuration générale de la boutique, personnalisation de l'apparence et passerelle SMTP
           </p>
         </div>
-
-        <div className="page-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            type="button"
-            className="btn-primary-custom"
-            onClick={handleSave}
-            disabled={saving || loading}
-            style={{
-              padding: '0.65rem 1.5rem',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              opacity: saving ? 0.7 : 1,
-              cursor: saving ? 'not-allowed' : 'pointer'
-            }}
-          >
-            <i className="flaticon-381-save" />
-            <span>{saving ? 'Enregistrement...' : 'Enregistrer Tout'}</span>
-          </button>
-        </div>
       </div>
 
       {/* Onglets de filtrage rapide (Navigation En-Page) */}
@@ -305,7 +322,6 @@ export default function AdminParameter() {
         }}
       >
         {[
-          { id: 'all', label: 'Tous les Paramètres', icon: 'flaticon-381-controls-3' },
           { id: 'store', label: 'Boutique & Devise', icon: 'flaticon-381-box' },
           { id: 'appearance', label: 'Apparence & Design', icon: 'flaticon-381-layer-1' },
           { id: 'smtp', label: 'Configuration SMTP', icon: 'flaticon-381-send' }
@@ -335,12 +351,12 @@ export default function AdminParameter() {
         ))}
       </div>
 
-      {/* Grille Principale des Cartes de Configuration */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+      {/* Conteneur des Cartes de Configuration (Full Width) */}
+      <div style={{ width: '100%' }}>
         
         {/* CARTE 1 : BOUTIQUE & DEVISE */}
-        {(activeTab === 'all' || activeTab === 'store') && (
-          <div className="admin-card">
+        {activeTab === 'store' && (
+          <div className="admin-card" style={{ width: '100%' }}>
             <div className="card-header-custom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
                 <i className="flaticon-381-box" style={{ color: '#111111' }} />
@@ -351,64 +367,68 @@ export default function AdminParameter() {
               </span>
             </div>
 
-            <div className="card-body-custom" style={{ padding: '1.5rem' }}>
+            <div className="card-body-custom" style={{ padding: '1.75rem' }}>
               <form onSubmit={handleSave}>
-                <div className="form-group-custom" style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                    Nom de la Boutique
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value={settings.store_name}
-                    onChange={(e) => setSettings({ ...settings, store_name: e.target.value })}
-                    placeholder="Ex: LeerBook"
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                  <div className="form-group-custom">
+                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
+                      Nom de la Boutique
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      value={settings.store_name}
+                      onChange={(e) => setSettings({ ...settings, store_name: e.target.value })}
+                      placeholder="Ex: LeerBook"
+                    />
+                  </div>
+
+                  <div className="form-group-custom">
+                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
+                      Devise par Défaut
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      value={settings.currency}
+                      disabled
+                      style={{ backgroundColor: '#f4f4f5', color: '#71717a', cursor: 'not-allowed' }}
+                    />
+                    <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem' }}>
+                      Fixée sur le Dinar Algérien (DA) pour les paiements locaux.
+                    </small>
+                  </div>
                 </div>
 
-                <div className="form-group-custom" style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                    Devise par Défaut
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value={settings.currency}
-                    disabled
-                    style={{ backgroundColor: '#f4f4f5', color: '#71717a', cursor: 'not-allowed' }}
-                  />
-                  <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem' }}>
-                    Fixée sur le Dinar Algérien (DA) pour les paiements locaux.
-                  </small>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                  <div className="form-group-custom">
+                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
+                      Frais de Livraison Standard (DA)
+                    </label>
+                    <input
+                      type="number"
+                      className="form-control-custom"
+                      value={settings.delivery_cost}
+                      onChange={(e) => setSettings({ ...settings, delivery_cost: e.target.value })}
+                      placeholder="500"
+                    />
+                  </div>
+
+                  <div className="form-group-custom">
+                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
+                      Téléphone Support / WhatsApp
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      value={settings.admin_phone}
+                      onChange={(e) => setSettings({ ...settings, admin_phone: e.target.value })}
+                      placeholder="0550 12 34 56"
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group-custom" style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                    Frais de Livraison Standard (DA)
-                  </label>
-                  <input
-                    type="number"
-                    className="form-control-custom"
-                    value={settings.delivery_cost}
-                    onChange={(e) => setSettings({ ...settings, delivery_cost: e.target.value })}
-                    placeholder="500"
-                  />
-                </div>
-
-                <div className="form-group-custom" style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                    Téléphone Support / WhatsApp
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value={settings.admin_phone}
-                    onChange={(e) => setSettings({ ...settings, admin_phone: e.target.value })}
-                    placeholder="0550 12 34 56"
-                  />
-                </div>
-
-                <div className="form-group-custom" style={{ marginBottom: '1.5rem' }}>
+                <div className="form-group-custom" style={{ marginBottom: '1.75rem' }}>
                   <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
                     Email de Contact Général
                   </label>
@@ -425,7 +445,7 @@ export default function AdminParameter() {
                   type="submit"
                   className="btn-primary-custom"
                   disabled={saving}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.5rem' }}
                 >
                   <i className="flaticon-381-save" />
                   <span>{saving ? 'Enregistrement...' : 'Enregistrer les Modifications'}</span>
@@ -436,8 +456,8 @@ export default function AdminParameter() {
         )}
 
         {/* CARTE 2 : APPARENCE & DESIGN */}
-        {(activeTab === 'all' || activeTab === 'appearance') && (
-          <div className="admin-card">
+        {activeTab === 'appearance' && (
+          <div className="admin-card" style={{ width: '100%' }}>
             <div className="card-header-custom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
                 <i className="flaticon-381-layer-1" style={{ color: '#111111' }} />
@@ -445,46 +465,8 @@ export default function AdminParameter() {
               </h4>
             </div>
 
-            <div className="card-body-custom" style={{ padding: '1.5rem' }}>
+            <div className="card-body-custom" style={{ padding: '1.75rem' }}>
               <form onSubmit={handleSave}>
-                {/* Mode Thème (Clair / Sombre / Auto) */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.5rem', display: 'block', fontSize: '0.88rem' }}>
-                    Mode du Thème
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.65rem' }}>
-                    {[
-                      { id: 'light', label: 'Clair', icon: 'fas fa-sun' },
-                      { id: 'dark', label: 'Sombre', icon: 'fas fa-moon' },
-                      { id: 'auto', label: 'Auto (Système)', icon: 'fas fa-adjust' }
-                    ].map((mode) => (
-                      <button
-                        key={mode.id}
-                        type="button"
-                        onClick={() => setSettings({ ...settings, theme_mode: mode.id })}
-                        style={{
-                          padding: '0.65rem 0.5rem',
-                          borderRadius: '8px',
-                          border: `2px solid ${settings.theme_mode === mode.id ? '#111111' : '#e4e4e7'}`,
-                          backgroundColor: settings.theme_mode === mode.id ? '#f4f4f5' : '#ffffff',
-                          color: '#111111',
-                          fontWeight: settings.theme_mode === mode.id ? 700 : 500,
-                          fontSize: '0.82rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.4rem',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <i className={mode.icon} />
-                        <span>{mode.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Couleur Principale / Brand Color */}
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
@@ -526,6 +508,7 @@ export default function AdminParameter() {
                     </div>
                   </div>
                 </div>
+
 
                 {/* Logo de la Boutique (Téléverser depuis l'appareil) & Titre Header */}
                 <div style={{ marginBottom: '1.5rem', padding: '1.25rem', backgroundColor: '#fafafa', borderRadius: '10px', border: '1px solid #f0f0f0' }}>
@@ -657,7 +640,7 @@ export default function AdminParameter() {
                   type="submit"
                   className="btn-primary-custom"
                   disabled={saving}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.5rem' }}
                 >
                   <i className="flaticon-381-save" />
                   <span>{saving ? 'Enregistrement...' : 'Enregistrer l’Apparence'}</span>
@@ -668,8 +651,8 @@ export default function AdminParameter() {
         )}
 
         {/* CARTE 3 : CONFIGURATION SMTP */}
-        {(activeTab === 'all' || activeTab === 'smtp') && (
-          <div className="admin-card">
+        {activeTab === 'smtp' && (
+          <div className="admin-card" style={{ width: '100%' }}>
             <div className="card-header-custom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
                 <i className="flaticon-381-send" style={{ color: '#111111' }} />
@@ -680,7 +663,7 @@ export default function AdminParameter() {
               </span>
             </div>
 
-            <div className="card-body-custom" style={{ padding: '1.5rem' }}>
+            <div className="card-body-custom" style={{ padding: '1.75rem' }}>
               <form onSubmit={handleSave}>
                 {/* Switch Activation SMTP */}
                 <div
@@ -688,11 +671,11 @@ export default function AdminParameter() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '0.75rem 1rem',
+                    padding: '0.85rem 1.25rem',
                     backgroundColor: '#fafafa',
                     borderRadius: '8px',
                     border: '1px solid #f0f0f0',
-                    marginBottom: '1.25rem'
+                    marginBottom: '1.5rem'
                   }}
                 >
                   <div>
@@ -713,7 +696,7 @@ export default function AdminParameter() {
                 </div>
 
                 {/* Hôte & Port SMTP */}
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
                   <div className="form-group-custom">
                     <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
                       Serveur Hôte SMTP *
@@ -779,58 +762,60 @@ export default function AdminParameter() {
                   </div>
                 </div>
 
-                {/* Nom d'utilisateur & Mot de passe SMTP */}
-                <div className="form-group-custom" style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                    Identifiant / Email SMTP d'Envoi
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value={settings.smtp_username}
-                    onChange={(e) => setSettings({ ...settings, smtp_username: e.target.value })}
-                    placeholder="contact@tiktokshop.dz"
-                  />
-                </div>
-
-                <div className="form-group-custom" style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                    Mot de Passe SMTP / Clé d'Application
-                  </label>
-                  <div style={{ position: 'relative' }}>
+                {/* Nom d'utilisateur & Mot de passe SMTP (Grille 2 Colonnes) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+                  <div className="form-group-custom">
+                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
+                      Identifiant / Email SMTP d'Envoi
+                    </label>
                     <input
-                      type={showPassword ? 'text' : 'password'}
+                      type="text"
                       className="form-control-custom"
-                      value={settings.smtp_password}
-                      onChange={(e) => setSettings({ ...settings, smtp_password: e.target.value })}
-                      placeholder="••••••••••••"
-                      style={{ paddingRight: '2.5rem' }}
+                      value={settings.smtp_username}
+                      onChange={(e) => setSettings({ ...settings, smtp_username: e.target.value })}
+                      placeholder="contact@tiktokshop.dz"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '10px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#71717a',
-                        fontSize: '0.9rem'
-                      }}
-                    >
-                      <i className={showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'} />
-                    </button>
                   </div>
-                  <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem', fontSize: '0.78rem' }}>
-                    Pour Gmail, utilisez un "Mot de passe d'application" généré depuis votre compte Google.
-                  </small>
+
+                  <div className="form-group-custom">
+                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
+                      Mot de Passe SMTP / Clé d'Application
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        className="form-control-custom"
+                        value={settings.smtp_password}
+                        onChange={(e) => setSettings({ ...settings, smtp_password: e.target.value })}
+                        placeholder="••••••••••••"
+                        style={{ paddingRight: '2.5rem' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#71717a',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        <i className={showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'} />
+                      </button>
+                    </div>
+                    <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem', fontSize: '0.78rem' }}>
+                      Pour Gmail, utilisez un "Mot de passe d'application" généré depuis votre compte Google.
+                    </small>
+                  </div>
                 </div>
 
                 {/* Expéditeur & Reply-To */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
                   <div className="form-group-custom">
                     <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
                       Nom d'Expéditeur ("From")
@@ -922,12 +907,73 @@ export default function AdminParameter() {
                     type="button"
                     className="btn-light-custom"
                     onClick={handleTestSmtp}
-                    disabled={smtpTesting}
+                    disabled={smtpTesting || sendingTestEmail}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem' }}
                   >
                     <i className={smtpTesting ? 'fas fa-spinner fa-spin' : 'flaticon-381-send-1'} />
                     <span>{smtpTesting ? 'Test en cours...' : 'Tester la Connexion SMTP'}</span>
                   </button>
+
+                  <button
+                    type="button"
+                    className="btn-light-custom"
+                    onClick={handleSendTestEmail}
+                    disabled={sendingTestEmail || smtpTesting}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.25rem' }}
+                    title="Envoyer un email de test réel avec le logo de la boutique"
+                  >
+                    <i className={sendingTestEmail ? 'fas fa-spinner fa-spin' : 'fas fa-envelope'} />
+                    <span>{sendingTestEmail ? 'Envoi en cours...' : 'Envoyer un Email de Test'}</span>
+                  </button>
+
+                  {/* Option Sécurité : Bloquer F12 */}
+                  <label
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.55rem',
+                      padding: '0.65rem 1.15rem',
+                      backgroundColor: String(settings.block_f12) === '1' ? '#fef2f2' : '#ffffff',
+                      border: String(settings.block_f12) === '1' ? '1.5px solid #ef4444' : '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      color: String(settings.block_f12) === '1' ? '#b91c1c' : '#374151',
+                      userSelect: 'none',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                    }}
+                    title="Bloquer la touche F12 et les outils d'inspection"
+                  >
+                    <input
+                      type="checkbox"
+                      id="block_f12_checkbox"
+                      checked={String(settings.block_f12) === '1'}
+                      onChange={async (e) => {
+                        const newVal = e.target.checked ? '1' : '0';
+                        const updated = { ...settings, block_f12: newVal };
+                        setSettings(updated);
+                        try {
+                          localStorage.setItem('block_f12', newVal);
+                          window.dispatchEvent(new CustomEvent('block_f12_changed', { detail: newVal }));
+                          await adminApi.saveParameters(updated);
+                          setToastMessage({
+                            type: 'success',
+                            text: newVal === '1' ? 'Protection F12 activée avec succès !' : 'Protection F12 désactivée.'
+                          });
+                        } catch (err) {
+                          console.error('Erreur save block_f12:', err);
+                        }
+                      }}
+                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#ef4444' }}
+                    />
+                    <i
+                      className="fas fa-shield-alt"
+                      style={{ color: String(settings.block_f12) === '1' ? '#ef4444' : '#9ca3af', fontSize: '0.95rem' }}
+                    />
+                    <span>Bloquer F12</span>
+                  </label>
                 </div>
               </form>
             </div>

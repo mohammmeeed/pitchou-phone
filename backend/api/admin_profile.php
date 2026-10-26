@@ -35,13 +35,13 @@ switch ($method) {
 
         if (!$admin) {
             // Créer l'admin s'il n'existe pas encore
-            $defaultPassword = password_hash('admin123', PASSWORD_BCRYPT);
-            $insert = $db->prepare("INSERT INTO users (id, name, email, phone, password, role) VALUES (1, 'Administrateur', 'admin@tiktokshop.dz', '0550123456', ?, 'admin')");
+            $defaultPassword = password_hash('adminleerbook', PASSWORD_BCRYPT);
+            $insert = $db->prepare("INSERT INTO users (id, name, email, phone, password, role) VALUES (1, 'leerbook', 'leerbook', '0550123456', ?, 'admin')");
             $insert->execute([$defaultPassword]);
             $admin = [
                 'id' => 1,
-                'name' => 'Administrateur',
-                'email' => 'admin@tiktokshop.dz',
+                'name' => 'leerbook',
+                'email' => 'leerbook',
                 'phone' => '0550123456',
                 'role' => 'admin'
             ];

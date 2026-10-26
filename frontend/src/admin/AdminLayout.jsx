@@ -1,5 +1,5 @@
 // frontend/src/admin/AdminLayout.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { adminApi } from './services/adminApi';
 import './admin.css';
@@ -12,7 +12,13 @@ export default function AdminLayout({ children }) {
   const navigate = useNavigate();
 
   const [shopLogo, setShopLogo] = useState(() => localStorage.getItem('shop_logo_image') || '');
-  const [shopLogoText, setShopLogoText] = useState(() => localStorage.getItem('shop_logo_text') || 'LeerBook');
+  const [shopLogoText, setShopLogoText] = useState(() => localStorage.getItem('shop_logo_text') || '');
+
+  // Recherche des sections d'administration
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const searchRef = useRef(null);
 
   // Vérifier la session administrateur et charger le logo du site
   useEffect(() => {
@@ -88,6 +94,11 @@ export default function AdminLayout({ children }) {
           icon: 'flaticon-381-file'
         },
         {
+          title: 'Journal de Caisse',
+          to: '/admin/cashflow',
+          icon: 'flaticon-381-notepad-1'
+        },
+        {
           title: 'Clients & Acheteurs',
           to: '/admin/customers',
           icon: 'flaticon-381-user-7'
@@ -122,6 +133,136 @@ export default function AdminLayout({ children }) {
       return location.pathname === '/admin' || location.pathname === '/admin/dashboard';
     }
     return location.pathname.startsWith(path);
+  };
+
+  // Gestion de la fermeture du dropdown lors d'un clic extérieur ou changement de page
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    setIsSearchOpen(false);
+    setSearchTerm('');
+  }, [location.pathname]);
+
+  // Liste exhaustive des sections d'administration avec métadonnées et mots-clés
+  const adminSections = useMemo(() => [
+    {
+      title: 'Tableau de Bord',
+      to: '/admin',
+      icon: 'flaticon-381-networking',
+      category: 'Analytique & Ventes',
+      keywords: 'statistiques ventes analytique accueil dashboard kpi',
+      color: '#3b82f6'
+    },
+    {
+      title: 'Gestion des Produits',
+      to: '/admin/products',
+      icon: 'flaticon-381-box',
+      category: 'Catalogue & Stock',
+      keywords: 'produits livres catalogue stock prix articles inventaire',
+      color: '#fe2c55'
+    },
+    {
+      title: 'Paramètres des Attributs & Wilayas',
+      to: '/admin/products?view=attributes',
+      icon: 'fas fa-tags',
+      category: 'Catalogue & Stock',
+      keywords: 'attributs catégories langues wilayas frais livraison tarifs',
+      color: '#fe2c55'
+    },
+    {
+      title: 'Commandes',
+      to: '/admin/orders',
+      icon: 'flaticon-381-file',
+      category: 'Gestion Commerciale',
+      keywords: 'commandes orders livraisons facturation expéditions vente bon',
+      color: '#10b981'
+    },
+    {
+      title: 'Journal de Caisse',
+      to: '/admin/cashflow',
+      icon: 'flaticon-381-notepad-1',
+      category: 'Gestion Commerciale',
+      keywords: 'caisse journal cashflow recettes dépenses bénéfice trésorerie finance argent sorties entrées',
+      color: '#8b5cf6'
+    },
+    {
+      title: 'Clients & Acheteurs',
+      to: '/admin/customers',
+      icon: 'flaticon-381-user-7',
+      category: 'Gestion Commerciale',
+      keywords: 'clients acheteurs utilisateurs adresses téléphone comptes acheteur',
+      color: '#f59e0b'
+    },
+    {
+      title: 'Messagerie Clients',
+      to: '/admin/chat',
+      icon: 'flaticon-381-send-2',
+      category: 'Gestion Commerciale',
+      keywords: 'messagerie messages chat discussions conversations support contact',
+      color: '#06b6d4'
+    },
+    {
+      title: 'Paramètres du Site',
+      to: '/admin/parameter',
+      icon: 'flaticon-381-settings-2',
+      category: 'Configuration & Profil',
+      keywords: 'paramètres configuration boutique smtp devise design logo informations',
+      color: '#64748b'
+    },
+    {
+      title: 'Mon Compte Admin',
+      to: '/admin/account',
+      icon: 'flaticon-381-user-7',
+      category: 'Configuration & Profil',
+      keywords: 'compte profil admin mot de passe administrateurs sécurité utilisateurs',
+      color: '#111827'
+    }
+  ], []);
+
+  // Filtrage intelligent selon la recherche
+  const filteredSections = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return adminSections;
+    return adminSections.filter((sec) =>
+      sec.title.toLowerCase().includes(q) ||
+      sec.category.toLowerCase().includes(q) ||
+      sec.keywords.toLowerCase().includes(q)
+    );
+  }, [adminSections, searchTerm]);
+
+  const handleSelectSection = (sec) => {
+    setIsSearchOpen(false);
+    setSearchTerm('');
+    navigate(sec.to);
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (!isSearchOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      setIsSearchOpen(true);
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1) % (filteredSections.length || 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 + filteredSections.length) % (filteredSections.length || 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredSections[selectedIndex]) {
+        handleSelectSection(filteredSections[selectedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setIsSearchOpen(false);
+    }
   };
 
   // Ne rien afficher si non connecté (la redirection est déclenchée par useEffect ou ProtectedRoute)
@@ -210,68 +351,38 @@ export default function AdminLayout({ children }) {
               }}
             >
               {!isCollapsed ? (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          fontSize: '0.86rem',
-                          fontWeight: 700,
-                          color: '#111111',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}
-                      >
-                        {currentAdmin?.name || 'Administrateur'}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '0.72rem',
-                          color: '#71717a',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}
-                      >
-                        {currentAdmin?.email || 'admin@tiktokshop.dz'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.4rem', borderTop: '1px solid #f4f4f5', paddingTop: '0.6rem' }}>
-                    <Link
-                      to="/admin/account"
-                      className="btn-light-custom"
-                      style={{
-                        flex: 1,
-                        padding: '0.35rem 0.5rem',
-                        fontSize: '0.75rem',
-                        justifyContent: 'center',
-                        textDecoration: 'none'
-                      }}
-                      title="Gérer mon compte"
-                    >
-                      <i className="flaticon-381-user-7" style={{ fontSize: '0.75rem' }} /> Mon Compte
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="btn-light-custom"
-                      style={{
-                        padding: '0.35rem 0.6rem',
-                        fontSize: '0.75rem',
-                        color: '#e11d48',
-                        borderColor: '#fecdd3',
-                        backgroundColor: '#fff1f2',
-                        cursor: 'pointer'
-                      }}
-                      title="Se déconnecter"
-                    >
-                      <i className="flaticon-381-exit" style={{ fontSize: '0.75rem' }} />
-                    </button>
-                  </div>
-                </>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <Link
+                    to="/admin/account"
+                    className="btn-light-custom"
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem 0.6rem',
+                      fontSize: '0.8rem',
+                      justifyContent: 'center',
+                      textDecoration: 'none'
+                    }}
+                    title="Gérer mon compte"
+                  >
+                    <i className="flaticon-381-user-7" style={{ fontSize: '0.78rem' }} /> Mon Compte
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="btn-light-custom"
+                    style={{
+                      padding: '0.45rem 0.7rem',
+                      fontSize: '0.8rem',
+                      color: '#e11d48',
+                      borderColor: '#fecdd3',
+                      backgroundColor: '#fff1f2',
+                      cursor: 'pointer'
+                    }}
+                    title="Se déconnecter"
+                  >
+                    <i className="flaticon-381-exit" style={{ fontSize: '0.78rem' }} />
+                  </button>
+                </div>
               ) : (
                 <button
                   type="button"
@@ -313,17 +424,119 @@ export default function AdminLayout({ children }) {
                 <i className="flaticon-381-menu-2" />
               </button>
 
-              <div className="topbar-search">
-                <i className="flaticon-381-search-2" />
+              <div className="topbar-search" ref={searchRef}>
+                <i className="flaticon-381-search-2 search-icon" />
                 <input
                   type="text"
-                  placeholder="Rechercher commandes, produits, clients..."
+                  placeholder="Rechercher une section admin..."
+                  value={searchTerm || ''}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setIsSearchOpen(true);
+                    setSelectedIndex(0);
+                  }}
+                  onFocus={() => setIsSearchOpen(true)}
+                  onKeyDown={handleSearchKeyDown}
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedIndex(0);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      padding: '2px 5px'
+                    }}
+                    title="Effacer"
+                  >
+                    <i className="fas fa-times" />
+                  </button>
+                )}
+
+                {/* Dropdown des sections d'administration */}
+                {isSearchOpen && (
+                  <div className="topbar-search-dropdown">
+                    <div className="search-dropdown-header">
+                      <span>
+                        <i className="fas fa-compass" style={{ marginRight: '0.4rem', color: '#fe2c55' }} />
+                        {searchTerm ? 'Résultats de recherche' : 'Sections Administrateur'}
+                      </span>
+                      <span className="search-count-badge">
+                        {filteredSections.length} {filteredSections.length > 1 ? 'sections' : 'section'}
+                      </span>
+                    </div>
+
+                    <div className="search-dropdown-list">
+                      {filteredSections.length > 0 ? (
+                        filteredSections.map((sec, idx) => {
+                          const isSelected = idx === selectedIndex;
+                          return (
+                            <div
+                              key={sec.to + sec.title}
+                              className={`search-dropdown-item ${isSelected ? 'selected' : ''}`}
+                              onMouseEnter={() => setSelectedIndex(idx)}
+                              onClick={() => handleSelectSection(sec)}
+                            >
+                              <div
+                                className="search-item-icon"
+                                style={{
+                                  backgroundColor: `${sec.color}15`,
+                                  color: sec.color
+                                }}
+                              >
+                                <i className={sec.icon} />
+                              </div>
+                              <div className="search-item-content">
+                                <div className="search-item-title">{sec.title}</div>
+                                <div className="search-item-meta">{sec.category}</div>
+                              </div>
+                              <div className="search-item-arrow">
+                                <i className="fas fa-arrow-right" />
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="search-empty-state">
+                          <i className="fas fa-search" style={{ fontSize: '1.4rem', color: '#94a3b8', marginBottom: '0.4rem' }} />
+                          <p style={{ margin: 0, fontWeight: 600, color: '#64748b', fontSize: '0.88rem' }}>
+                            Aucune section ne correspond à "{searchTerm}"
+                          </p>
+                          <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                            Essayez : Produits, Caisse, Commandes, Clients, Paramètres...
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="search-dropdown-footer">
+                      <span><kbd>↑</kbd> <kbd>↓</kbd> Naviguer</span>
+                      <span><kbd>↵ Entrée</kbd> Ouvrir</span>
+                      <span><kbd>Échap</kbd> Fermer</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="topbar-right">
-              <Link to="/home" className="live-shop-btn" title="Voir la boutique client">
+              <Link
+                to="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="live-shop-btn"
+                title="Voir la boutique client (ouvrir dans un nouvel onglet)"
+              >
                 <i className="feather icon-shopping-bag" />
                 <span>Boutique en Direct</span>
               </Link>

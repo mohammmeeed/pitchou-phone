@@ -5,18 +5,25 @@ const Header = ({
   title, 
   showBack = false, 
   backUrl, 
+  onBackClick,
   showMenu = false, 
   onMenuClick, 
   showFilter = false, 
   filterUrl = "/filter",
+  onSearchClick,
+  searchActive = false,
   bgWhite = false,
   borderZero = false,
-  rightCustom
+  rightCustom,
+  viewMode = 'feed',
+  onViewModeChange
 }) => {
   const navigate = useNavigate();
 
   const handleBack = () => {
-    if (backUrl) {
+    if (typeof onBackClick === 'function') {
+      onBackClick();
+    } else if (backUrl) {
       navigate(backUrl);
     } else {
       navigate(-1);
@@ -77,8 +84,9 @@ const Header = ({
                 onClick={onMenuClick} 
                 className="menu-toggler"
                 style={{ cursor: 'pointer' }}
+                aria-label="Menu"
               >
-                <i className="icon feather icon-grid"></i>
+                <i className="icon feather icon-menu"></i>
               </a>
             )}
             {title && <h6 className="title mb-0">{title}</h6>}
@@ -86,7 +94,7 @@ const Header = ({
           
           <div className="mid-content header-logo">
             {!title && (
-              <Link to="/home" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Link to="/" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {shopLogo ? (
                   <img src={shopLogo} alt={shopLogoText || "Logo"} style={{ maxHeight: '36px', maxWidth: '140px', objectFit: 'contain' }} />
                 ) : (
@@ -99,10 +107,70 @@ const Header = ({
           <div className="right-content dz-meta">
             {rightCustom ? (
               rightCustom
+            ) : onViewModeChange ? (
+              <button
+                type="button"
+                onClick={() => onViewModeChange(viewMode === 'feed' ? 'grid' : 'feed')}
+                className="filter-icon"
+                style={{
+                  background: 'transparent',
+                  color: 'inherit',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0
+                }}
+                title={viewMode === 'feed' ? "Afficher en grille 2x2" : "Afficher en plein écran"}
+                aria-label="Changer le mode d'affichage"
+              >
+                {viewMode === 'feed' ? (
+                  /* 4 Carrés : pour passer en grille 2x2 */
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                    <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                    <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                    <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                  </svg>
+                ) : (
+                  /* Téléphone : pour revenir au mode scroll/plein écran */
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="3" ry="3"></rect>
+                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                  </svg>
+                )}
+              </button>
             ) : showFilter ? (
-              <Link to={filterUrl} className="filter-icon">
-                <i className="flaticon flaticon-settings-sliders"></i>
-              </Link>
+              onSearchClick ? (
+                <button
+                  type="button"
+                  onClick={onSearchClick}
+                  className={`filter-icon ${searchActive ? 'active' : ''}`}
+                  style={{
+                    background: searchActive ? 'var(--primary)' : 'transparent',
+                    color: searchActive ? '#ffffff' : 'inherit',
+                    borderColor: searchActive ? 'var(--primary)' : 'var(--border-color)',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0
+                  }}
+                  title={searchActive ? "Fermer la recherche" : "Rechercher"}
+                  aria-label="Recherche"
+                >
+                  <i className={`icon feather ${searchActive ? 'icon-x' : 'icon-search'}`}></i>
+                </button>
+              ) : (
+                <Link to={filterUrl} className="filter-icon">
+                  <i className="icon feather icon-search"></i>
+                </Link>
+              )
             ) : null}
           </div>
         </div>

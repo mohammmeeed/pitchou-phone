@@ -494,60 +494,70 @@ export default function AdminDashboard() {
 
             <div className="card-body-custom" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                {countriesData.map((country, idx) => (
-                  <div key={idx}>
-                    {/* Première ligne : Code, Nom, Badge et Nombre de visites */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#18181b' }}>{country.code}</span>
-                        <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#18181b' }}>{country.name}</span>
-                        <span
-                          style={{
-                            backgroundColor: '#f4f4f5',
-                            color: '#888890',
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            fontSize: '0.68rem',
-                            fontWeight: 600
-                          }}
-                        >
-                          {country.code}
-                        </span>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#18181b' }}>{country.visits}</span>{' '}
-                        <span style={{ fontWeight: 400, color: '#71717a', fontSize: '0.82rem' }}>visites</span>
-                      </div>
-                    </div>
-
-                    {/* Barre de progression pleine largeur */}
-                    <div
-                      style={{
-                        height: '6px',
-                        backgroundColor: '#f4f4f5',
-                        borderRadius: '6px',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: '100%',
-                          width: `${country.percentage}%`,
-                          backgroundColor: idx === 0 ? adminPrimaryColor : (idx === 1 ? '#2781d5' : '#209f84'),
-                          borderRadius: '6px',
-                          transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}
-                      />
-                    </div>
-
-                    {/* Pourcentage sous la barre aligné à droite */}
-                    <div style={{ textAlign: 'right', marginTop: '0.35rem' }}>
-                      <span style={{ fontWeight: 700, color: '#18181b', fontSize: '0.8rem' }}>
-                        {country.percentage}%
-                      </span>
+                {countriesData.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#71717a', padding: '2rem 1rem', fontSize: '0.88rem' }}>
+                    <div style={{ marginBottom: '0.4rem', fontSize: '1.3rem' }}>🌐</div>
+                    <strong>Aucune visite enregistrée pour le moment</strong>
+                    <div style={{ fontSize: '0.78rem', color: '#a1a1aa', marginTop: '0.35rem' }}>
+                      Les visites réelles apparaîtront automatiquement dès que des visiteurs naviguent sur la boutique.
                     </div>
                   </div>
-                ))}
+                ) : (
+                  countriesData.map((country, idx) => (
+                    <div key={idx}>
+                      {/* Première ligne : Code, Nom, Badge et Nombre de visites */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#18181b' }}>{country.code}</span>
+                          <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#18181b' }}>{country.name}</span>
+                          <span
+                            style={{
+                              backgroundColor: '#f4f4f5',
+                              color: '#888890',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.68rem',
+                              fontWeight: 600
+                            }}
+                          >
+                            {country.code}
+                          </span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#18181b' }}>{country.visits}</span>{' '}
+                          <span style={{ fontWeight: 400, color: '#71717a', fontSize: '0.82rem' }}>visites</span>
+                        </div>
+                      </div>
+
+                      {/* Barre de progression pleine largeur */}
+                      <div
+                        style={{
+                          height: '6px',
+                          backgroundColor: '#f4f4f5',
+                          borderRadius: '6px',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${country.percentage}%`,
+                            backgroundColor: idx === 0 ? adminPrimaryColor : (idx === 1 ? '#2781d5' : '#209f84'),
+                            borderRadius: '6px',
+                            transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }}
+                        />
+                      </div>
+
+                      {/* Pourcentage sous la barre aligné à droite */}
+                      <div style={{ textAlign: 'right', marginTop: '0.35rem' }}>
+                        <span style={{ fontWeight: 700, color: '#18181b', fontSize: '0.8rem' }}>
+                          {country.percentage}%
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -641,8 +651,24 @@ export default function AdminDashboard() {
                 });
               })()}
             </div>
-            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #eaeaea', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-              <div><strong style={{ color: '#209f84' }}>+34%</strong> vs semaine passée</div>
+            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #eaeaea', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+              <div>
+                {(() => {
+                  const growth = stats?.weeklySalesStats?.growthPercent;
+                  if (growth === undefined || growth === null) {
+                    return <span style={{ color: '#71717a' }}>Données en direct</span>;
+                  }
+                  const isPositive = growth > 0;
+                  const isNegative = growth < 0;
+                  const color = isPositive ? '#209f84' : (isNegative ? '#ef4444' : '#71717a');
+                  const sign = isPositive ? '+' : '';
+                  return (
+                    <span>
+                      <strong style={{ color }}>{sign}{growth}%</strong> vs semaine passée
+                    </span>
+                  );
+                })()}
+              </div>
               <div>
                 Pic des ventes:{' '}
                 <strong style={{ color: '#111111' }}>
@@ -666,37 +692,84 @@ export default function AdminDashboard() {
           </div>
           <div className="card-body-custom">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.8rem 1rem', background: '#fcfaff', borderRadius: '8px', border: '1px solid #f0e6f9' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ff5c00' }} />
-                  <span style={{ fontWeight: 600 }}>Commandes En Attente</span>
-                </div>
-                <span className="badge-custom bg-soft-warning">{stats?.pendingOrders ?? 2} commandes</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.8rem 1rem', background: '#f5faf9', borderRadius: '8px', border: '1px solid #e1f4f0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#209f84' }} />
-                  <span style={{ fontWeight: 600 }}>Commandes Livrées</span>
-                </div>
-                <span className="badge-custom bg-soft-success">1 commande</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.8rem 1rem', background: '#f4f8fd', borderRadius: '8px', border: '1px solid #e2effc' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#2781d5' }} />
-                  <span style={{ fontWeight: 600 }}>Commandes Confirmées</span>
-                </div>
-                <span className="badge-custom bg-soft-info">1 commande</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.8rem 1rem', background: '#f4f4f5', borderRadius: '8px', border: '1px solid #e4e4e7' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#111111' }} />
-                  <span style={{ fontWeight: 600 }}>Commandes Expédiées</span>
-                </div>
-                <span className="badge-custom bg-soft-primary">1 commande</span>
-              </div>
+              {[
+                {
+                  status: 'En attente',
+                  label: 'Commandes En Attente',
+                  dotColor: '#ff5c00',
+                  bg: '#fcfaff',
+                  border: '#f0e6f9',
+                  badgeClass: 'badge-custom bg-soft-warning',
+                  count: stats?.ordersByStatus?.['En attente'] ?? stats?.pendingOrders ?? 0
+                },
+                {
+                  status: 'Livrée',
+                  label: 'Commandes Livrées',
+                  dotColor: '#209f84',
+                  bg: '#f5faf9',
+                  border: '#e1f4f0',
+                  badgeClass: 'badge-custom bg-soft-success',
+                  count: stats?.ordersByStatus?.['Livrée'] ?? 0
+                },
+                {
+                  status: 'Confirmée',
+                  label: 'Commandes Confirmées',
+                  dotColor: '#2781d5',
+                  bg: '#f4f8fd',
+                  border: '#e2effc',
+                  badgeClass: 'badge-custom bg-soft-info',
+                  count: stats?.ordersByStatus?.['Confirmée'] ?? 0
+                },
+                {
+                  status: 'Expédiée',
+                  label: 'Commandes Expédiées',
+                  dotColor: '#111111',
+                  bg: '#f4f4f5',
+                  border: '#e4e4e7',
+                  badgeClass: 'badge-custom bg-soft-primary',
+                  count: stats?.ordersByStatus?.['Expédiée'] ?? 0
+                }
+              ].map((item) => {
+                const count = item.count;
+                return (
+                  <Link
+                    key={item.status}
+                    to={`/admin/orders?status=${encodeURIComponent(item.status)}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.8rem 1rem',
+                      background: item.bg,
+                      borderRadius: '8px',
+                      border: `1px solid ${item.border}`,
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: item.dotColor }} />
+                      <span style={{ fontWeight: 600, color: '#18181b' }}>{item.label}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className={item.badgeClass} style={{ cursor: 'pointer' }}>
+                        {count} {count > 1 ? 'commandes' : 'commande'}
+                      </span>
+                      <i className="fas fa-chevron-right" style={{ fontSize: '0.7rem', color: '#a1a1aa' }} />
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </div>

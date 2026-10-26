@@ -1,14 +1,36 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 
-const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
+const TinderCardStack = ({ 
+  profiles = [], 
+  onOpenDetail, 
+  onSwipeRight, 
+  onResetFilters,
+  onIndexChange,
+  initialIndex = 0
+}) => {
   const datingCtx = useDating();
   const addToLiked = datingCtx?.addToLiked;
   const isLiked = datingCtx?.isLiked;
   const removeFromLiked = datingCtx?.removeFromLiked;
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const handleResetFilters = () => {
+    if (onResetFilters) {
+      onResetFilters();
+    } else if (datingCtx?.setActiveFilters) {
+      datingCtx.setActiveFilters({
+        search: '',
+        categories: [],
+        languages: [],
+        maxPrice: 6000
+      });
+    }
+  };
+
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    return initialIndex < profiles.length ? initialIndex : 0;
+  });
   const [dragState, setDragState] = useState({
     active: false,
     startX: 0,
@@ -22,18 +44,93 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
   const wheelLock = useRef(false);
   const containerRef = useRef(null);
 
-  if (!profiles || profiles.length === 0) return null;
+  const safeIndex = profiles.length > 0 ? (currentIndex < profiles.length ? currentIndex : 0) : 0;
+  const activeCard = profiles.length > 0 ? profiles[safeIndex] : null;
+  const nextIndex = profiles.length > 0 ? (safeIndex + 1) % profiles.length : 0;
+  const prevIndex = profiles.length > 0 ? (safeIndex - 1 + profiles.length) % profiles.length : 0;
+  const nextCard = profiles.length > 0 ? profiles[nextIndex] : null;
+  const prevCard = profiles.length > 0 ? profiles[prevIndex] : null;
 
-  const activeCard = profiles[currentIndex];
-  const nextIndex = (currentIndex + 1) % profiles.length;
-  const prevIndex = (currentIndex - 1 + profiles.length) % profiles.length;
-  const nextCard = profiles[nextIndex];
-  const prevCard = profiles[prevIndex];
+  // Reset index if profiles length changed
+  useEffect(() => {
+    if (currentIndex >= profiles.length) {
+      setCurrentIndex(0);
+    }
+  }, [profiles.length, currentIndex]);
+
+  // Notifier le parent (Home) de l'index du livre actuellement affiché
+  useEffect(() => {
+    if (onIndexChange) {
+      onIndexChange(safeIndex);
+    }
+  }, [safeIndex, onIndexChange]);
+
+  // Préchargement intelligent de l'image suivante (avec debounce de 100ms pour le scroll rapide)
+  useEffect(() => {
+    if (!nextCard || !nextCard.image) return;
+    const timer = setTimeout(() => {
+      const img = new Image();
+      img.src = nextCard.image;
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [currentIndex, nextCard?.image]);
+
+  const loadingProducts = datingCtx?.loadingProducts;
+
+  if (loadingProducts) {
+    return null;
+  }
+
+  if (!profiles || profiles.length === 0) {
+    return (
+      <div 
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          textAlign: 'center',
+          padding: '24px',
+          color: '#6b7280'
+        }}
+      >
+        <div 
+          style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            background: 'rgba(0,0,0,0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '16px',
+            fontSize: '26px',
+            color: '#9ca3af'
+          }}
+        >
+          <i className="icon feather icon-search"></i>
+        </div>
+        <h5 style={{ fontWeight: 600, color: '#111827', marginBottom: '8px' }}>Aucun livre trouvé</h5>
+        <p style={{ fontSize: '13px', maxWidth: '260px', margin: '0 auto 18px', color: '#6b7280' }}>
+          Aucun livre ne correspond à votre recherche ou à vos filtres.
+        </p>
+        <button 
+          type="button"
+          onClick={handleResetFilters}
+          className="btn btn-primary btn-sm rounded-pill"
+          style={{ padding: '9px 24px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+        >
+          Réinitialiser la recherche
+        </button>
+      </div>
+    );
+  }
 
   // Mouse wheel navigation (scroll down = next card from below, scroll up = prev card from above)
   const handleWheel = (e) => {
     if (animating || dragState.active || wheelLock.current) return;
-    if (Math.abs(e.deltaY) > 25) {
+    if (Math.abs(e.deltaY) > 35) {
       wheelLock.current = true;
       if (e.deltaY > 0) {
         startSlide('slide-up');
@@ -42,7 +139,7 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
       }
       setTimeout(() => {
         wheelLock.current = false;
-      }, 380);
+      }, 420);
     }
   };
 
@@ -64,46 +161,47 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
     const dx = touch.clientX - dragState.startX;
     const dy = touch.clientY - dragState.startY;
 
+    const isHorizontal = Math.abs(dx) > Math.abs(dy);
+
     setDragState(prev => ({
       ...prev,
       dx,
       dy,
+      isHorizontal,
     }));
   };
 
   const handleTouchEnd = () => {
     if (!dragState.active || animating) return;
-    const { dx, dy } = dragState;
-    const isHorizontal = Math.abs(dx) > Math.abs(dy);
+    const { dx, dy, isHorizontal } = dragState;
 
-    const cardWidth = containerRef.current?.offsetWidth || 380;
-    const threshold = Math.min(cardWidth * 0.22, 70);
+    // Geste Horizontal vers la Droite -> Swipe to Cart (+ Panier)
+    if (isHorizontal && dx > 60) {
+      startSlide('to-right');
+      return;
+    }
 
-    if (isHorizontal) {
-      if (dx > threshold) {
-        startSlide('to-right');
-      } else if (dx < -threshold) {
-        startSlide('to-left');
-      } else {
-        startSlide('reset');
-      }
-    } else {
+    // Geste Vertical (TikTok Feed)
+    if (!isHorizontal) {
       if (dy < -50) {
-        // Swiped UP -> Next card slides in from below (comme TikTok)
+        // Swiped UP -> Carte suivante venant du bas (style TikTok)
         startSlide('slide-up');
+        return;
       } else if (dy > 50) {
-        // Swiped DOWN -> Previous card slides in from above
+        // Swiped DOWN -> Carte précédente venant du haut
         startSlide('slide-down');
-      } else {
-        startSlide('reset');
+        return;
       }
     }
+
+    // Si pas de seuil atteint -> Réinitialisation fluide
+    startSlide('reset');
   };
 
   const startSlide = (direction) => {
     setAnimating(true);
     setAnimatingDir(direction);
-    setDragState({ active: false, startX: 0, startY: 0, dx: 0, dy: 0 });
+    setDragState({ active: false, startX: 0, startY: 0, dx: 0, dy: 0, isHorizontal: false });
 
     if (direction === 'reset') {
       setTimeout(() => {
@@ -113,11 +211,10 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
       return;
     }
 
+    // Si Swipe à droite -> Ajouter au panier
     if (direction === 'to-right' && activeCard) {
       if (onSwipeRight) {
         onSwipeRight(activeCard);
-      } else if (addToLiked) {
-        addToLiked(activeCard);
       }
     }
 
@@ -125,6 +222,7 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
       if (direction === 'slide-down') {
         setCurrentIndex(prevIndex);
       } else {
+        // slide-up et to-right passent tous deux à la carte suivante
         setCurrentIndex(nextIndex);
       }
       setAnimating(false);
@@ -132,13 +230,8 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
     }, 300);
   };
 
-  // Determine dynamic positions
-  const { active, dx, dy } = dragState;
-  const isHorizontal = Math.abs(dx) > Math.abs(dy);
-  const cardWidth = containerRef.current?.offsetWidth || 380;
-
-  // Progression exacte 1:1 à mesure que la carte se rapproche du bord latéral
-  const lateralProgress = Math.min(Math.max(Math.abs(dx) / cardWidth, 0), 1);
+  // Determine dynamic positions (Vertical TikTok + Horizontal Swipe Right)
+  const { active, dx, dy, isHorizontal } = dragState;
 
   let activeStyle = {
     touchAction: 'none',
@@ -152,18 +245,24 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
     display: 'block',
   };
 
-  if (active) {
-    if (isHorizontal) {
-      // Reste strictement horizontale sans s'incliner (ne s'incline pas)
-      activeStyle.transform = `translateX(${dx}px)`;
-      activeStyle.transition = 'none';
+  const isSwipingRight = active && isHorizontal && dx > 0;
+  const greenBorderOpacity = isSwipingRight ? Math.min(dx / 70, 1) : 0;
+  const cartBadgeOpacity = isSwipingRight ? Math.min(dx / 50, 1) : 0;
 
-      // À mesure que la carte se rapproche du bord latéral, la carte suivante remonte dans la même proportion
-      nextStyle.transform = `translateY(${(1 - lateralProgress) * 100}%)`;
+  if (active) {
+    if (isHorizontal && dx > 0) {
+      // Glissement vers la droite (Swipe to cart)
+      const rot = Math.min(dx * 0.04, 12);
+      activeStyle.transform = `translate(${dx}px, ${dy * 0.15}px) rotate(${rot}deg)`;
+      activeStyle.transition = 'none';
+      activeStyle.zIndex = 10;
+      
+      // La carte suivante se prépare dessous
+      nextStyle.transform = `translateY(0) scale(${0.94 + Math.min(dx / 500, 0.06)})`;
+      nextStyle.opacity = 0.4 + Math.min(dx / 120, 0.6);
       nextStyle.transition = 'none';
-      nextStyle.display = 'block';
       prevStyle.display = 'none';
-    } else {
+    } else if (!isHorizontal) {
       activeStyle.transform = `translateY(${dy}px)`;
       activeStyle.transition = 'none';
       if (dy < 0) {
@@ -177,10 +276,23 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
         prevStyle.transition = 'none';
         nextStyle.display = 'none';
       }
+    } else {
+      // Glissement gauche (résistance)
+      activeStyle.transform = `translateX(${dx * 0.25}px)`;
+      activeStyle.transition = 'none';
     }
   } else if (animating) {
     const ease = 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)';
-    if (animatingDir === 'slide-up') {
+    if (animatingDir === 'to-right') {
+      activeStyle.transform = 'translate(130%, 0) rotate(16deg)';
+      activeStyle.opacity = 0;
+      activeStyle.transition = 'transform 0.3s ease-out, opacity 0.25s ease-out';
+      activeStyle.zIndex = 10;
+      nextStyle.transform = 'translateY(0) scale(1)';
+      nextStyle.opacity = 1;
+      nextStyle.transition = ease;
+      prevStyle.display = 'none';
+    } else if (animatingDir === 'slide-up') {
       activeStyle.transform = 'translateY(-100%)';
       activeStyle.transition = ease;
       nextStyle.transform = 'translateY(0)';
@@ -192,20 +304,8 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
       prevStyle.transform = 'translateY(0)';
       prevStyle.transition = ease;
       nextStyle.display = 'none';
-    } else if (animatingDir === 'to-right') {
-      activeStyle.transform = 'translateX(110%)';
-      activeStyle.opacity = 0;
-      activeStyle.transition = 'all 0.3s ease-out';
-      nextStyle.transform = 'translateY(0)';
-      nextStyle.transition = ease;
-    } else if (animatingDir === 'to-left') {
-      activeStyle.transform = 'translateX(-110%)';
-      activeStyle.opacity = 0;
-      activeStyle.transition = 'all 0.3s ease-out';
-      nextStyle.transform = 'translateY(0)';
-      nextStyle.transition = ease;
     } else if (animatingDir === 'reset') {
-      activeStyle.transform = 'translate(0, 0)';
+      activeStyle.transform = 'translate(0, 0) rotate(0deg)';
       activeStyle.transition = 'transform 0.25s ease-out';
       nextStyle.transform = 'translateY(100%)';
       nextStyle.transition = 'transform 0.25s ease-out';
@@ -215,11 +315,6 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
   } else {
     activeStyle.transform = 'translateY(0)';
   }
-
-  const likeOpacity = active && isHorizontal && dx > 0 ? Math.min(dx / 80, 1) : animatingDir === 'to-right' ? 1 : 0;
-  const rejectOpacity = active && isHorizontal && dx < 0 ? Math.min(Math.abs(dx) / 80, 1) : animatingDir === 'to-left' ? 1 : 0;
-  const greenBorderOpacity = active && isHorizontal && dx > 0 ? Math.min(dx / 50, 1) : animatingDir === 'to-right' ? 1 : 0;
-
   // Render card helper
   const renderCardContent = (card, isCurrent = false) => {
     const isCardFavorited = isLiked ? isLiked(card.id) : false;
@@ -229,6 +324,7 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
         <div className="dz-media">
           {card.video ? (
             <video 
+              key={`vid-${card.id}`}
               src={card.video} 
               poster={card.image}
               autoPlay 
@@ -237,7 +333,13 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
               playsInline 
             />
           ) : (
-            <img src={card.image} alt={card.name} />
+            <img 
+              key={`img-${card.id}`}
+              src={card.image} 
+              alt={card.name} 
+              loading="eager"
+              decoding="async"
+            />
           )}
         </div>
         <div className="dz-content">
@@ -264,16 +366,34 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
             </h4>
           </div>
 
-          <div className="card-price-wrap">
-            <span className="card-price-value">
-              {card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : (card.priceFormatted || '')}
-            </span>
-          </div>
+          <div className="card-bottom-row d-flex align-items-center justify-content-between w-100">
+            <div className="card-price-wrap" style={{ width: 'auto', margin: 0 }}>
+              <span className="card-price-value">
+                {card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : (card.priceFormatted || '')}
+              </span>
+            </div>
 
-          <div className="d-flex align-items-center">
             <button
               type="button"
-              className="card-add-to-cart-btn w-100"
+              className="card-view-more-btn"
+              style={{
+                width: 'auto',
+                maxWidth: 'fit-content',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 14px',
+                fontSize: '13px',
+                fontWeight: 700,
+                borderRadius: '9999px',
+                backgroundColor: '#ffffff',
+                color: '#000000',
+                border: 'none',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35)',
+                cursor: 'pointer',
+                lineHeight: 1,
+                flexShrink: 0
+              }}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -282,21 +402,20 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
                 }
               }}
             >
+              <span>Voir plus</span>
               <svg 
-                width="19" 
-                height="19" 
+                width="14" 
+                height="14" 
                 viewBox="0 0 24 24" 
                 fill="none" 
                 stroke="#000000" 
-                strokeWidth="2.3" 
+                strokeWidth="2.5" 
                 strokeLinecap="round" 
                 strokeLinejoin="round"
               >
-                <circle cx="9" cy="21" r="1"></circle>
-                <circle cx="20" cy="21" r="1"></circle>
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <polyline points="19 12 12 19 5 12"></polyline>
               </svg>
-              <span>AJOUTER AU PANIER</span>
             </button>
           </div>
         </div>
@@ -313,6 +432,7 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
       {/* Previous Card (Positioned Above vertically) */}
       {prevCard && (
         <div 
+          key={`prev-${prevCard.id}`}
           className="dzSwipe_card card-prev"
           style={prevStyle}
         >
@@ -323,6 +443,7 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
       {/* Next Card (Positioned Below vertically like TikTok) */}
       {nextCard && (
         <div 
+          key={`next-${nextCard.id}`}
           className="dzSwipe_card card-next"
           style={nextStyle}
         >
@@ -333,6 +454,8 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
       {/* Active Card (Current) */}
       {activeCard && (
         <div 
+          key={`active-${activeCard.id}`}
+          data-product-id={activeCard.id}
           className={`dzSwipe_card card-active ${animatingDir}`}
           style={activeStyle}
           onMouseDown={handleTouchStart}
@@ -345,39 +468,43 @@ const TinderCardStack = ({ profiles = [], onOpenDetail, onSwipeRight }) => {
         >
           {renderCardContent(activeCard, true)}
 
-          {/* Dynamic Green/Pink Border when Swiping Right */}
+          {/* Bordure verte lumineuse lors du swipe à droite */}
           <div 
             className="dz-swipe-border-green" 
             style={{ 
               opacity: greenBorderOpacity,
-              borderColor: '#ff4458',
-              boxShadow: 'inset 0 0 25px rgba(255, 68, 88, 0.4)'
+              borderColor: '#209f84',
+              boxShadow: 'inset 0 0 20px rgba(32, 159, 132, 0.45), 0 0 15px rgba(32, 159, 132, 0.3)'
             }}
           />
 
-          {/* Dynamic Action Badges for Horizontal Swipes */}
+          {/* Badge dynamique AJOUTER AU PANIER */}
           <div 
-            className="dzSwipe_card__option dzReject"
-            style={{ opacity: rejectOpacity }}
-          >
-            <i className="fa-solid fa-xmark"></i>
-          </div>
-          <div 
-            className="dzSwipe_card__option dzLike"
             style={{ 
-              opacity: likeOpacity,
-              background: '#ff4458',
-              borderColor: '#ff4458',
+              position: 'absolute',
+              top: '40px',
+              left: '25px',
+              opacity: cartBadgeOpacity,
+              background: '#209f84',
+              color: '#ffffff',
+              border: '2px solid rgba(255, 255, 255, 0.95)',
+              borderRadius: '16px',
+              padding: '8px 16px',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: '3px',
-              padding: '8px 14px'
+              gap: '8px',
+              fontWeight: 800,
+              fontSize: '13.5px',
+              letterSpacing: '0.5px',
+              boxShadow: '0 8px 24px rgba(32, 159, 132, 0.5)',
+              transform: `scale(${0.85 + Math.min(cartBadgeOpacity * 0.2, 0.2)}) rotate(-8deg)`,
+              pointerEvents: 'none',
+              zIndex: 20,
+              transition: 'transform 0.1s ease'
             }}
           >
-            <i className="fa-solid fa-heart" style={{ fontSize: '24px', color: '#fff' }}></i>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#fff', letterSpacing: '0.5px' }}>FAVORI</span>
+            <i className="icon feather icon-shopping-cart" style={{ fontSize: '18px' }}></i>
+            <span>+ PANIER</span>
           </div>
 
           <div className="dzSwipe_card__drag"></div>

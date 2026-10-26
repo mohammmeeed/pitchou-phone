@@ -283,14 +283,15 @@ i[class*="flaticon-381-"]:after {
 
 .topbar-search {
   position: relative;
-  width: 320px;
+  width: 380px;
+  max-width: 100%;
 }
 
 .topbar-search input {
   width: 100%;
-  padding: 0.55rem 1rem 0.55rem 2.4rem;
+  padding: 0.58rem 2.2rem 0.58rem 2.4rem;
   border: 1px solid var(--admin-border-color);
-  border-radius: var(--admin-radius-md);
+  border-radius: 10px;
   background: var(--admin-light);
   font-size: 0.88rem;
   transition: all 0.2s ease;
@@ -300,17 +301,166 @@ i[class*="flaticon-381-"]:after {
 .topbar-search input:focus {
   outline: none;
   background: #ffffff;
-  border-color: var(--admin-primary);
-  box-shadow: 0 0 0 3px var(--admin-primary-light);
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
 }
 
-.topbar-search i {
+.topbar-search .search-icon {
   position: absolute;
   left: 0.85rem;
   top: 50%;
   transform: translateY(-50%);
   color: #9ba1b7;
   font-size: 0.95rem;
+  pointer-events: none;
+}
+
+/* Dropdown des sections d'administration */
+.topbar-search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 420px;
+  max-width: 90vw;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.12), 0 8px 16px -4px rgba(0, 0, 0, 0.06);
+  z-index: 1050;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: searchDropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes searchDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.search-dropdown-header {
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #edf2f7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.search-count-badge {
+  background: #e2e8f0;
+  color: #475569;
+  padding: 0.15rem 0.55rem;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.search-dropdown-list {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 0.4rem;
+}
+
+.search-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.search-dropdown-item:hover,
+.search-dropdown-item.selected {
+  background-color: #f1f5f9;
+}
+
+.search-item-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.search-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.search-item-meta {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+.search-item-arrow {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all 0.15s ease;
+}
+
+.search-dropdown-item:hover .search-item-arrow,
+.search-dropdown-item.selected .search-item-arrow {
+  opacity: 1;
+  transform: translateX(0);
+  color: #0f172a;
+}
+
+.search-empty-state {
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.search-dropdown-footer {
+  padding: 0.55rem 1rem;
+  background: #f8fafc;
+  border-top: 1px solid #edf2f7;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.search-dropdown-footer kbd {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  font-family: inherit;
+  font-size: 0.7rem;
+  color: #475569;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
 }
 
 .topbar-right {
@@ -752,4 +902,142 @@ i[class*="flaticon-381-"]:after {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   Product Form Layout (Full Width Responsive)
+   ========================================================================== */
+.product-form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+}
+
+.product-preview-card {
+  width: 100%;
+  max-width: 380px;
+  position: sticky;
+  top: 90px;
+}
+
+@media (max-width: 1100px) {
+  .product-form-layout {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+  .product-preview-card {
+    max-width: 340px;
+  }
+}
+
+@media (max-width: 991px) {
+  .product-form-layout {
+    grid-template-columns: 1fr;
+  }
+  .product-preview-card {
+    max-width: 420px;
+    margin: 0 auto;
+    position: static;
+  }
+}
+
+/* ==========================================================================
+   Order Details Layout (Full Width Responsive)
+   ========================================================================== */
+.order-details-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+}
+
+.order-sidebar-card {
+  width: 100%;
+  position: sticky;
+  top: 90px;
+}
+
+@media (max-width: 1100px) {
+  .order-details-layout {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+@media (max-width: 991px) {
+  .order-details-layout {
+    grid-template-columns: 1fr;
+  }
+  .order-sidebar-card {
+    position: static;
+    max-width: 100%;
+  }
+}
+
+/* ==========================================================================
+   Bon de Livraison - Print Styles (Format A4 Épuré & Professionnel)
+   ========================================================================== */
+.printable-delivery-slip {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Masquer tous les éléments d'interface web standard */
+  .no-print,
+  .admin-sidebar,
+  .admin-topbar,
+  .admin-toast,
+  .page-header,
+  .page-actions,
+  button,
+  .nav-toggle-btn {
+    display: none !important;
+  }
+
+  /* Réinitialiser les conteneurs d'administration */
+  .mediqu-admin,
+  .admin-shell,
+  .admin-main,
+  .admin-content-body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  /* Afficher uniquement le bon de livraison épuré */
+  .printable-delivery-slip {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 10px 15px !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+  }
+}
+
+
 

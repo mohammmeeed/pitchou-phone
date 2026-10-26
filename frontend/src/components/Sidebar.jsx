@@ -1,12 +1,12 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
 import { useDating } from '../context/DatingContext';
 
 const Sidebar = ({ isOpen, onClose }) => {
-  const { darkMode, toggleDarkMode } = useTheme();
-  const { userProfile, setUserProfile } = useDating();
+  const { userProfile, setUserProfile, cartItems = [] } = useDating();
   const location = useLocation();
+
+  const cartCount = cartItems.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
 
   // Récupérer le nom de compte et le numéro de téléphone du client
   const [customerUser, setCustomerUser] = React.useState(() => {
@@ -45,14 +45,13 @@ const Sidebar = ({ isOpen, onClose }) => {
   };
 
   const navItems = [
-    { name: "Accueil", path: "/home", icon: "icon-home" },
-    { name: "Favoris", path: "/wishlist", icon: "icon-list" },
-    { name: "Mon Panier", path: "/explore", icon: "icon-shopping-cart" },
+    { name: "Accueil", path: "/", icon: "icon-home" },
+    { name: "Catégories", path: "/categories", icon: "icon-book-open" },
+    { name: "Mon Panier", path: "/panier", icon: "icon-shopping-cart", isCart: true },
     { name: "Messagerie", path: "/chat", icon: "icon-message-circle" },
-    { name: "Paramètres", path: "/setting", icon: "icon-settings" },
     { name: "Mon Profil", path: isLoggedIn ? "/profile" : "/login", icon: "icon-user" },
     ...(isLoggedIn
-      ? [{ name: "Déconnexion", path: "/home", icon: "icon-log-out" }]
+      ? [{ name: "Déconnexion", path: "/", icon: "icon-log-out" }]
       : [{ name: "Connexion / Inscription", path: "/login", icon: "icon-log-in" }])
   ];
 
@@ -105,8 +104,13 @@ const Sidebar = ({ isOpen, onClose }) => {
                   onClick={() => handleNavClick(item)}
                   className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
                 >
-                  <span className="dz-icon">
+                  <span className="dz-icon" style={{ position: 'relative' }}>
                     <i className={`icon feather ${item.icon}`}></i>
+                    {item.isCart && cartCount > 0 && (
+                      <span className="sidebar-cart-badge">
+                        {cartCount > 99 ? '99+' : cartCount}
+                      </span>
+                    )}
                   </span>
                   <span>{item.name}</span>
                 </Link>
@@ -115,26 +119,6 @@ const Sidebar = ({ isOpen, onClose }) => {
           </ul>
 
           <div className="sidebar-bottom">
-            <ul className="app-setting">
-              <li>
-                <div className="mode">
-                  <span className="dz-icon">
-                    <i className="icon feather icon-moon"></i>
-                  </span>
-                  <span>Dark Mode</span>
-                  <div className="custom-switch">
-                    <input 
-                      type="checkbox" 
-                      className="switch-input theme-btn" 
-                      id="toggle-dark-menu"
-                      checked={darkMode}
-                      onChange={toggleDarkMode}
-                    />
-                    <label className="custom-switch-label" htmlFor="toggle-dark-menu"></label>
-                  </div>
-                </div>
-              </li>
-            </ul>
             <div className="app-info">
               <h6 className="name">LeerBook</h6>
               <span className="ver-info">App Version 1.2</span>

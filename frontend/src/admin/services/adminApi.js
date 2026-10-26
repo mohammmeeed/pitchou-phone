@@ -104,13 +104,14 @@ const FALLBACK_STATS = {
       uniqueVisitors: [0, 0, 0, 0, 0, 0, 0, 1, 19, 8, 1]
     },
     countries: [
-      { code: "DZ", name: "Algérie", visits: 282, percentage: 98.9 },
-      { code: "US", name: "États-Unis", visits: 3, percentage: 1.1 }
+      { code: "DZ", name: "Algérie", visits: 1544, percentage: 98.2 },
+      { code: "FR", name: "France", visits: 22, percentage: 1.4 },
+      { code: "US", name: "États-Unis", visits: 6, percentage: 0.4 }
     ],
     devices: {
-      mobile: 65,
-      desktop: 211,
-      tablet: 9
+      mobile: 1047,
+      desktop: 397,
+      tablet: 128
     }
   }
 };
@@ -128,8 +129,8 @@ export const adminApi = {
     } catch (e) {}
     return {
       id: 1,
-      name: 'Super Admin',
-      email: 'admin@tiktokshop.dz',
+      name: 'leerbook',
+      email: 'leerbook',
       phone: '0550123456',
       role: 'admin'
     };
@@ -155,13 +156,7 @@ export const adminApi = {
       return { success: false, message: data.message || 'Identifiants invalides' };
     } catch (err) {
       console.warn('Login error:', err);
-      if ((email === 'admin@tiktokshop.dz' || email === 'admin') && (password === 'admin123' || password === 'password')) {
-        const fallbackUser = { id: 1, name: 'Super Admin', email: 'admin@tiktokshop.dz', phone: '0550123456', role: 'admin' };
-        localStorage.setItem('admin_token', 'tk_fallback_' + Date.now());
-        localStorage.setItem('admin_user', JSON.stringify(fallbackUser));
-        return { success: true, user: fallbackUser };
-      }
-      return { success: false, message: 'Impossible de joindre le serveur PHP' };
+      return { success: false, message: 'Identifiants incorrects ou serveur indisponible' };
     }
   },
 
@@ -202,6 +197,7 @@ export const adminApi = {
           author: 'Sophia Sterling',
           format: 'Édition Reliée',
           price: 2500,
+          purchase_price: 1600,
           stock: 14,
           category: 'Roman & Littérature',
           rating: 4.9,
@@ -214,6 +210,7 @@ export const adminApi = {
           author: 'Alex Rivera',
           format: 'Broché Premium',
           price: 1850,
+          purchase_price: 1200,
           stock: 22,
           category: 'Développement Personnel',
           rating: 4.7,
@@ -226,6 +223,7 @@ export const adminApi = {
           author: 'Amine Belkacem',
           format: 'Édition Collector',
           price: 2300,
+          purchase_price: 1500,
           stock: 8,
           category: 'Histoire & Récits',
           rating: 4.8,
@@ -238,6 +236,7 @@ export const adminApi = {
           author: 'Elena Rostova',
           format: 'Couverture Rigide',
           price: 2100,
+          purchase_price: 1350,
           stock: 19,
           category: 'Fantasy & Mystère',
           rating: 4.9,
@@ -250,6 +249,7 @@ export const adminApi = {
           author: 'Karim Ziani',
           format: 'Édition Poche',
           price: 1950,
+          purchase_price: 1250,
           stock: 15,
           category: 'Philosophie & Poésie',
           rating: 4.6,
@@ -262,6 +262,7 @@ export const adminApi = {
           author: 'Nadia Bensaid',
           format: 'Édition Limitée',
           price: 2700,
+          purchase_price: 1750,
           stock: 5,
           category: 'Roman Graphique',
           rating: 4.9,
@@ -344,6 +345,19 @@ export const adminApi = {
     }
   },
 
+  async deleteOrder(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/orders?id=${id}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      return json;
+    } catch (err) {
+      console.warn('Fallback order delete:', err.message);
+      return { success: true, message: 'Commande supprimée' };
+    }
+  },
+
   // 4. Customers List
   async getCustomers() {
     try {
@@ -353,12 +367,14 @@ export const adminApi = {
       return json.data || [];
     } catch (err) {
       console.warn('Fallback customers:', err.message);
+      const saved = localStorage.getItem('admin_fallback_customers');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
       return [
-        { id: 1, name: 'Mohamed Guedaoui', email: 'mohamed@email.com', phone: '0550123456', address: 'Alger Centre', total_orders: 1, total_spent: 2500, created_at: '2026-10-13 10:37:15' },
-        { id: 2, name: 'Sara Benali', email: 'sara@gmail.com', phone: '0770984512', address: 'Oran, Maraval', total_orders: 1, total_spent: 1850, created_at: '2026-10-13 10:37:15' },
-        { id: 3, name: 'Yacine Kaci', email: 'yacine@yahoo.fr', phone: '0661239845', address: 'Constantine', total_orders: 1, total_spent: 4600, created_at: '2026-10-13 10:37:15' },
-        { id: 4, name: 'Amina Mansouri', email: 'amina@email.com', phone: '0554321987', address: 'Annaba', total_orders: 1, total_spent: 2100, created_at: '2026-10-13 10:37:15' },
-        { id: 5, name: 'Karim Belhadj', email: 'karim@outlook.com', phone: '0771234567', address: 'Sétif', total_orders: 1, total_spent: 1950, created_at: '2026-10-13 10:37:15' }
+        { id: 1, name: 'Mohamed Guedaoui', email: 'mohamed@email.com', phone: '0550123456', password: 'motdepasse123', address: 'Alger Centre', total_orders: 1, total_spent: 2500, created_at: '2026-10-13 10:37:15' }
       ];
     }
   },
@@ -375,6 +391,27 @@ export const adminApi = {
     } catch (err) {
       console.error('Erreur mise à jour client:', err);
       return { success: false, message: err.message || 'Erreur réseau' };
+    }
+  },
+
+  async deleteCustomer(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers?id=${id}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      return json;
+    } catch (err) {
+      console.warn('Fallback customer delete:', err.message);
+      try {
+        const saved = localStorage.getItem('admin_fallback_customers');
+        let list = saved ? JSON.parse(saved) : [
+          { id: 1, name: 'Mohamed Guedaoui', email: 'mohamed@email.com', phone: '0550123456', address: 'Alger Centre', total_orders: 1, total_spent: 2500, created_at: '2026-10-13 10:37:15' }
+        ];
+        list = list.filter((c) => String(c.id) !== String(id));
+        localStorage.setItem('admin_fallback_customers', JSON.stringify(list));
+      } catch (e) {}
+      return { success: true, message: 'Client supprimé' };
     }
   },
 
@@ -403,22 +440,55 @@ export const adminApi = {
     }
   },
 
-  async sendMessage(customerId, messageText, sender = 'admin') {
+  async sendMessage(customerId, messageText, sender = 'admin', customerData = null) {
     try {
+      const payload = {
+        customer_id: customerId,
+        message: messageText,
+        sender
+      };
+      if (customerData) {
+        payload.customer_name = customerData.name;
+        payload.customer_phone = customerData.phone;
+        payload.customer_email = customerData.email;
+        payload.customer_address = customerData.address;
+      }
       const res = await fetch(`${API_BASE_URL}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_id: customerId,
-          message: messageText,
-          sender
-        })
+        body: JSON.stringify(payload)
       });
       const json = await res.json();
       return json;
     } catch (err) {
       console.warn('Fallback send message:', err.message);
       return { success: false };
+    }
+  },
+
+  async deleteConversation(customerId) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/messages?customer_id=${customerId}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      return json;
+    } catch (err) {
+      console.warn('Fallback delete conversation:', err.message);
+      return { success: true, message: 'Discussion supprimée' };
+    }
+  },
+
+  async deleteMessage(messageId) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/messages?id=${messageId}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      return json;
+    } catch (err) {
+      console.warn('Fallback delete message:', err.message);
+      return { success: true, message: 'Message supprimé' };
     }
   },
 
@@ -547,6 +617,12 @@ export const adminApi = {
       const res = await fetch(`${API_BASE_URL}/parameters`);
       if (!res.ok) throw new Error('Erreur API paramètres');
       const data = await res.json();
+      if (data?.settings?.block_f12 !== undefined) {
+        try {
+          localStorage.setItem('block_f12', String(data.settings.block_f12));
+          window.dispatchEvent(new CustomEvent('block_f12_changed', { detail: String(data.settings.block_f12) }));
+        } catch (e) {}
+      }
       return data.settings || null;
     } catch (err) {
       console.warn('Fallback getParameters:', err.message);
@@ -558,6 +634,12 @@ export const adminApi = {
     if (settings?.accent_color) {
       try {
         localStorage.setItem('shop_accent_color', settings.accent_color);
+      } catch (e) {}
+    }
+    if (settings?.block_f12 !== undefined) {
+      try {
+        localStorage.setItem('block_f12', String(settings.block_f12));
+        window.dispatchEvent(new CustomEvent('block_f12_changed', { detail: String(settings.block_f12) }));
       } catch (e) {}
     }
     try {
@@ -589,16 +671,37 @@ export const adminApi = {
     }
   },
 
-  // 9. Attributs du Catalogue (Catégories & Langues)
+  async sendTestEmail(targetEmail) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/parameters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_test_email', email: targetEmail })
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn('Fallback sendTestEmail:', err.message);
+      return { success: false, message: 'Erreur réseau lors de l\'envoi du test' };
+    }
+  },
+
+  // 9. Attributs du Catalogue (Catégories, Langues & Wilayas de Livraison)
   async getAttributes() {
     try {
       const res = await fetch(`${API_BASE_URL}/attributes`);
       if (!res.ok) throw new Error('Erreur API attributs');
       const data = await res.json();
       if (data && data.success) {
+        if (Array.isArray(data.wilayas)) {
+          try {
+            localStorage.setItem('tiktok_shop_wilayas', JSON.stringify(data.wilayas));
+          } catch (e) {}
+        }
         return {
           categories: data.categories || [],
-          languages: data.languages || []
+          languages: data.languages || [],
+          wilayas: Array.isArray(data.wilayas) ? data.wilayas : []
         };
       }
     } catch (err) {
@@ -608,6 +711,7 @@ export const adminApi = {
     try {
       const savedCats = localStorage.getItem('tiktok_shop_categories');
       const savedLangs = localStorage.getItem('tiktok_shop_languages');
+      const savedWilayas = localStorage.getItem('tiktok_shop_wilayas');
       return {
         categories: savedCats ? JSON.parse(savedCats) : [
           'Roman & Littérature',
@@ -617,7 +721,8 @@ export const adminApi = {
           'Philosophie & Poésie',
           'Roman Graphique'
         ],
-        languages: savedLangs ? JSON.parse(savedLangs) : ['Français', 'Anglais', 'Arabe']
+        languages: savedLangs ? JSON.parse(savedLangs) : ['Français', 'Anglais', 'Arabe'],
+        wilayas: savedWilayas ? JSON.parse(savedWilayas) : []
       };
     } catch (e) {
       return {
@@ -629,7 +734,8 @@ export const adminApi = {
           'Philosophie & Poésie',
           'Roman Graphique'
         ],
-        languages: ['Français', 'Anglais', 'Arabe']
+        languages: ['Français', 'Anglais', 'Arabe'],
+        wilayas: []
       };
     }
   },
@@ -648,6 +754,11 @@ export const adminApi = {
       if (payload.languages) {
         localStorage.setItem('tiktok_shop_languages', JSON.stringify(payload.languages));
       }
+      if (data && Array.isArray(data.wilayas)) {
+        localStorage.setItem('tiktok_shop_wilayas', JSON.stringify(data.wilayas));
+      } else if (payload.wilayas) {
+        localStorage.setItem('tiktok_shop_wilayas', JSON.stringify(payload.wilayas));
+      }
       return data;
     } catch (err) {
       console.warn('Fallback saveAttributes vers localStorage:', err.message);
@@ -657,7 +768,96 @@ export const adminApi = {
       if (payload.languages) {
         localStorage.setItem('tiktok_shop_languages', JSON.stringify(payload.languages));
       }
+      if (payload.wilayas) {
+        localStorage.setItem('tiktok_shop_wilayas', JSON.stringify(payload.wilayas));
+      }
       return { success: true, message: 'Attributs enregistrés localement' };
+    }
+  },
+
+  // Journal de Caisse & Trésorerie
+  async getCashflow(params = {}) {
+    try {
+      const qs = new URLSearchParams(params).toString();
+      const res = await fetch(`${API_BASE_URL}/cashflow.php?${qs}`);
+      if (!res.ok) throw new Error('Erreur HTTP ' + res.status);
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn('Erreur getCashflow:', err.message);
+      return { success: false, data: [], kpi: {}, counts: {} };
+    }
+  },
+
+  async createCashflowEntry(entry) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cashflow.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry)
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur createCashflowEntry:', err);
+      throw err;
+    }
+  },
+
+  async updateCashflowEntry(entry) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cashflow.php`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry)
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur updateCashflowEntry:', err);
+      throw err;
+    }
+  },
+
+  async deleteCashflowEntry(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cashflow.php?id=${id}`, {
+        method: 'DELETE'
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur deleteCashflowEntry:', err);
+      throw err;
+    }
+  },
+
+  // Catégories d'opérations du Journal de Caisse
+  async getCashflowCategories() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cashflow_categories`);
+      if (!res.ok) throw new Error('Erreur HTTP ' + res.status);
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn('Fallback cashflow categories:', err.message);
+      return {
+        success: true,
+        recettes: ['VENTE BOUTIQUE / POS', 'VERSEMENT CLIENT', 'AUTRE RECETTE'],
+        depenses: ['ACHAT MARCHANDISE / STOCK', 'FRAIS DE LIVRAISON', 'FOURNITURES & EMBALLAGE', 'MARKETING & PUBLICITÉ', 'LOYER & CHARGES', 'AUTRE DÉPENSE']
+      };
+    }
+  },
+
+  async saveCashflowCategory(payload) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/cashflow_categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur saveCashflowCategory:', err);
+      throw err;
     }
   }
 };
+

@@ -77,14 +77,27 @@ export const initialProfiles = [
   }
 ];
 
+// Algorithme de mélange aléatoire Fisher-Yates
+const shuffleArray = (array) => {
+  if (!Array.isArray(array)) return [];
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 export const DatingProvider = ({ children }) => {
-  const [allProfiles, setAllProfiles] = useState(initialProfiles);
+  const [allProfiles, setAllProfiles] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [activeFilters, setActiveFilters] = useState(() => {
     try {
       const saved = localStorage.getItem('tiktok_shop_active_filters');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
     return {
+      search: '',
       categories: [],
       languages: [],
       maxPrice: 6000
@@ -99,7 +112,46 @@ export const DatingProvider = ({ children }) => {
 
   // Profils filtrés selon les critères actifs
   const profiles = React.useMemo(() => {
+    const normalize = (val) =>
+      String(val || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+
     return allProfiles.filter((p) => {
+      // 0. Recherche textuelle (titre, auteur, catégorie, description, langue)
+      if (activeFilters.search && activeFilters.search.trim() !== '') {
+        const q = normalize(activeFilters.search);
+
+        // Titre
+        const titleMatch = normalize(p.name || p.title).includes(q);
+        // Auteur
+        const authorMatch = normalize(p.author).includes(q);
+        // Description
+        const descMatch = normalize(p.bio || p.description).includes(q);
+
+        // Catégorie
+        const pCats = Array.isArray(p.categories) && p.categories.length > 0
+          ? p.categories
+          : (typeof p.category === 'string' && p.category.trim() !== ''
+              ? p.category.split(',').map((s) => s.trim())
+              : (Array.isArray(p.interests) ? p.interests : []));
+        const catMatch = pCats.some((c) => normalize(c).includes(q));
+
+        // Langue
+        const pLangs = Array.isArray(p.languages)
+          ? p.languages
+          : (typeof p.languages === 'string' && p.languages.trim() !== ''
+              ? p.languages.split(',').map((s) => s.trim())
+              : (typeof p.language === 'string' ? [p.language] : []));
+        const langMatch = pLangs.some((l) => normalize(l).includes(q));
+
+        if (!titleMatch && !authorMatch && !descMatch && !catMatch && !langMatch) {
+          return false;
+        }
+      }
+
       // 1. Catégories
       if (activeFilters.categories && activeFilters.categories.length > 0) {
         const pCats = Array.isArray(p.categories) && p.categories.length > 0
@@ -200,6 +252,18 @@ export const DatingProvider = ({ children }) => {
           setUserProfile(null);
         }
       } catch (e) {}
+
+      try {
+        const savedCart = localStorage.getItem('tiktok_cart');
+        if (savedCart) {
+          const parsed = JSON.parse(savedCart);
+          if (Array.isArray(parsed)) {
+            setCartItems(parsed);
+          }
+        } else {
+          setCartItems([]);
+        }
+      } catch (e) {}
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -247,6 +311,7 @@ export const DatingProvider = ({ children }) => {
           author: p.author || '',
           format: p.format || '',
           price: Number(p.price) || 0,
+          purchase_price: Number(p.purchase_price) || 0,
           priceFormatted: `${Number(p.price).toLocaleString('fr-FR')} DA`,
           image: p.image || '/assets/images/books/book1.jpg',
           images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []),
@@ -266,10 +331,23 @@ export const DatingProvider = ({ children }) => {
                 ? p.languages.split(',').map((s) => s.trim()).filter(Boolean)
                 : [])
         }));
-        setAllProfiles(formatted);
+
+        // Mélange aléatoire à chaque actualisation (en privilégiant les livres en stock)
+        const inStock = formatted.filter((p) => (Number(p.stock) || 0) > 0);
+        const outOfStock = formatted.filter((p) => (Number(p.stock) || 0) <= 0);
+        const randomized = inStock.length > 0
+          ? [...shuffleArray(inStock), ...shuffleArray(outOfStock)]
+          : shuffleArray(formatted);
+
+        setAllProfiles(randomized);
+      } else {
+        setAllProfiles(shuffleArray(initialProfiles));
       }
     } catch (err) {
       console.warn('Utilisation des données initiales locales:', err.message);
+      setAllProfiles(shuffleArray(initialProfiles));
+    } finally {
+      setLoadingProducts(false);
     }
   };
 
@@ -291,6 +369,7 @@ export const DatingProvider = ({ children }) => {
           title: product.name || product.title,
           format: product.format || '',
           price: Number(product.price) || 0,
+          purchase_price: Number(product.purchase_price) || 0,
           quantity: 1,
           image: product.image || '/assets/images/books/book1.jpg'
         }
@@ -364,6 +443,7 @@ export const DatingProvider = ({ children }) => {
       value={{
         profiles,
         allProfiles,
+        loadingProducts,
         setProfiles: setAllProfiles,
         activeFilters,
         setActiveFilters,

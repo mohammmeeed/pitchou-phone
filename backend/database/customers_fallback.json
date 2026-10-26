@@ -1,0 +1,15 @@
+[
+    {
+        "id": 1,
+        "name": "nvtest",
+        "email": "expedremote@gmail.com",
+        "phone": "003333",
+        "password": "focus1408",
+        "address": "15 - Tizi Ouzou - Makouda",
+        "wilaya": "15 - Tizi Ouzou",
+        "commune": "Makouda",
+        "total_orders": 0,
+        "total_spent": 0,
+        "created_at": "2026-10-26 10:48:19"
+    }
+]

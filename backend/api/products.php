@@ -3,8 +3,8 @@
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/database.php';
 
-$pdo = Database::getConnection();
-$method = $_SERVER['REQUEST_METHOD'];
+$pdo = Database::getConnectionSafe();
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 switch ($method) {
     case 'GET':
@@ -76,42 +76,117 @@ function formatProduct(array $product): array {
     }
     $product['categories'] = array_values($categories);
     $product['category'] = !empty($product['categories']) ? implode(', ', $product['categories']) : ($product['category'] ?? '');
+    $product['purchase_price'] = isset($product['purchase_price']) ? (float)$product['purchase_price'] : 0.0;
 
     return $product;
 }
 
-function handleGet(PDO $pdo): void {
-    if (isset($_GET['id'])) {
-        $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ?");
-        $stmt->execute([(int)$_GET['id']]);
-        $product = $stmt->fetch();
-        if ($product) {
-            echo json_encode(["success" => true, "data" => formatProduct($product)]);
-        } else {
-            http_response_code(404);
-            echo json_encode(["success" => false, "message" => "Produit non trouvé"]);
+function handleGet(?PDO $pdo): void {
+    $fallbackFile = __DIR__ . '/../database/products_fallback.json';
+
+    if ($pdo === null) {
+        $products = [];
+        if (file_exists($fallbackFile)) {
+            $products = json_decode(file_get_contents($fallbackFile), true) ?? [];
         }
+
+        if (isset($_GET['id'])) {
+            $id = (int)$_GET['id'];
+            foreach ($products as $p) {
+                if ((int)($p['id'] ?? 0) === $id) {
+                    echo json_encode(["success" => true, "data" => formatProduct($p)]);
+                    return;
+                }
+            }
+            echo json_encode(["success" => false, "data" => null, "message" => "Produit non trouvé"]);
+            return;
+        }
+
+        if (!empty($_GET['search'])) {
+            $search = mb_strtolower(trim($_GET['search']));
+            $products = array_filter($products, function($p) use ($search) {
+                return (
+                    (isset($p['name']) && mb_stripos($p['name'], $search) !== false) ||
+                    (isset($p['author']) && mb_stripos($p['author'], $search) !== false) ||
+                    (isset($p['category']) && mb_stripos($p['category'], $search) !== false)
+                );
+            });
+        }
+
+        if (!empty($_GET['random']) || (!empty($_GET['order']) && $_GET['order'] === 'random')) {
+            shuffle($products);
+        }
+
+        $formatted = array_map('formatProduct', array_values($products));
+        echo json_encode(["success" => true, "data" => $formatted, "count" => count($formatted), "fallback" => true]);
         return;
     }
 
-    $sql = "SELECT * FROM products";
-    $params = [];
-    if (!empty($_GET['search'])) {
-        $sql .= " WHERE name LIKE ? OR author LIKE ? OR category LIKE ?";
-        $q = "%" . $_GET['search'] . "%";
-        $params = [$q, $q, $q];
+    try {
+        if (isset($_GET['id'])) {
+            $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ?");
+            $stmt->execute([(int)$_GET['id']]);
+            $product = $stmt->fetch();
+            if ($product) {
+                echo json_encode(["success" => true, "data" => formatProduct($product)]);
+            } else {
+                // Secondary check in fallback file if not found
+                if (file_exists($fallbackFile)) {
+                    $fbProducts = json_decode(file_get_contents($fallbackFile), true) ?? [];
+                    foreach ($fbProducts as $p) {
+                        if ((int)($p['id'] ?? 0) === (int)$_GET['id']) {
+                            echo json_encode(["success" => true, "data" => formatProduct($p)]);
+                            return;
+                        }
+                    }
+                }
+                echo json_encode(["success" => false, "data" => null, "message" => "Produit non trouvé"]);
+            }
+            return;
+        }
+
+        $sql = "SELECT * FROM products";
+        $params = [];
+        if (!empty($_GET['search'])) {
+            $sql .= " WHERE name LIKE ? OR author LIKE ? OR category LIKE ?";
+            $q = "%" . $_GET['search'] . "%";
+            $params = [$q, $q, $q];
+        }
+        if (!empty($_GET['random']) || (!empty($_GET['order']) && $_GET['order'] === 'random')) {
+            $sql .= " ORDER BY RAND()";
+        } else {
+            $sql .= " ORDER BY id DESC";
+        }
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $products = $stmt->fetchAll();
+
+        // Update fallback cache periodically when all products are fetched
+        if (empty($_GET['search']) && empty($_GET['random']) && !empty($products)) {
+            @file_put_contents($fallbackFile, json_encode($products, JSON_UNESCAPED_UNICODE));
+        }
+
+        $formatted = array_map('formatProduct', $products);
+        echo json_encode(["success" => true, "data" => $formatted, "count" => count($formatted)]);
+    } catch (Throwable $e) {
+        if (file_exists($fallbackFile)) {
+            $products = json_decode(file_get_contents($fallbackFile), true) ?? [];
+            $formatted = array_map('formatProduct', array_values($products));
+            echo json_encode(["success" => true, "data" => $formatted, "count" => count($formatted), "fallback" => true]);
+        } else {
+            http_response_code(500);
+            echo json_encode(["success" => false, "message" => $e->getMessage()]);
+        }
     }
-    $sql .= " ORDER BY id DESC";
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $products = $stmt->fetchAll();
-
-    $formatted = array_map('formatProduct', $products);
-    echo json_encode(["success" => true, "data" => $formatted, "count" => count($formatted)]);
 }
 
-function handlePost(PDO $pdo): void {
+function handlePost(?PDO $pdo): void {
+    if ($pdo === null) {
+        http_response_code(503);
+        echo json_encode(["success" => false, "message" => "Base de données non connectée"]);
+        return;
+    }
     $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 
     if (empty($input['name']) || !isset($input['price'])) {
@@ -157,12 +232,15 @@ function handlePost(PDO $pdo): void {
     $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
     $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
 
-    $stmt = $pdo->prepare("INSERT INTO products (name, author, format, price, stock, category, categories, rating, image, images, video, videos, bio, languages, is_featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $purchasePrice = isset($input['purchase_price']) && $input['purchase_price'] !== '' ? (float)$input['purchase_price'] : 0.0;
+
+    $stmt = $pdo->prepare("INSERT INTO products (name, author, format, price, purchase_price, stock, category, categories, rating, image, images, video, videos, bio, languages, is_featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         trim($input['name']),
         trim($input['author'] ?? ''),
         trim($input['format'] ?? ''),
         (float)$input['price'],
+        $purchasePrice,
         (int)($input['stock'] ?? 10),
         $categoriesStr,
         $categoriesJson,
@@ -185,7 +263,12 @@ function handlePost(PDO $pdo): void {
     ]);
 }
 
-function handlePut(PDO $pdo): void {
+function handlePut(?PDO $pdo): void {
+    if ($pdo === null) {
+        http_response_code(503);
+        echo json_encode(["success" => false, "message" => "Base de données non connectée"]);
+        return;
+    }
     $input = json_decode(file_get_contents('php://input'), true);
     $id = (int)($_GET['id'] ?? ($input['id'] ?? 0));
 
@@ -232,13 +315,16 @@ function handlePut(PDO $pdo): void {
     $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
     $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
 
-    $stmt = $pdo->prepare("UPDATE products SET name = ?, author = ?, format = ?, price = ?, stock = ?, category = ?, categories = ?, image = ?, images = ?, video = ?, videos = ?, bio = ?, languages = ?, is_featured = ? WHERE id = ?");
+    $purchasePrice = isset($input['purchase_price']) && $input['purchase_price'] !== '' ? (float)$input['purchase_price'] : 0.0;
+
+    $stmt = $pdo->prepare("UPDATE products SET name = ?, author = ?, format = ?, price = ?, purchase_price = ?, stock = ?, category = ?, categories = ?, image = ?, images = ?, video = ?, videos = ?, bio = ?, languages = ?, is_featured = ? WHERE id = ?");
     $stmt->execute([
         trim($input['name']),
         trim($input['author'] ?? ''),
         trim($input['format'] ?? ''),
         (float)$input['price'],
-        (int)($input['stock'] ?? 10),
+        $purchasePrice,
+        (isset($input['stock']) ? (int)$input['stock'] : 0),
         $categoriesStr,
         $categoriesJson,
         $mainImage,
@@ -254,7 +340,12 @@ function handlePut(PDO $pdo): void {
     echo json_encode(["success" => true, "message" => "Produit mis à jour avec succès"]);
 }
 
-function handleDelete(PDO $pdo): void {
+function handleDelete(?PDO $pdo): void {
+    if ($pdo === null) {
+        http_response_code(503);
+        echo json_encode(["success" => false, "message" => "Base de données non connectée"]);
+        return;
+    }
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) {
         http_response_code(400);

@@ -1,5 +1,5 @@
 // frontend/src/admin/pages/AdminProducts.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import AdminLayout from '../AdminLayout';
 import { adminApi } from '../services/adminApi';
 
@@ -10,6 +10,54 @@ export default function AdminProducts() {
   const [selectedCategory, setSelectedCategory] = useState('Tous');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
+
+  // Category Searchable Select State & Refs (Filter Bar)
+  const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
+  const [catSearchQuery, setCatSearchQuery] = useState('');
+  const catDropdownRef = useRef(null);
+  const catSearchInputRef = useRef(null);
+
+  // Form Category Dropdown State & Refs (Add/Edit Form)
+  const [isFormCatDropdownOpen, setIsFormCatDropdownOpen] = useState(false);
+  const [formCatSearchQuery, setFormCatSearchQuery] = useState('');
+  const formCatDropdownRef = useRef(null);
+  const formCatSearchInputRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (catDropdownRef.current && !catDropdownRef.current.contains(event.target)) {
+        setIsCatDropdownOpen(false);
+      }
+      if (formCatDropdownRef.current && !formCatDropdownRef.current.contains(event.target)) {
+        setIsFormCatDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setIsCatDropdownOpen(false);
+        setIsFormCatDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isCatDropdownOpen && catSearchInputRef.current) {
+      setTimeout(() => catSearchInputRef.current?.focus(), 50);
+    }
+  }, [isCatDropdownOpen]);
+
+  useEffect(() => {
+    if (isFormCatDropdownOpen && formCatSearchInputRef.current) {
+      setTimeout(() => formCatSearchInputRef.current?.focus(), 50);
+    }
+  }, [isFormCatDropdownOpen]);
 
   // In-Page View State: 'list' (Catalogue table) or 'form' (Integrated form card, NO pop-up!)
   const [viewMode, setViewMode] = useState('list');
@@ -42,9 +90,24 @@ export default function AdminProducts() {
     'Arabe'
   ]);
   const [newCatInput, setNewCatInput] = useState('');
-  const [editingCategory, setEditingCategory] = useState(null); // { oldName: string, value: string }
+  const [editingCategory, setEditingCategory] = useState(null); // { oldName: string, value: string, image: string }
+  const [categoryImages, setCategoryImages] = useState({});
+  const [uploadingCatImage, setUploadingCatImage] = useState(false);
   const [newLangInput, setNewLangInput] = useState('');
   const [editingLanguage, setEditingLanguage] = useState(null); // { oldName: string, value: string }
+
+  // Onglets & Recherche dans Paramètres des Attributs (Affichage en fenêtres dédiées pleine page)
+  const [attributeTab, setAttributeTab] = useState('categories'); // 'categories' | 'languages' | 'wilayas'
+  const [categorySearch, setCategorySearch] = useState('');
+  const [languageSearch, setLanguageSearch] = useState('');
+
+  // Wilayas State (Ajout, Modification, Suppression et Tarifs de Livraison Bureau & Domicile)
+  const [wilayasList, setWilayasList] = useState([]);
+  const [newWilayaNameInput, setNewWilayaNameInput] = useState('');
+  const [newWilayaBureauPriceInput, setNewWilayaBureauPriceInput] = useState('350');
+  const [newWilayaDomicilePriceInput, setNewWilayaDomicilePriceInput] = useState('500');
+  const [editingWilaya, setEditingWilaya] = useState(null); // { oldName: string, name: string, price_bureau: number, price_domicile: number, price: number }
+  const [wilayaSearch, setWilayaSearch] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -52,6 +115,7 @@ export default function AdminProducts() {
     author: '',
     format: '',
     price: '',
+    purchase_price: '',
     stock: '15',
     category: '',
     categories: [],
@@ -106,8 +170,14 @@ export default function AdminProducts() {
         if (Array.isArray(data.categories) && data.categories.length > 0) {
           setCategoriesList(data.categories);
         }
+        if (data.category_images && typeof data.category_images === 'object') {
+          setCategoryImages(data.category_images);
+        }
         if (Array.isArray(data.languages) && data.languages.length > 0) {
           setLanguagesList(data.languages);
+        }
+        if (Array.isArray(data.wilayas)) {
+          setWilayasList(data.wilayas);
         }
       }
     } catch (e) {
@@ -115,7 +185,7 @@ export default function AdminProducts() {
     }
   };
 
-  // Handlers pour Catégories (Ajouter, Modifier, Supprimer sans pop-up)
+  // Handlers pour Catégories (Ajouter, Modifier avec image, Supprimer)
   const handleAddCategory = async (e) => {
     e.preventDefault();
     const trimmed = newCatInput.trim();
@@ -128,17 +198,54 @@ export default function AdminProducts() {
     setCategoriesList(updated);
     setNewCatInput('');
     showToast(`Catégorie "${trimmed}" ajoutée avec succès !`);
-    await adminApi.saveAttributes({ action: 'add_category', name: trimmed, categories: updated, languages: languagesList });
+    await adminApi.saveAttributes({ action: 'add_category', name: trimmed, categories: updated, category_images: categoryImages, languages: languagesList });
   };
 
-  const handleSaveEditCategory = async (oldName, newName) => {
-    const trimmed = newName.trim();
-    if (!trimmed || trimmed === oldName) {
+  const handleCategoryPhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingCatImage(true);
+    try {
+      const res = await adminApi.uploadMedia(file);
+      if (res && res.url) {
+        setEditingCategory((prev) => ({
+          ...prev,
+          image: res.url
+        }));
+        showToast("Photo de couverture importée ! Cliquez sur Valider pour enregistrer.");
+      } else {
+        alert("Erreur lors du téléversement de la photo.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors du téléversement de la photo.");
+    } finally {
+      setUploadingCatImage(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleSaveEditCategory = async (oldName, newName, image) => {
+    const trimmed = (newName || '').trim();
+    if (!trimmed) {
       setEditingCategory(null);
       return;
     }
     const updated = categoriesList.map((c) => (c === oldName ? trimmed : c));
     setCategoriesList(updated);
+
+    const updatedImages = { ...categoryImages };
+    if (oldName !== trimmed) {
+      delete updatedImages[oldName];
+    }
+    if (image && typeof image === 'string' && image.trim() !== '') {
+      updatedImages[trimmed] = image.trim();
+    } else {
+      delete updatedImages[trimmed];
+    }
+    setCategoryImages(updatedImages);
+
     setFormData((prev) => {
       const currentCats = (prev.categories || []).map((c) => (c === oldName ? trimmed : c));
       return {
@@ -151,14 +258,25 @@ export default function AdminProducts() {
       setSelectedCategory(trimmed);
     }
     setEditingCategory(null);
-    showToast(`Catégorie renommée en "${trimmed}" !`);
-    await adminApi.saveAttributes({ action: 'edit_category', oldName, newName: trimmed, categories: updated, languages: languagesList });
+    showToast(`Catégorie "${trimmed}" mise à jour !`);
+    await adminApi.saveAttributes({ 
+      action: 'edit_category', 
+      oldName, 
+      newName: trimmed, 
+      image: image || '',
+      categories: updated, 
+      category_images: updatedImages,
+      languages: languagesList 
+    });
     await loadProducts();
   };
 
   const handleDeleteCategory = async (catName) => {
     const updated = categoriesList.filter((c) => c !== catName);
     setCategoriesList(updated);
+    const updatedImages = { ...categoryImages };
+    delete updatedImages[catName];
+    setCategoryImages(updatedImages);
     setFormData((prev) => {
       const currentCats = (prev.categories || []).filter((c) => c !== catName);
       return {
@@ -171,7 +289,13 @@ export default function AdminProducts() {
       setSelectedCategory('Tous');
     }
     showToast(`Catégorie "${catName}" supprimée.`);
-    await adminApi.saveAttributes({ action: 'delete_category', name: catName, categories: updated, languages: languagesList });
+    await adminApi.saveAttributes({ 
+      action: 'delete_category', 
+      name: catName, 
+      categories: updated, 
+      category_images: updatedImages,
+      languages: languagesList 
+    });
   };
 
   // Handlers pour Langues (Ajouter, Modifier, Supprimer sans pop-up)
@@ -220,6 +344,92 @@ export default function AdminProducts() {
     }
     showToast(`Langue "${langName}" supprimée.`);
     await adminApi.saveAttributes({ action: 'delete_language', name: langName, categories: categoriesList, languages: updated });
+  };
+
+  // Handlers pour Wilayas & Frais de Livraison (Ajouter, Modifier, Supprimer)
+  const handleAddWilaya = async (e) => {
+    e.preventDefault();
+    const trimmed = newWilayaNameInput.trim();
+    if (!trimmed) return;
+    if (wilayasList.some((w) => (w.name || '').toLowerCase() === trimmed.toLowerCase())) {
+      showToast('Cette wilaya existe déjà.');
+      return;
+    }
+    const pBureau = parseFloat(newWilayaBureauPriceInput) >= 0 ? parseFloat(newWilayaBureauPriceInput) : 350;
+    const pDomicile = parseFloat(newWilayaDomicilePriceInput) >= 0 ? parseFloat(newWilayaDomicilePriceInput) : 500;
+    const newObj = {
+      name: trimmed,
+      price_bureau: pBureau,
+      price_domicile: pDomicile,
+      price: pDomicile
+    };
+    const updated = [...wilayasList, newObj];
+    setWilayasList(updated);
+    setNewWilayaNameInput('');
+    setNewWilayaBureauPriceInput('350');
+    setNewWilayaDomicilePriceInput('500');
+    showToast(`Wilaya "${trimmed}" ajoutée (Bureau: ${pBureau} DA, Domicile: ${pDomicile} DA) !`);
+    const res = await adminApi.saveAttributes({
+      action: 'add_wilaya',
+      name: trimmed,
+      price_bureau: pBureau,
+      price_domicile: pDomicile,
+      price: pDomicile,
+      categories: categoriesList,
+      languages: languagesList,
+      wilayas: updated
+    });
+    if (res && Array.isArray(res.wilayas)) {
+      setWilayasList(res.wilayas);
+    }
+  };
+
+  const handleSaveEditWilaya = async (oldName, newName, newBureauPrice, newDomicilePrice) => {
+    const trimmed = (newName || '').trim();
+    if (!trimmed) {
+      setEditingWilaya(null);
+      return;
+    }
+    const pBureau = parseFloat(newBureauPrice) >= 0 ? parseFloat(newBureauPrice) : 350;
+    const pDomicile = parseFloat(newDomicilePrice) >= 0 ? parseFloat(newDomicilePrice) : 500;
+    const updated = wilayasList.map((w) =>
+      w.name === oldName
+        ? { ...w, name: trimmed, price_bureau: pBureau, price_domicile: pDomicile, price: pDomicile }
+        : w
+    );
+    setWilayasList(updated);
+    setEditingWilaya(null);
+    showToast(`Wilaya "${trimmed}" mise à jour (Bureau: ${pBureau} DA, Domicile: ${pDomicile} DA) !`);
+    const res = await adminApi.saveAttributes({
+      action: 'edit_wilaya',
+      oldName,
+      newName: trimmed,
+      price_bureau: pBureau,
+      price_domicile: pDomicile,
+      price: pDomicile,
+      categories: categoriesList,
+      languages: languagesList,
+      wilayas: updated
+    });
+    if (res && Array.isArray(res.wilayas)) {
+      setWilayasList(res.wilayas);
+    }
+  };
+
+  const handleDeleteWilaya = async (wilayaName) => {
+    const updated = wilayasList.filter((w) => w.name !== wilayaName);
+    setWilayasList(updated);
+    showToast(`Wilaya "${wilayaName}" supprimée.`);
+    const res = await adminApi.saveAttributes({
+      action: 'delete_wilaya',
+      name: wilayaName,
+      categories: categoriesList,
+      languages: languagesList,
+      wilayas: updated
+    });
+    if (res && Array.isArray(res.wilayas)) {
+      setWilayasList(res.wilayas);
+    }
   };
 
   const loadProducts = async () => {
@@ -458,6 +668,7 @@ export default function AdminProducts() {
       author: '',
       format: '',
       price: '',
+      purchase_price: '',
       stock: '15',
       category: '',
       categories: [],
@@ -537,7 +748,8 @@ export default function AdminProducts() {
       author: prod.author || '',
       format: prod.format || '',
       price: prod.price || '',
-      stock: prod.stock || '15',
+      purchase_price: prod.purchase_price !== undefined && prod.purchase_price !== null && Number(prod.purchase_price) > 0 ? String(prod.purchase_price) : '',
+      stock: prod.stock !== undefined && prod.stock !== null ? String(prod.stock) : '0',
       category: parsedCategories.join(', '),
       categories: parsedCategories,
       rating: prod.rating || 4.8,
@@ -568,6 +780,7 @@ export default function AdminProducts() {
       video: formData.videos?.[0] || formData.video || null,
       videos: formData.videos || [],
       price: parseFloat(formData.price),
+      purchase_price: formData.purchase_price !== '' ? parseFloat(formData.purchase_price) : 0,
       stock: parseInt(formData.stock, 10) || 0
     };
 
@@ -600,6 +813,46 @@ export default function AdminProducts() {
   };
 
   const categoriesForFilter = ['Tous', ...categoriesList];
+
+  const categoryCounts = useMemo(() => {
+    const counts = {};
+    const norm = (s) => (s || '').toLowerCase().trim();
+
+    categoriesList.forEach((c) => {
+      counts[c] = 0;
+    });
+
+    products.forEach((p) => {
+      const pCats = Array.isArray(p.categories) && p.categories.length > 0
+        ? p.categories
+        : (p.category ? p.category.split(',').map((s) => s.trim()) : []);
+      const pCatsNorm = pCats.map(norm);
+
+      categoriesList.forEach((cat) => {
+        const catNorm = norm(cat);
+        if (pCatsNorm.some((c) => c === catNorm || c.includes(catNorm))) {
+          counts[cat] = (counts[cat] || 0) + 1;
+        }
+      });
+    });
+
+    return counts;
+  }, [products, categoriesList]);
+
+  const filteredCategoriesForSelect = useMemo(() => {
+    const q = catSearchQuery.toLowerCase().trim();
+    if (!q) return categoriesForFilter;
+    return categoriesForFilter.filter((cat) => {
+      if (cat === 'Tous') return 'tous'.includes(q) || 'toutes'.includes(q);
+      return cat.toLowerCase().includes(q);
+    });
+  }, [categoriesForFilter, catSearchQuery]);
+
+  const filteredFormCategories = useMemo(() => {
+    const q = formCatSearchQuery.toLowerCase().trim();
+    if (!q) return categoriesList;
+    return categoriesList.filter((cat) => cat.toLowerCase().includes(q));
+  }, [categoriesList, formCatSearchQuery]);
 
   const filteredProducts = products.filter((p) => {
     const pName = (p.name || '').toLowerCase();
@@ -659,226 +912,1201 @@ export default function AdminProducts() {
             </div>
           </div>
 
-          {/* Grille 2 colonnes des attributs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-            {/* Carte 1 : Catégories */}
-            <div className="admin-card">
-              <div className="card-header-custom" style={{ borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4>
-                  <i className="fas fa-tags" style={{ color: '#fe2c55', marginRight: '0.5rem' }} />
-                  Catégories de Produits
-                </h4>
-                <span className="badge-custom bg-soft-primary">
+          {/* Navigation par Onglets (Fenêtres en Pleine Page) */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.6rem',
+              marginBottom: '1.75rem',
+              borderBottom: '1px solid #e2e8f0',
+              paddingBottom: '0.85rem',
+              flexWrap: 'wrap'
+            }}
+          >
+            {[
+              { id: 'categories', label: 'Catégories de Produits', count: categoriesList.length, icon: 'fas fa-tags', color: '#fe2c55' },
+              { id: 'languages', label: 'Langues des Livres', count: languagesList.length, icon: 'fas fa-globe', color: '#209f84' },
+              { id: 'wilayas', label: 'Wilayas & Tarifs de Livraison', count: wilayasList.length, icon: 'fas fa-truck-moving', color: '#0284c7' }
+            ].map((tab) => {
+              const isActive = attributeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAttributeTab(tab.id)}
+                  style={{
+                    padding: '0.7rem 1.35rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    fontWeight: isActive ? 700 : 500,
+                    fontSize: '0.92rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    backgroundColor: isActive ? '#111827' : '#f1f5f9',
+                    color: isActive ? '#ffffff' : '#475569',
+                    boxShadow: isActive ? '0 4px 12px rgba(17,24,39,0.15)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <i className={tab.icon} style={{ color: isActive ? '#ffffff' : tab.color }} />
+                  <span>{tab.label}</span>
+                  <span
+                    style={{
+                      padding: '0.15rem 0.55rem',
+                      borderRadius: '12px',
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                      color: isActive ? '#ffffff' : '#64748b'
+                    }}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* FENÊTRE 1 : CATÉGORIES DE PRODUITS (Full Width) */}
+          {attributeTab === 'categories' && (
+            <div className="admin-card" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+              <div
+                className="card-header-custom"
+                style={{
+                  borderBottom: '1px solid #f0f0f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                  padding: '1.25rem 1.5rem',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                <div>
+                  <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.15rem', fontWeight: 800, color: '#111827' }}>
+                    <i className="fas fa-tags" style={{ color: '#fe2c55' }} />
+                    Catégories de Produits
+                  </h4>
+                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                    Gérer l'ensemble des catégories associées aux livres du catalogue
+                  </p>
+                </div>
+                <span className="badge-custom bg-soft-primary" style={{ fontWeight: 800, fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}>
                   {categoriesList.length} catégories
                 </span>
               </div>
-              <div className="card-body-custom" style={{ padding: '1.5rem' }}>
-                {/* Formulaire d'ajout inline */}
-                <form onSubmit={handleAddCategory} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    placeholder="Nouvelle catégorie (ex: Sciences, Biographie...)"
-                    value={newCatInput}
-                    onChange={(e) => setNewCatInput(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    type="submit"
-                    className="btn-primary-custom"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', padding: '0.65rem 1.15rem' }}
-                  >
-                    <i className="fas fa-plus" /> Ajouter
-                  </button>
-                </form>
 
-                {/* Liste des catégories avec Modifier et Supprimer */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  {categoriesList.map((cat) => (
-                    <div
-                      key={cat}
+              <div className="card-body-custom" style={{ padding: '1.5rem' }}>
+                {/* Barre d'action : Formulaire d'ajout rapide + Barre de recherche */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#f8fafc',
+                    padding: '1.25rem',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0'
+                  }}
+                >
+                  <form
+                    onSubmit={handleAddCategory}
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      flex: 1,
+                      minWidth: '300px'
+                    }}
+                  >
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      placeholder="Nouvelle catégorie (ex: Sciences, Biographie, Mangas...)"
+                      value={newCatInput}
+                      onChange={(e) => setNewCatInput(e.target.value)}
+                      style={{ flex: 1, minWidth: '220px' }}
+                    />
+                    <button
+                      type="submit"
+                      className="btn-primary-custom"
                       style={{
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '0.75rem 1rem',
-                        borderRadius: '8px',
-                        backgroundColor: '#f9fafb',
-                        border: '1px solid #f0f0f0'
+                        gap: '0.45rem',
+                        whiteSpace: 'nowrap',
+                        padding: '0.65rem 1.25rem',
+                        fontWeight: 700
                       }}
                     >
-                      {editingCategory?.oldName === cat ? (
-                        <div style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
-                          <input
-                            type="text"
-                            className="form-control-custom"
-                            value={editingCategory.value}
-                            onChange={(e) => setEditingCategory({ ...editingCategory, value: e.target.value })}
-                            style={{ flex: 1, padding: '0.4rem 0.75rem', fontSize: '0.9rem' }}
-                            autoFocus
-                          />
-                          <button
-                            type="button"
-                            className="btn-primary-custom"
-                            onClick={() => handleSaveEditCategory(cat, editingCategory.value)}
-                            style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem' }}
-                            title="Enregistrer"
-                          >
-                            <i className="fas fa-check" />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-light-custom"
-                            onClick={() => setEditingCategory(null)}
-                            style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem' }}
-                            title="Annuler"
-                          >
-                            <i className="fas fa-times" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                            <i className="fas fa-folder" style={{ color: '#9ca3af', fontSize: '0.9rem' }} />
-                            <span style={{ fontWeight: 600, color: '#18181b', fontSize: '0.92rem' }}>{cat}</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <button
-                              type="button"
-                              onClick={() => setEditingCategory({ oldName: cat, value: cat })}
-                              className="btn-light-custom"
-                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', borderRadius: '6px' }}
-                              title="Modifier cette catégorie"
-                            >
-                              <i className="fas fa-edit" style={{ color: '#3b82f6' }} /> Modifier
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCategory(cat)}
-                              className="btn-light-custom"
-                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', borderRadius: '6px', color: '#ef4444' }}
-                              title="Supprimer cette catégorie"
-                            >
-                              <i className="fas fa-trash-alt" />
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                      <i className="fas fa-plus" /> Ajouter Catégorie
+                    </button>
+                  </form>
+
+                  {/* Recherche rapide */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
+                    <i
+                      className="fas fa-search"
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#94a3b8',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      placeholder="Rechercher une catégorie..."
+                      value={categorySearch}
+                      onChange={(e) => setCategorySearch(e.target.value)}
+                      style={{ paddingLeft: '2.2rem', fontSize: '0.85rem' }}
+                    />
+                  </div>
                 </div>
+
+                {/* Grille responsive des catégories */}
+                {(() => {
+                  const filteredCats = categoriesList.filter((cat) =>
+                    !categorySearch || cat.toLowerCase().includes(categorySearch.toLowerCase())
+                  );
+
+                  if (filteredCats.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+                        <i className="fas fa-folder-open" style={{ fontSize: '2.5rem', marginBottom: '0.75rem', display: 'block', opacity: 0.4 }} />
+                        <p style={{ margin: 0, fontWeight: 600 }}>Aucune catégorie ne correspond à "{categorySearch}".</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: '0.75rem'
+                      }}
+                    >
+                      {filteredCats.map((cat) => {
+                        const isEditing = editingCategory?.oldName === cat;
+
+                        return (
+                          <div
+                            key={cat}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              backgroundColor: isEditing ? '#fef2f2' : '#ffffff',
+                              border: isEditing ? '1.5px solid #fe2c55' : '1px solid #e2e8f0',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {isEditing ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%' }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
+                                  <input
+                                    type="text"
+                                    className="form-control-custom"
+                                    value={editingCategory.value}
+                                    onChange={(e) => setEditingCategory({ ...editingCategory, value: e.target.value })}
+                                    placeholder="Nom de la catégorie"
+                                    style={{ flex: 1, padding: '0.4rem 0.65rem', fontSize: '0.88rem' }}
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    className="btn-primary-custom"
+                                    onClick={() => handleSaveEditCategory(cat, editingCategory.value, editingCategory.image)}
+                                    style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                                    title="Enregistrer"
+                                  >
+                                    <i className="fas fa-check" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-light-custom"
+                                    onClick={() => setEditingCategory(null)}
+                                    style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                                    title="Annuler"
+                                  >
+                                    <i className="fas fa-times" />
+                                  </button>
+                                </div>
+
+                                {/* Sélecteur de Photo de Couverture pour la Catégorie */}
+                                <div style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '0.65rem', 
+                                  padding: '0.45rem 0.65rem', 
+                                  backgroundColor: '#f8fafc', 
+                                  borderRadius: '6px',
+                                  border: '1px dashed #cbd5e1'
+                                }}>
+                                  {editingCategory.image ? (
+                                    <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
+                                      <img 
+                                        src={editingCategory.image} 
+                                        alt="Aperçu catégorie" 
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingCategory({ ...editingCategory, image: '' })}
+                                        style={{
+                                          position: 'absolute',
+                                          top: '-5px',
+                                          right: '-5px',
+                                          width: '17px',
+                                          height: '17px',
+                                          borderRadius: '50%',
+                                          backgroundColor: '#ef4444',
+                                          color: '#ffffff',
+                                          border: 'none',
+                                          fontSize: '11px',
+                                          fontWeight: 'bold',
+                                          lineHeight: 1,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          cursor: 'pointer'
+                                        }}
+                                        title="Retirer l'image"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div style={{ 
+                                      width: '42px', 
+                                      height: '42px', 
+                                      borderRadius: '6px', 
+                                      backgroundColor: '#e2e8f0', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      color: '#94a3b8', 
+                                      fontSize: '0.9rem',
+                                      flexShrink: 0 
+                                    }}>
+                                      <i className="fas fa-image" />
+                                    </div>
+                                  )}
+
+                                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                    <label 
+                                      className="btn-light-custom" 
+                                      style={{ 
+                                        cursor: uploadingCatImage ? 'not-allowed' : 'pointer', 
+                                        margin: 0, 
+                                        display: 'inline-flex', 
+                                        alignItems: 'center', 
+                                        gap: '5px', 
+                                        fontSize: '0.78rem', 
+                                        padding: '0.3rem 0.6rem',
+                                        width: 'fit-content',
+                                        borderRadius: '5px',
+                                        backgroundColor: '#ffffff',
+                                        border: '1px solid #e2e8f0'
+                                      }}
+                                    >
+                                      <i className="fas fa-upload" style={{ color: '#3b82f6' }} />
+                                      <span>
+                                        {uploadingCatImage 
+                                          ? 'Téléversement...' 
+                                          : editingCategory.image 
+                                            ? 'Changer l\'image' 
+                                            : 'Ajouter une image'}
+                                      </span>
+                                      <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        style={{ display: 'none' }} 
+                                        onChange={handleCategoryPhotoUpload}
+                                        disabled={uploadingCatImage}
+                                      />
+                                    </label>
+                                    <span style={{ fontSize: '0.71rem', color: '#64748b' }}>
+                                      {editingCategory.image ? 'Image personnalisée active pour cette catégorie' : 'Aucune image (utilise la couverture d\'un livre)'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                                  {categoryImages[cat] ? (
+                                    <img
+                                      src={categoryImages[cat]}
+                                      alt={cat}
+                                      style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '6px',
+                                        objectFit: 'cover',
+                                        flexShrink: 0,
+                                        border: '1px solid #cbd5e1'
+                                      }}
+                                    />
+                                  ) : (
+                                    <i className="fas fa-folder" style={{ color: '#fe2c55', fontSize: '0.92rem', flexShrink: 0 }} />
+                                  )}
+                                  <span
+                                    style={{
+                                      fontWeight: 700,
+                                      color: '#1e293b',
+                                      fontSize: '0.9rem',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}
+                                    title={cat}
+                                  >
+                                    {cat}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingCategory({ oldName: cat, value: cat, image: categoryImages[cat] || '' })}
+                                    className="btn-light-custom"
+                                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px' }}
+                                    title="Modifier cette catégorie"
+                                  >
+                                    <i className="fas fa-edit" style={{ color: '#3b82f6' }} /> Modifier
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCategory(cat)}
+                                    className="btn-light-custom"
+                                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', color: '#ef4444' }}
+                                    title="Supprimer cette catégorie"
+                                  >
+                                    <i className="fas fa-trash-alt" />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
+          )}
 
-            {/* Carte 2 : Langues */}
-            <div className="admin-card">
-              <div className="card-header-custom" style={{ borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4>
-                  <i className="fas fa-globe" style={{ color: '#209f84', marginRight: '0.5rem' }} />
-                  Langues des Livres
-                </h4>
-                <span className="badge-custom bg-soft-info">
-                  {languagesList.length} langues
+          {/* FENÊTRE 2 : LANGUES DES LIVRES (Full Width) */}
+          {attributeTab === 'languages' && (
+            <div className="admin-card" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+              <div
+                className="card-header-custom"
+                style={{
+                  borderBottom: '1px solid #f0f0f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                  padding: '1.25rem 1.5rem',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                <div>
+                  <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.15rem', fontWeight: 800, color: '#111827' }}>
+                    <i className="fas fa-globe" style={{ color: '#209f84' }} />
+                    Langues des Livres
+                  </h4>
+                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                    Gérer les langues disponibles pour les livres et éditions
+                  </p>
+                </div>
+                <span className="badge-custom bg-soft-info" style={{ fontWeight: 800, fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}>
+                  {languagesList.length} langues configurées
                 </span>
               </div>
-              <div className="card-body-custom" style={{ padding: '1.5rem' }}>
-                {/* Formulaire d'ajout inline */}
-                <form onSubmit={handleAddLanguage} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    placeholder="Nouvelle langue (ex: Espagnol, Italien...)"
-                    value={newLangInput}
-                    onChange={(e) => setNewLangInput(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    type="submit"
-                    className="btn-primary-custom"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', padding: '0.65rem 1.15rem' }}
-                  >
-                    <i className="fas fa-plus" /> Ajouter
-                  </button>
-                </form>
 
-                {/* Liste des langues avec Modifier et Supprimer */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  {languagesList.map((lang) => (
+              <div className="card-body-custom" style={{ padding: '1.5rem' }}>
+                {/* Barre d'action : Formulaire d'ajout rapide + Barre de recherche */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#f8fafc',
+                    padding: '1.25rem',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0'
+                  }}
+                >
+                  <form
+                    onSubmit={handleAddLanguage}
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      flex: 1,
+                      minWidth: '300px'
+                    }}
+                  >
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      placeholder="Nouvelle langue (ex: Espagnol, Italien, Allemand...)"
+                      value={newLangInput}
+                      onChange={(e) => setNewLangInput(e.target.value)}
+                      style={{ flex: 1, minWidth: '220px' }}
+                    />
+                    <button
+                      type="submit"
+                      className="btn-primary-custom"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        whiteSpace: 'nowrap',
+                        padding: '0.65rem 1.25rem',
+                        fontWeight: 700
+                      }}
+                    >
+                      <i className="fas fa-plus" /> Ajouter Langue
+                    </button>
+                  </form>
+
+                  {/* Recherche rapide */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
+                    <i
+                      className="fas fa-search"
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#94a3b8',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      placeholder="Rechercher une langue..."
+                      value={languageSearch}
+                      onChange={(e) => setLanguageSearch(e.target.value)}
+                      style={{ paddingLeft: '2.2rem', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Grille responsive des langues */}
+                {(() => {
+                  const filteredLangs = languagesList.filter((lang) =>
+                    !languageSearch || lang.toLowerCase().includes(languageSearch.toLowerCase())
+                  );
+
+                  if (filteredLangs.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+                        <i className="fas fa-language" style={{ fontSize: '2.5rem', marginBottom: '0.75rem', display: 'block', opacity: 0.4 }} />
+                        <p style={{ margin: 0, fontWeight: 600 }}>Aucune langue ne correspond à "{languageSearch}".</p>
+                      </div>
+                    );
+                  }
+
+                  return (
                     <div
-                      key={lang}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: '0.75rem'
+                      }}
+                    >
+                      {filteredLangs.map((lang) => {
+                        const isEditing = editingLanguage?.oldName === lang;
+
+                        return (
+                          <div
+                            key={lang}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              backgroundColor: isEditing ? '#f0fdf4' : '#ffffff',
+                              border: isEditing ? '1.5px solid #209f84' : '1px solid #e2e8f0',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {isEditing ? (
+                              <div style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  className="form-control-custom"
+                                  value={editingLanguage.value}
+                                  onChange={(e) => setEditingLanguage({ ...editingLanguage, value: e.target.value })}
+                                  style={{ flex: 1, padding: '0.4rem 0.65rem', fontSize: '0.88rem' }}
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  className="btn-primary-custom"
+                                  onClick={() => handleSaveEditLanguage(lang, editingLanguage.value)}
+                                  style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                                  title="Enregistrer"
+                                >
+                                  <i className="fas fa-check" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-light-custom"
+                                  onClick={() => setEditingLanguage(null)}
+                                  style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                                  title="Annuler"
+                                >
+                                  <i className="fas fa-times" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                                  <i className="fas fa-language" style={{ color: '#209f84', fontSize: '1.1rem', flexShrink: 0 }} />
+                                  <span
+                                    style={{
+                                      fontWeight: 700,
+                                      color: '#1e293b',
+                                      fontSize: '0.9rem',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}
+                                    title={lang}
+                                  >
+                                    {lang}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingLanguage({ oldName: lang, value: lang })}
+                                    className="btn-light-custom"
+                                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px' }}
+                                    title="Modifier cette langue"
+                                  >
+                                    <i className="fas fa-edit" style={{ color: '#3b82f6' }} /> Modifier
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteLanguage(lang)}
+                                    className="btn-light-custom"
+                                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', color: '#ef4444' }}
+                                    title="Supprimer cette langue"
+                                  >
+                                    <i className="fas fa-trash-alt" />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* FENÊTRE 3 : WILAYAS D'ALGÉRIE & FRAIS DE LIVRAISON (Full Width) */}
+          {attributeTab === 'wilayas' && (
+            <div className="admin-card" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+              <div
+                className="card-header-custom"
+                style={{
+                  borderBottom: '1px solid #f0f0f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                  padding: '1.25rem 1.5rem',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                <div>
+                  <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.15rem', fontWeight: 800, color: '#111827' }}>
+                    <i className="fas fa-truck-moving" style={{ color: '#0284c7' }} />
+                    Wilayas d'Algérie & Tarifs de Livraison
+                  </h4>
+                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                    Ajouter, modifier ou supprimer des wilayas et personnaliser le prix de livraison spécifique pour chacune
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span className="badge-custom bg-soft-info" style={{ fontWeight: 800, fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}>
+                    <i className="fas fa-map-marker-alt" style={{ marginRight: '0.35rem' }} />
+                    {wilayasList.length} wilayas configurées
+                  </span>
+                </div>
+              </div>
+
+              <div className="card-body-custom" style={{ padding: '1.5rem' }}>
+                {/* Barre d'action : Formulaire d'ajout rapide + Barre de recherche */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#f8fafc',
+                    padding: '1.25rem',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0'
+                  }}
+                >
+                  {/* Formulaire d'ajout rapide inline avec tarifs Bureau et Domicile */}
+                  <form
+                    onSubmit={handleAddWilaya}
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      flex: 1,
+                      minWidth: '320px'
+                    }}
+                  >
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      placeholder="Nom / Code wilaya (ex: 59 - Nouvelle Wilaya)"
+                      value={newWilayaNameInput}
+                      onChange={(e) => setNewWilayaNameInput(e.target.value)}
+                      style={{ flex: '1 1 200px', minWidth: '170px' }}
+                    />
+
+                    {/* Tarif Bureau */}
+                    <div
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '0.75rem 1rem',
+                        gap: '0.35rem',
+                        backgroundColor: '#ffffff',
+                        padding: '0.25rem 0.55rem',
                         borderRadius: '8px',
-                        backgroundColor: '#f9fafb',
-                        border: '1px solid #f0f0f0'
+                        border: '1px solid #bae6fd'
+                      }}
+                      title="Tarif de livraison retrait au bureau / agence (Stopdesk)"
+                    >
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                        <i className="fas fa-building" /> Bureau:
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="50"
+                        className="form-control-custom"
+                        placeholder="350"
+                        value={newWilayaBureauPriceInput}
+                        onChange={(e) => setNewWilayaBureauPriceInput(e.target.value)}
+                        style={{ width: '85px', padding: '0.25rem 0.4rem', fontSize: '0.88rem', fontWeight: 700, border: '1px solid #e2e8f0' }}
+                      />
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>DA</span>
+                    </div>
+
+                    {/* Tarif Domicile */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        backgroundColor: '#ffffff',
+                        padding: '0.25rem 0.55rem',
+                        borderRadius: '8px',
+                        border: '1px solid #bbf7d0'
+                      }}
+                      title="Tarif de livraison à domicile"
+                    >
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                        <i className="fas fa-home" /> Domicile:
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="50"
+                        className="form-control-custom"
+                        placeholder="500"
+                        value={newWilayaDomicilePriceInput}
+                        onChange={(e) => setNewWilayaDomicilePriceInput(e.target.value)}
+                        style={{ width: '85px', padding: '0.25rem 0.4rem', fontSize: '0.88rem', fontWeight: 700, border: '1px solid #e2e8f0' }}
+                      />
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>DA</span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn-primary-custom"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        whiteSpace: 'nowrap',
+                        padding: '0.65rem 1.25rem',
+                        fontWeight: 700
                       }}
                     >
-                      {editingLanguage?.oldName === lang ? (
-                        <div style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
-                          <input
-                            type="text"
-                            className="form-control-custom"
-                            value={editingLanguage.value}
-                            onChange={(e) => setEditingLanguage({ ...editingLanguage, value: e.target.value })}
-                            style={{ flex: 1, padding: '0.4rem 0.75rem', fontSize: '0.9rem' }}
-                            autoFocus
-                          />
-                          <button
-                            type="button"
-                            className="btn-primary-custom"
-                            onClick={() => handleSaveEditLanguage(lang, editingLanguage.value)}
-                            style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem' }}
-                            title="Enregistrer"
+                      <i className="fas fa-plus" /> Ajouter Wilaya
+                    </button>
+                  </form>
+
+                  {/* Recherche rapide */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
+                    <i
+                      className="fas fa-search"
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#94a3b8',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      placeholder="Filtrer par nom ou numéro..."
+                      value={wilayaSearch}
+                      onChange={(e) => setWilayaSearch(e.target.value)}
+                      style={{ paddingLeft: '2.2rem', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Grille des wilayas configurées */}
+                {(() => {
+                  const filteredWilayas = wilayasList.filter((w) =>
+                    !wilayaSearch ||
+                    (w.name || '').toLowerCase().includes(wilayaSearch.toLowerCase())
+                  );
+
+                  if (filteredWilayas.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+                        <i className="fas fa-map-marked-alt" style={{ fontSize: '2.5rem', marginBottom: '0.75rem', display: 'block', opacity: 0.4 }} />
+                        <p style={{ margin: 0, fontWeight: 600 }}>Aucune wilaya ne correspond à "{wilayaSearch}".</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+                        gap: '0.75rem',
+                        maxHeight: '620px',
+                        overflowY: 'auto',
+                        paddingRight: '0.25rem'
+                      }}
+                    >
+                      {filteredWilayas.map((wilaya) => {
+                        const bureauPrice = wilaya.price_bureau !== undefined ? wilaya.price_bureau : Math.max(250, (wilaya.price || 500) - 200);
+                        const domicilePrice = wilaya.price_domicile !== undefined ? wilaya.price_domicile : (wilaya.price || 500);
+
+                        return (
+                          <div
+                            key={wilaya.name}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '8px',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                              transition: 'all 0.15s ease'
+                            }}
                           >
-                            <i className="fas fa-check" />
-                          </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                              <i className="fas fa-map-marker-alt" style={{ color: '#0284c7', fontSize: '0.92rem', flexShrink: 0 }} />
+                              <span
+                                style={{
+                                  fontWeight: 700,
+                                  color: '#1e293b',
+                                  fontSize: '0.9rem',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}
+                                title={wilaya.name}
+                              >
+                                {wilaya.name}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                              {/* Badge Bureau */}
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '0.2rem 0.55rem',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#e0f2fe',
+                                  color: '#0369a1',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  border: '1px solid #bae6fd'
+                                }}
+                                title="Tarif retrait au bureau (Stopdesk)"
+                              >
+                                <i className="fas fa-building" style={{ fontSize: '0.7rem' }} /> {bureauPrice} DA
+                              </span>
+
+                              {/* Badge Domicile */}
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '0.2rem 0.55rem',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#f0fdf4',
+                                  color: '#16a34a',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  border: '1px solid #bbf7d0'
+                                }}
+                                title="Tarif livraison à domicile"
+                              >
+                                <i className="fas fa-home" style={{ fontSize: '0.7rem' }} /> {domicilePrice} DA
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => setEditingWilaya({
+                                  oldName: wilaya.name,
+                                  name: wilaya.name,
+                                  price_bureau: bureauPrice,
+                                  price_domicile: domicilePrice,
+                                  price: domicilePrice
+                                })}
+                                className="btn-light-custom"
+                                style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', cursor: 'pointer' }}
+                                title="Modifier les prix de livraison dans une fenêtre pop-up"
+                              >
+                                <i className="fas fa-edit" style={{ color: '#3b82f6' }} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteWilaya(wilaya.name)}
+                                className="btn-light-custom"
+                                style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', color: '#ef4444', cursor: 'pointer' }}
+                                title="Supprimer cette wilaya"
+                              >
+                                <i className="fas fa-trash-alt" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* POP-UP MODAL : MODIFIER LES PRIX DE LIVRAISON DE LA WILAYA */}
+                {editingWilaya && (
+                  <div
+                    style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                      backdropFilter: 'blur(4px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 99999,
+                      padding: '1rem'
+                    }}
+                    onClick={() => setEditingWilaya(null)}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: '16px',
+                        width: '100%',
+                        maxWidth: '480px',
+                        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+                        overflow: 'hidden',
+                        animation: 'fadeIn 0.2s ease-out'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* En-tête du Pop-up */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '1.25rem 1.5rem',
+                          borderBottom: '1px solid #f1f5f9',
+                          backgroundColor: '#f8fafc'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div
+                            style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '10px',
+                              backgroundColor: '#e0f2fe',
+                              color: '#0284c7',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '1.15rem'
+                            }}
+                          >
+                            <i className="fas fa-truck-moving" />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                              Modifier Tarifs de Livraison
+                            </h3>
+                            <p style={{ margin: '0.15rem 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                              Wilaya : <strong style={{ color: '#0284c7' }}>{editingWilaya.oldName}</strong>
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingWilaya(null)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '1.25rem',
+                            color: '#94a3b8',
+                            cursor: 'pointer',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '6px'
+                          }}
+                          title="Fermer"
+                        >
+                          <i className="fas fa-times" />
+                        </button>
+                      </div>
+
+                      {/* Corps du Pop-up */}
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleSaveEditWilaya(
+                            editingWilaya.oldName,
+                            editingWilaya.name,
+                            editingWilaya.price_bureau,
+                            editingWilaya.price_domicile
+                          );
+                        }}
+                      >
+                        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                          {/* Nom de la Wilaya */}
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.88rem', fontWeight: 700, color: '#334155', marginBottom: '0.45rem' }}>
+                              Nom / Numéro de la Wilaya *
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                              <i
+                                className="fas fa-map-marker-alt"
+                                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#0284c7' }}
+                              />
+                              <input
+                                type="text"
+                                className="form-control-custom"
+                                value={editingWilaya.name}
+                                onChange={(e) => setEditingWilaya({ ...editingWilaya, name: e.target.value })}
+                                required
+                                style={{ width: '100%', paddingLeft: '2.4rem', paddingRight: '0.9rem', paddingTop: '0.65rem', paddingBottom: '0.65rem', fontSize: '0.95rem' }}
+                                autoFocus
+                              />
+                            </div>
+                          </div>
+
+                          {/* Grille 2 colonnes pour les 2 tarifs */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            {/* Tarif Bureau (Stopdesk) */}
+                            <div
+                              style={{
+                                backgroundColor: '#f0f9ff',
+                                border: '1.5px solid #bae6fd',
+                                borderRadius: '10px',
+                                padding: '0.9rem'
+                              }}
+                            >
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.84rem', fontWeight: 800, color: '#0369a1', marginBottom: '0.45rem' }}>
+                                <i className="fas fa-building" /> Tarif Bureau (Stopdesk)
+                              </label>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="50"
+                                  className="form-control-custom"
+                                  value={editingWilaya.price_bureau}
+                                  onChange={(e) => setEditingWilaya({ ...editingWilaya, price_bureau: e.target.value })}
+                                  required
+                                  style={{ width: '100%', paddingRight: '2.4rem', paddingTop: '0.55rem', paddingBottom: '0.55rem', fontWeight: 700, fontSize: '0.95rem', backgroundColor: '#ffffff' }}
+                                />
+                                <span
+                                  style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    fontWeight: 700,
+                                    fontSize: '0.8rem',
+                                    color: '#64748b'
+                                  }}
+                                >
+                                  DA
+                                </span>
+                              </div>
+                              <small style={{ display: 'block', fontSize: '0.74rem', color: '#0284c7', marginTop: '0.35rem' }}>
+                                Retrait au bureau
+                              </small>
+                            </div>
+
+                            {/* Tarif Domicile */}
+                            <div
+                              style={{
+                                backgroundColor: '#f0fdf4',
+                                border: '1.5px solid #bbf7d0',
+                                borderRadius: '10px',
+                                padding: '0.9rem'
+                              }}
+                            >
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.84rem', fontWeight: 800, color: '#15803d', marginBottom: '0.45rem' }}>
+                                <i className="fas fa-home" /> Tarif Domicile
+                              </label>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="50"
+                                  className="form-control-custom"
+                                  value={editingWilaya.price_domicile}
+                                  onChange={(e) => setEditingWilaya({ ...editingWilaya, price_domicile: e.target.value })}
+                                  required
+                                  style={{ width: '100%', paddingRight: '2.4rem', paddingTop: '0.55rem', paddingBottom: '0.55rem', fontWeight: 700, fontSize: '0.95rem', backgroundColor: '#ffffff' }}
+                                />
+                                <span
+                                  style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    fontWeight: 700,
+                                    fontSize: '0.8rem',
+                                    color: '#64748b'
+                                  }}
+                                >
+                                  DA
+                                </span>
+                              </div>
+                              <small style={{ display: 'block', fontSize: '0.74rem', color: '#16a34a', marginTop: '0.35rem' }}>
+                                Livraison à domicile
+                              </small>
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              padding: '0.75rem 1rem',
+                              backgroundColor: '#f8fafc',
+                              borderRadius: '8px',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.82rem',
+                              color: '#64748b',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem'
+                            }}
+                          >
+                            <i className="fas fa-info-circle text-primary" />
+                            <span>Ces tarifs seront appliqués automatiquement lors du paiement de commande pour cette wilaya.</span>
+                          </div>
+                        </div>
+
+                        {/* Pied du Pop-up */}
+                        <div
+                          style={{
+                            padding: '1rem 1.5rem',
+                            borderTop: '1px solid #f1f5f9',
+                            backgroundColor: '#f8fafc',
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '0.75rem'
+                          }}
+                        >
                           <button
                             type="button"
                             className="btn-light-custom"
-                            onClick={() => setEditingLanguage(null)}
-                            style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem' }}
-                            title="Annuler"
+                            onClick={() => setEditingWilaya(null)}
+                            style={{ padding: '0.65rem 1.25rem', fontSize: '0.9rem', cursor: 'pointer' }}
                           >
-                            <i className="fas fa-times" />
+                            Annuler
+                          </button>
+                          <button
+                            type="submit"
+                            className="btn-primary-custom"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              padding: '0.65rem 1.5rem',
+                              fontSize: '0.9rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <i className="fas fa-check" /> Enregistrer les Tarifs
                           </button>
                         </div>
-                      ) : (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                            <i className="fas fa-language" style={{ color: '#9ca3af', fontSize: '0.9rem' }} />
-                            <span style={{ fontWeight: 600, color: '#18181b', fontSize: '0.92rem' }}>{lang}</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <button
-                              type="button"
-                              onClick={() => setEditingLanguage({ oldName: lang, value: lang })}
-                              className="btn-light-custom"
-                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', borderRadius: '6px' }}
-                              title="Modifier cette langue"
-                            >
-                              <i className="fas fa-edit" style={{ color: '#3b82f6' }} /> Modifier
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteLanguage(lang)}
-                              className="btn-light-custom"
-                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', borderRadius: '6px', color: '#ef4444' }}
-                              title="Supprimer cette langue"
-                            >
-                              <i className="fas fa-trash-alt" />
-                            </button>
-                          </div>
-                        </>
-                      )}
+                      </form>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
         </div>
       ) : viewMode === 'form' ? (
         <div>
@@ -950,10 +2178,10 @@ export default function AdminProducts() {
             </div>
           )}
 
-          {/* Layout Principal : Formulaire à gauche (2/3) + Aperçu en direct à droite (1/3) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+          {/* Layout Principal : Formulaire à gauche + Aperçu en direct à droite (Plein écran) */}
+          <div className="product-form-layout">
             {/* Colonne Formulaire */}
-            <div className="admin-card" style={{ flex: 2 }}>
+            <div className="admin-card" style={{ overflow: 'visible', position: 'relative' }}>
               <div className="card-header-custom" style={{ borderBottom: '1px solid #f0f0f0' }}>
                 <h4>
                   <i className="flaticon-381-box" style={{ color: '#111111', marginRight: '0.5rem' }} />
@@ -964,7 +2192,7 @@ export default function AdminProducts() {
                 </span>
               </div>
 
-              <div className="card-body-custom" style={{ padding: '1.5rem' }}>
+              <div className="card-body-custom" style={{ padding: '1.5rem', overflow: 'visible' }}>
                 <form onSubmit={handleSubmit}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
                     {/* Nom */}
@@ -992,11 +2220,16 @@ export default function AdminProducts() {
                       />
                     </div>
 
-                    {/* Catégories du Livre (Sélection par Cases à Cocher / Checkboxes) */}
-                    <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
+                    {/* Catégories du Livre (Dropdown Sélecteur Recherchable) */}
+                    <div
+                      ref={formCatDropdownRef}
+                      className="form-group-custom"
+                      style={{ gridColumn: '1 / -1', position: 'relative' }}
+                    >
+                      {/* Header with Title and Manage link */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <label className="form-label-custom" style={{ margin: 0 }}>Catégorie(s) du Livre</label>
+                          <label className="form-label-custom" style={{ margin: 0 }}>Catégorie(s) du Livre *</label>
                           {(() => {
                             const currentCats = Array.isArray(formData.categories) && formData.categories.length > 0
                               ? formData.categories
@@ -1063,63 +2296,279 @@ export default function AdminProducts() {
                         </div>
                       </div>
 
-                      {/* Liste directe des Checkboxes (Sans aucun Dropdown) */}
-                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
-                        {categoriesList.map((cat) => {
-                          const currentCats = Array.isArray(formData.categories) && formData.categories.length > 0
-                            ? formData.categories
-                            : (formData.category ? formData.category.split(',').map((s) => s.trim()).filter(Boolean) : []);
-                          const isSelected = currentCats.includes(cat);
+                      {/* Dropdown Trigger Box */}
+                      {(() => {
+                        const currentCats = Array.isArray(formData.categories) && formData.categories.length > 0
+                          ? formData.categories
+                          : (formData.category ? formData.category.split(',').map((s) => s.trim()).filter(Boolean) : []);
 
-                          return (
-                            <button
-                              key={cat}
-                              type="button"
-                              onClick={() => toggleCategory(cat)}
+                        return (
+                          <>
+                            <div
+                              onClick={() => setIsFormCatDropdownOpen((prev) => !prev)}
                               style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.6rem',
-                                padding: '0.65rem 1.15rem',
-                                borderRadius: '8px',
-                                border: isSelected ? '2px solid #111111' : '1px solid #d4d4d8',
-                                backgroundColor: isSelected ? '#111111' : '#ffffff',
-                                color: isSelected ? '#ffffff' : '#374151',
-                                fontWeight: isSelected ? 600 : 500,
-                                fontSize: '0.88rem',
+                                minHeight: '48px',
+                                padding: '0.45rem 0.85rem',
+                                borderRadius: '10px',
+                                border: isFormCatDropdownOpen ? '1.5px solid #111111' : '1px solid #d4d4d8',
+                                backgroundColor: '#ffffff',
                                 cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                boxShadow: isSelected ? '0 2px 5px rgba(0,0,0,0.1)' : 'none'
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.75rem',
+                                boxShadow: isFormCatDropdownOpen ? '0 0 0 3px rgba(0,0,0,0.06)' : '0 1px 2px rgba(0,0,0,0.03)',
+                                transition: 'all 0.18s ease'
                               }}
                             >
-                              <span
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center', flex: 1 }}>
+                                {currentCats.length === 0 ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#888', fontSize: '0.88rem' }}>
+                                    <i className="fas fa-tags" style={{ color: '#a1a1aa' }} />
+                                    <span>Sélectionner une ou plusieurs catégories dans la liste déroulante...</span>
+                                  </div>
+                                ) : (
+                                  currentCats.map((cat) => (
+                                    <span
+                                      key={cat}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        padding: '0.3rem 0.65rem',
+                                        borderRadius: '6px',
+                                        backgroundColor: '#111111',
+                                        color: '#ffffff',
+                                        fontSize: '0.82rem',
+                                        fontWeight: 600,
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleCategory(cat);
+                                      }}
+                                    >
+                                      <span>{cat}</span>
+                                      <i
+                                        className="fas fa-times"
+                                        style={{ fontSize: '0.72rem', opacity: 0.85, cursor: 'pointer' }}
+                                        title="Retirer"
+                                      />
+                                    </span>
+                                  ))
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                                <i
+                                  className={`fas fa-chevron-${isFormCatDropdownOpen ? 'up' : 'down'}`}
+                                  style={{ fontSize: '0.85rem', color: '#71717a' }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Dropdown Menu Popover */}
+                            {isFormCatDropdownOpen && (
+                              <div
                                 style={{
-                                  width: '18px',
-                                  height: '18px',
-                                  borderRadius: '4px',
-                                  border: isSelected ? '1.5px solid #34d399' : '1.5px solid #9ca3af',
-                                  backgroundColor: isSelected ? '#34d399' : '#ffffff',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '0.7rem',
-                                  color: '#111111',
-                                  fontWeight: 900,
-                                  transition: 'all 0.15s ease'
+                                  position: 'absolute',
+                                  top: 'calc(100% + 6px)',
+                                  left: 0,
+                                  width: '100%',
+                                  backgroundColor: '#ffffff',
+                                  border: '1px solid #e4e4e7',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 14px 40px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.06)',
+                                  zIndex: 1050,
+                                  overflow: 'hidden'
                                 }}
                               >
-                                {isSelected && <i className="fas fa-check" />}
-                              </span>
-                              <span>{cat}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                                {/* Search input inside dropdown */}
+                                <div
+                                  style={{
+                                    padding: '0.75rem',
+                                    borderBottom: '1px solid #f4f4f5',
+                                    backgroundColor: '#fafafa',
+                                    position: 'relative'
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <i
+                                    className="fas fa-search"
+                                    style={{
+                                      position: 'absolute',
+                                      left: '1.25rem',
+                                      top: '50%',
+                                      transform: 'translateY(-50%)',
+                                      color: '#a1a1aa',
+                                      fontSize: '0.85rem'
+                                    }}
+                                  />
+                                  <input
+                                    ref={formCatSearchInputRef}
+                                    type="text"
+                                    placeholder="Rechercher une catégorie..."
+                                    value={formCatSearchQuery}
+                                    onChange={(e) => setFormCatSearchQuery(e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '0.55rem 2rem 0.55rem 2.2rem',
+                                      fontSize: '0.86rem',
+                                      border: '1px solid #e4e4e7',
+                                      borderRadius: '8px',
+                                      backgroundColor: '#ffffff',
+                                      outline: 'none',
+                                      boxSizing: 'border-box'
+                                    }}
+                                  />
+                                  {formCatSearchQuery && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setFormCatSearchQuery('')}
+                                      style={{
+                                        position: 'absolute',
+                                        right: '1.25rem',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: '#a1a1aa'
+                                      }}
+                                    >
+                                      <i className="fas fa-times" />
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Header info */}
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    padding: '0.45rem 0.85rem',
+                                    backgroundColor: '#ffffff',
+                                    borderBottom: '1px solid #f4f4f5',
+                                    fontSize: '0.75rem',
+                                    color: '#71717a'
+                                  }}
+                                >
+                                  <span>{filteredFormCategories.length} catégories disponibles</span>
+                                  {currentCats.length > 0 && (
+                                    <span style={{ color: '#2563eb', fontWeight: 600 }}>
+                                      {currentCats.length} cochée{currentCats.length > 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Scrollable categories checkbox list */}
+                                <div style={{ maxHeight: '260px', overflowY: 'auto', padding: '0.4rem' }}>
+                                  {filteredFormCategories.length === 0 ? (
+                                    <div style={{ padding: '1.5rem', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
+                                      <i className="fas fa-search" style={{ display: 'block', fontSize: '1.25rem', marginBottom: '0.5rem', color: '#d4d4d8' }} />
+                                      Aucune catégorie ne correspond à « {formCatSearchQuery} »
+                                    </div>
+                                  ) : (
+                                    filteredFormCategories.map((cat) => {
+                                      const isSelected = currentCats.includes(cat);
+                                      return (
+                                        <div
+                                          key={cat}
+                                          onClick={() => toggleCategory(cat)}
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '0.55rem 0.75rem',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            backgroundColor: isSelected ? '#f4f4f5' : 'transparent',
+                                            transition: 'background-color 0.12s ease',
+                                            marginBottom: '2px'
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            if (!isSelected) e.currentTarget.style.backgroundColor = '#fafafa';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                            <span
+                                              style={{
+                                                width: '18px',
+                                                height: '18px',
+                                                borderRadius: '4px',
+                                                border: isSelected ? '1.5px solid #111111' : '1.5px solid #d4d4d8',
+                                                backgroundColor: isSelected ? '#111111' : '#ffffff',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '0.68rem',
+                                                color: '#ffffff',
+                                                transition: 'all 0.15s ease'
+                                              }}
+                                            >
+                                              {isSelected && <i className="fas fa-check" />}
+                                            </span>
+                                            <span style={{ fontSize: '0.86rem', fontWeight: isSelected ? 600 : 400, color: '#18181b' }}>
+                                              {cat}
+                                            </span>
+                                          </div>
+                                          {isSelected && (
+                                            <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
+                                              Sélectionné
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                </div>
+
+                                {/* Footer bar */}
+                                <div
+                                  style={{
+                                    padding: '0.5rem 0.85rem',
+                                    borderTop: '1px solid #f4f4f5',
+                                    backgroundColor: '#fafafa',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <span style={{ fontSize: '0.78rem', color: '#71717a' }}>
+                                    {currentCats.length} catégorie{currentCats.length > 1 ? 's' : ''} choisie{currentCats.length > 1 ? 's' : ''}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsFormCatDropdownOpen(false)}
+                                    style={{
+                                      padding: '0.4rem 0.95rem',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 600,
+                                      backgroundColor: '#111111',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Fermer
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
-                    {/* Prix */}
+                    {/* Prix de Vente */}
                     <div className="form-group-custom">
-                      <label className="form-label-custom">Prix (en DA) *</label>
+                      <label className="form-label-custom">Prix de Vente (en DA) *</label>
                       <input
                         type="number"
                         step="50"
@@ -1129,6 +2578,24 @@ export default function AdminProducts() {
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         required
                       />
+                    </div>
+
+                    {/* Prix d'Achat */}
+                    <div className="form-group-custom">
+                      <label className="form-label-custom">Prix d'Achat (en DA)</label>
+                      <input
+                        type="number"
+                        step="50"
+                        className="form-control-custom"
+                        placeholder="Ex: 1800"
+                        value={formData.purchase_price}
+                        onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
+                      />
+                      {formData.price && formData.purchase_price && Number(formData.price) > Number(formData.purchase_price) && (
+                        <div style={{ fontSize: '0.74rem', color: '#16a34a', marginTop: '4px', fontWeight: 600 }}>
+                          Marge: +{(Number(formData.price) - Number(formData.purchase_price)).toLocaleString()} DA ({Math.round(((Number(formData.price) - Number(formData.purchase_price)) / Number(formData.price)) * 100)}%)
+                        </div>
+                      )}
                     </div>
 
                     {/* Stock */}
@@ -1737,7 +3204,7 @@ export default function AdminProducts() {
             </div>
 
             {/* Colonne Aperçu en Direct */}
-            <div className="admin-card" style={{ maxWidth: '380px', position: 'sticky', top: '90px' }}>
+            <div className="admin-card product-preview-card">
               <div className="card-header-custom" style={{ borderBottom: '1px solid #f0f0f0' }}>
                 <h4>Aperçu de la Fiche</h4>
                 <span className="badge-custom bg-soft-info">Live</span>
@@ -1818,27 +3285,45 @@ export default function AdminProducts() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '1rem',
-                    padding: '0.75rem',
+                    gap: '0.85rem',
+                    padding: '0.75rem 0.5rem',
                     backgroundColor: '#fafafa',
                     borderRadius: '8px',
-                    marginBottom: '1rem'
+                    marginBottom: '0.75rem'
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: '0.72rem', color: '#999', textTransform: 'uppercase' }}>Prix Vente</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#111111' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#999', textTransform: 'uppercase' }}>Prix Vente</div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#111111' }}>
                       {formData.price ? Number(formData.price).toLocaleString() : '0'} DA
                     </div>
                   </div>
-                  <div style={{ width: '1px', height: '30px', backgroundColor: '#e0e0e0' }} />
+                  {formData.purchase_price && Number(formData.purchase_price) > 0 ? (
+                    <>
+                      <div style={{ width: '1px', height: '28px', backgroundColor: '#e0e0e0' }} />
+                      <div>
+                        <div style={{ fontSize: '0.7rem', color: '#999', textTransform: 'uppercase' }}>Prix Achat</div>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#475569' }}>
+                          {Number(formData.purchase_price).toLocaleString()} DA
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+                  <div style={{ width: '1px', height: '28px', backgroundColor: '#e0e0e0' }} />
                   <div>
-                    <div style={{ fontSize: '0.72rem', color: '#999', textTransform: 'uppercase' }}>Disponibilité</div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 600, color: Number(formData.stock) > 0 ? '#209f84' : '#f72b50' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#999', textTransform: 'uppercase' }}>Disponibilité</div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 600, color: Number(formData.stock) > 0 ? '#209f84' : '#f72b50' }}>
                       {formData.stock || 0} en stock
                     </div>
                   </div>
                 </div>
+
+                {formData.price && formData.purchase_price && Number(formData.price) > Number(formData.purchase_price) ? (
+                  <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700, marginBottom: '0.8rem', background: '#f0fdf4', padding: '0.35rem 0.75rem', borderRadius: '6px', border: '1px solid #bbf7d0', display: 'inline-block' }}>
+                    <i className="fas fa-chart-line" style={{ marginRight: '4px' }} />
+                    Marge brute : +{(Number(formData.price) - Number(formData.purchase_price)).toLocaleString()} DA / unité
+                  </div>
+                ) : null}
 
                 {formData.bio && (
                   <p
@@ -1907,7 +3392,8 @@ export default function AdminProducts() {
           </div>
 
           {/* Filter / Search Bar */}
-          <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
+          {/* Filter / Search Bar */}
+          <div className="admin-card" style={{ marginBottom: '1.5rem', overflow: 'visible', position: 'relative', zIndex: 20 }}>
             <div
               className="card-body-custom"
               style={{
@@ -1916,11 +3402,13 @@ export default function AdminProducts() {
                 flexWrap: 'wrap',
                 gap: '1rem',
                 alignItems: 'center',
-                justifyContent: 'space-between'
+                justifyContent: 'space-between',
+                overflow: 'visible'
               }}
             >
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: 1, minWidth: '260px' }}>
-                <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
+              {/* Left: Search input by title / author */}
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: '1 1 280px', maxWidth: '420px' }}>
+                <div style={{ position: 'relative', width: '100%' }}>
                   <i
                     className="flaticon-381-search-2"
                     style={{
@@ -1957,44 +3445,297 @@ export default function AdminProducts() {
                 )}
               </div>
 
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '0.45rem',
-                  flexWrap: 'wrap',
-                  maxHeight: '130px',
-                  overflowY: 'auto',
-                  padding: '0.5rem',
-                  borderRadius: '12px',
-                  backgroundColor: '#f8f9fa',
-                  border: '1px solid #ebebeb'
-                }}
-              >
-                {categoriesForFilter.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategory(cat);
-                      setCurrentPage(1);
-                    }}
+              {/* Right: Searchable Select for Categories */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                {/* Active filter badge if category is selected */}
+                {selectedCategory !== 'Tous' && (
+                  <div
                     style={{
-                      padding: '0.4rem 0.85rem',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      padding: '0.45rem 0.85rem',
+                      backgroundColor: '#fff1f2',
+                      border: '1px solid #fecdd3',
                       borderRadius: '50px',
-                      border: '1px solid',
-                      borderColor: selectedCategory === cat ? '#111111' : '#e0e0e0',
-                      backgroundColor: selectedCategory === cat ? '#111111' : '#ffffff',
-                      color: selectedCategory === cat ? '#ffffff' : '#444',
-                      cursor: 'pointer',
-                      transition: 'all 0.18s ease',
-                      boxShadow: selectedCategory === cat ? '0 2px 6px rgba(0,0,0,0.2)' : '0 1px 2px rgba(0,0,0,0.03)'
+                      fontSize: '0.82rem',
+                      color: '#be123c',
+                      fontWeight: 600
                     }}
                   >
-                    {cat}
+                    <span>Filtre: {selectedCategory}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategory('Tous');
+                        setCurrentPage(1);
+                      }}
+                      title="Réinitialiser la catégorie"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#be123c',
+                        padding: '0 2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <i className="fas fa-times" />
+                    </button>
+                  </div>
+                )}
+
+                {/* The Searchable Select Combobox */}
+                <div ref={catDropdownRef} style={{ position: 'relative', minWidth: '280px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsCatDropdownOpen((prev) => !prev)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem',
+                      padding: '0.65rem 1rem',
+                      backgroundColor: '#ffffff',
+                      border: isCatDropdownOpen ? '1.5px solid #111111' : '1px solid #d4d4d8',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontSize: '0.88rem',
+                      color: '#18181b',
+                      fontWeight: 500,
+                      boxShadow: isCatDropdownOpen ? '0 0 0 3px rgba(0,0,0,0.06)' : '0 1px 2px rgba(0,0,0,0.04)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <i
+                        className="fas fa-layer-group"
+                        style={{
+                          color: selectedCategory !== 'Tous' ? '#fe2c55' : '#71717a',
+                          fontSize: '0.95rem'
+                        }}
+                      />
+                      <span style={{ fontWeight: selectedCategory !== 'Tous' ? 600 : 500, color: selectedCategory !== 'Tous' ? '#111111' : '#52525b' }}>
+                        {selectedCategory === 'Tous' ? 'Toutes les catégories' : selectedCategory}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                      <span
+                        style={{
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          backgroundColor: selectedCategory !== 'Tous' ? '#fe2c55' : '#f4f4f5',
+                          color: selectedCategory !== 'Tous' ? '#ffffff' : '#71717a',
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: '12px'
+                        }}
+                      >
+                        {selectedCategory === 'Tous'
+                          ? products.length
+                          : (categoryCounts[selectedCategory] || 0)}
+                      </span>
+                      <i
+                        className={`fas fa-chevron-${isCatDropdownOpen ? 'up' : 'down'}`}
+                        style={{ fontSize: '0.75rem', color: '#a1a1aa' }}
+                      />
+                    </div>
                   </button>
-                ))}
+
+                  {/* Dropdown Menu */}
+                  {isCatDropdownOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 6px)',
+                        right: 0,
+                        width: '330px',
+                        maxWidth: '90vw',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e4e4e7',
+                        borderRadius: '12px',
+                        boxShadow: '0 14px 38px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)',
+                        zIndex: 1050,
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {/* Search Input inside Dropdown */}
+                      <div
+                        style={{
+                          padding: '0.75rem',
+                          borderBottom: '1px solid #f4f4f5',
+                          backgroundColor: '#fafafa',
+                          position: 'relative'
+                        }}
+                      >
+                        <i
+                          className="fas fa-search"
+                          style={{
+                            position: 'absolute',
+                            left: '1.25rem',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            color: '#a1a1aa',
+                            fontSize: '0.85rem'
+                          }}
+                        />
+                        <input
+                          ref={catSearchInputRef}
+                          type="text"
+                          placeholder="Rechercher une catégorie..."
+                          value={catSearchQuery}
+                          onChange={(e) => setCatSearchQuery(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem 2rem 0.5rem 2.2rem',
+                            fontSize: '0.84rem',
+                            border: '1px solid #e4e4e7',
+                            borderRadius: '8px',
+                            backgroundColor: '#ffffff',
+                            outline: 'none',
+                            color: '#18181b',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                        {catSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setCatSearchQuery('')}
+                            style={{
+                              position: 'absolute',
+                              right: '1.25rem',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: '#a1a1aa',
+                              padding: '2px 5px',
+                              fontSize: '0.8rem'
+                            }}
+                          >
+                            <i className="fas fa-times" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Header info */}
+                      <div
+                        style={{
+                          padding: '0.4rem 0.85rem',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          color: '#a1a1aa',
+                          backgroundColor: '#ffffff',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <span>Catégories ({filteredCategoriesForSelect.length})</span>
+                        {selectedCategory !== 'Tous' && (
+                          <span
+                            onClick={() => {
+                              setSelectedCategory('Tous');
+                              setCurrentPage(1);
+                              setIsCatDropdownOpen(false);
+                            }}
+                            style={{ color: '#fe2c55', cursor: 'pointer', textTransform: 'none' }}
+                          >
+                            Réinitialiser
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Category Options List */}
+                      <div
+                        style={{
+                          maxHeight: '260px',
+                          overflowY: 'auto',
+                          padding: '0.35rem'
+                        }}
+                      >
+                        {filteredCategoriesForSelect.length === 0 ? (
+                          <div style={{ padding: '1.5rem', textAlign: 'center', color: '#71717a', fontSize: '0.85rem' }}>
+                            <i className="fas fa-search" style={{ display: 'block', fontSize: '1.25rem', marginBottom: '0.5rem', color: '#d4d4d8' }} />
+                            Aucune catégorie ne correspond à « {catSearchQuery} »
+                          </div>
+                        ) : (
+                          filteredCategoriesForSelect.map((cat) => {
+                            const isSelected = selectedCategory === cat;
+                            const count = cat === 'Tous' ? products.length : (categoryCounts[cat] || 0);
+
+                            return (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCategory(cat);
+                                  setCurrentPage(1);
+                                  setIsCatDropdownOpen(false);
+                                  setCatSearchQuery('');
+                                }}
+                                style={{
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '0.55rem 0.75rem',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  backgroundColor: isSelected ? '#111111' : 'transparent',
+                                  color: isSelected ? '#ffffff' : '#27272a',
+                                  cursor: 'pointer',
+                                  fontSize: '0.84rem',
+                                  fontWeight: isSelected ? 600 : 400,
+                                  textAlign: 'left',
+                                  transition: 'background-color 0.12s ease',
+                                  marginBottom: '2px'
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelected) e.currentTarget.style.backgroundColor = '#f4f4f5';
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {cat === 'Tous' ? (
+                                    <i className="fas fa-border-all" style={{ fontSize: '0.8rem', color: isSelected ? '#ffffff' : '#71717a' }} />
+                                  ) : null}
+                                  {cat === 'Tous' ? 'Toutes les catégories' : cat}
+                                </span>
+
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                                  <span
+                                    style={{
+                                      fontSize: '0.72rem',
+                                      padding: '0.1rem 0.45rem',
+                                      borderRadius: '10px',
+                                      backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : '#f4f4f5',
+                                      color: isSelected ? '#ffffff' : '#71717a',
+                                      fontWeight: 600
+                                    }}
+                                  >
+                                    {count}
+                                  </span>
+                                  {isSelected && (
+                                    <i className="fas fa-check" style={{ fontSize: '0.75rem', color: '#34d399' }} />
+                                  )}
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -2089,9 +3830,19 @@ export default function AdminProducts() {
                             })()}
                           </td>
                           <td>
-                            <strong style={{ fontSize: '1rem', color: '#111111' }}>
+                            <strong style={{ fontSize: '0.96rem', color: '#111111' }}>
                               {Number(p.price).toLocaleString()} DA
                             </strong>
+                            {p.purchase_price !== undefined && p.purchase_price !== null && Number(p.purchase_price) > 0 ? (
+                              <div style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '2px' }}>
+                                Achat: <span style={{ color: '#475569', fontWeight: 600 }}>{Number(p.purchase_price).toLocaleString()} DA</span>
+                                {Number(p.price) > Number(p.purchase_price) && (
+                                  <span style={{ color: '#16a34a', fontWeight: 600, marginLeft: '4px' }}>
+                                    (+{(Number(p.price) - Number(p.purchase_price)).toLocaleString()} DA)
+                                  </span>
+                                )}
+                              </div>
+                            ) : null}
                           </td>
                           <td>
                             {stockNum > 10 ? (

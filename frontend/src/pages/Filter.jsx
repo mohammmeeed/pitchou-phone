@@ -63,7 +63,10 @@ const Filter = () => {
     return combined.filter((l) => l && l.trim() !== '');
   }, [allProducts, defaultLanguages]);
 
-  // État des sélections
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return activeFilters.search || '';
+  });
+
   const [selectedCategories, setSelectedCategories] = useState(() => {
     if (Array.isArray(activeFilters.categories) && activeFilters.categories.length > 0) {
       return activeFilters.categories;
@@ -98,24 +101,137 @@ const Filter = () => {
     );
   };
 
-  const handleApply = () => {
+  const [isClearing, setIsClearing] = useState(false);
+
+  const handleClearFilters = () => {
+    setIsClearing(true);
+    setSearchQuery('');
+    setSelectedCategories([]);
+    setSelectedLanguages([]);
+    setPriceRange(6000);
     if (setActiveFilters) {
       setActiveFilters({
+        search: '',
+        categories: [],
+        languages: [],
+        maxPrice: 6000
+      });
+    }
+    if (datingCtx?.resetCards) {
+      datingCtx.resetCards();
+    }
+    setTimeout(() => {
+      setIsClearing(false);
+    }, 400);
+  };
+
+  const handleApply = () => {
+    if (datingCtx?.resetCards) {
+      datingCtx.resetCards();
+    }
+    if (setActiveFilters) {
+      setActiveFilters({
+        search: searchQuery.trim(),
         categories: selectedCategories,
         languages: selectedLanguages,
         maxPrice: Number(priceRange)
       });
     }
-    navigate('/home');
+    navigate('/');
   };
 
   return (
     <div className="page-wrapper">
-      <Header title="Date Filter" showBack={true} backUrl="/home" />
+      <Header 
+        title="Date Filter" 
+        showBack={true} 
+        backUrl="/" 
+        rightCustom={
+          <a
+            role="button"
+            tabIndex={0}
+            onClick={handleClearFilters}
+            className="filter-icon"
+            style={{ 
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--secondary, #111827)'
+            }}
+            title="Effacer tous les filtres"
+            aria-label="Effacer tous les filtres"
+          >
+            <i 
+              className="icon feather icon-rotate-ccw" 
+              style={{ 
+                fontSize: '18px', 
+                transition: 'transform 0.4s ease',
+                transform: isClearing ? 'rotate(-360deg)' : 'none'
+              }}
+            ></i>
+          </a>
+        }
+      />
 
       <div className="page-content space-top p-b50">
         <div className="container">
           
+          {/* BARRE DE RECHERCHE */}
+          <div className="card style-1" style={{ overflow: 'hidden', marginBottom: '16px' }}>
+            <div 
+              className="d-flex align-items-center"
+              style={{
+                padding: '12px 16px',
+                gap: '12px'
+              }}
+            >
+              <i className="icon feather icon-search" style={{ fontSize: '18px', color: '#9ca3af', flexShrink: 0 }}></i>
+              <input
+                type="text"
+                className="form-control border-0 p-0 shadow-none"
+                placeholder="Titre, auteur, catégorie, description, langue..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleApply();
+                  }
+                }}
+                style={{
+                  fontSize: '14px',
+                  background: 'transparent',
+                  color: 'var(--title, #111827)',
+                  fontWeight: 400,
+                  outline: 'none',
+                  boxShadow: 'none'
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '2px 4px',
+                    cursor: 'pointer',
+                    color: '#9ca3af',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%'
+                  }}
+                  title="Effacer"
+                  aria-label="Effacer la recherche"
+                >
+                  <i className="icon feather icon-x" style={{ fontSize: '16px' }}></i>
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* CARTE 1 : DROPDOWN CATÉGORIES EXISTANTES */}
           <div className="card style-1" style={{ overflow: 'hidden', marginBottom: '16px' }}>
             <div 

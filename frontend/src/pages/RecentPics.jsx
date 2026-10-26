@@ -218,7 +218,7 @@ const RecentPics = () => {
 
         <div className="footer fixed bg-white">
           <div className="container">
-            <Link to="/home" className="btn btn-lg btn-gradient w-100 dz-flex-box btn-shadow rounded-xl">
+            <Link to="/" className="btn btn-lg btn-gradient w-100 dz-flex-box btn-shadow rounded-xl">
               Next
             </Link>
           </div>

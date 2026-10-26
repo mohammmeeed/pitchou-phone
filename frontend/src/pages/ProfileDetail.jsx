@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import { useDating, initialProfiles } from '../context/DatingContext';
 
@@ -7,8 +7,9 @@ const API_BASE_URL = '/api';
 
 const ProfileDetail = () => {
   const navigate = useNavigate();
+  const routeParams = useParams();
   const [searchParams] = useSearchParams();
-  const id = searchParams.get('id');
+  const id = routeParams.id || searchParams.get('id');
   const [addedToCart, setAddedToCart] = useState(false);
   const datingCtx = useDating();
   const profiles = Array.isArray(datingCtx?.profiles) ? datingCtx.profiles : [];
@@ -138,7 +139,7 @@ const ProfileDetail = () => {
     addToCart(profile);
     setAddedToCart(true);
     setTimeout(() => {
-      navigate('/explore');
+      navigate('/panier');
     }, 700);
   };
 
