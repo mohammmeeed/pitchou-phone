@@ -564,6 +564,19 @@ export const adminApi = {
     }
   },
 
+  async deleteAdminAccount(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin_profile?id=${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn('Fallback delete admin:', err.message);
+      return { success: false, error: err.message || 'Erreur réseau' };
+    }
+  },
+
   // 7. Upload Photo or Video from Device (Single & Multi-files)
   async uploadMedia(file) {
     try {

@@ -1,38 +1,33 @@
 // frontend/src/admin/pages/AdminAccount.jsx
-// Gestion du compte et identifiants administrateur (Hospital React / Mediqu Design System)
+// Gestion des Utilisateurs Administrateurs (Hospital React / Mediqu Design System)
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
 import AdminLayout from '../AdminLayout';
 import { adminApi } from '../services/adminApi';
 
 export default function AdminAccount() {
-  const [profile, setProfile] = useState(() => adminApi.getCurrentAdmin() || {
-    name: '',
-    email: '',
-    phone: '',
-    role: ''
-  });
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [profile, setProfile] = useState(() => adminApi.getCurrentAdmin() || { id: 1, name: '', email: '' });
+  const [adminList, setAdminList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error', message: string }
-  const navigate = useNavigate();
 
-  // Liste des administrateurs et création en-page (PAS DE POP-UP)
-  const [adminList, setAdminList] = useState([]);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'create' | 'list'
-  const [creating, setCreating] = useState(false);
-  const [createFeedback, setCreateFeedback] = useState(null);
-  const [newAdmin, setNewAdmin] = useState({
+  // Formulaire d'ajout / modification (Fermé par défaut)
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null); // null = création, number = édition
+  const formRef = useRef(null);
+
+  const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
+    role: 'admin',
     password: '',
-    confirmPassword: '',
-    role: 'admin'
+    confirmPassword: ''
   });
+
+  // Modal de confirmation de suppression
+  const [deleteModal, setDeleteModal] = useState({ open: false, admin: null, deleting: false });
 
   useEffect(() => {
     loadProfile();
@@ -40,72 +35,150 @@ export default function AdminAccount() {
   }, []);
 
   const loadProfile = async () => {
-    setLoading(true);
     try {
       const data = await adminApi.getAdminProfile();
-      if (data) {
-        setProfile(data);
-      }
+      if (data) setProfile(data);
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
   const loadAdminList = async () => {
+    setLoading(true);
     try {
       const list = await adminApi.getAllAdmins();
       setAdminList(list || []);
     } catch (err) {
       console.warn('Erreur chargement admins:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSave = async (e) => {
+  // Ouvrir le formulaire pour un NOUVEL utilisateur
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      role: 'admin',
+      password: '',
+      confirmPassword: ''
+    });
+    setFeedback(null);
+    setIsFormOpen(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  };
+
+  // Ouvrir le formulaire pour MODIFIER un utilisateur existant
+  const handleStartEdit = (adm) => {
+    setEditingId(adm.id);
+    setFormData({
+      name: adm.name || '',
+      email: adm.email || '',
+      phone: adm.phone || '',
+      role: adm.role || 'admin',
+      password: '',
+      confirmPassword: ''
+    });
+    setFeedback(null);
+    setIsFormOpen(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  };
+
+  // Fermer le formulaire
+  const handleCloseForm = () => {
+    setIsFormOpen(false);
+    setEditingId(null);
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      role: 'admin',
+      password: '',
+      confirmPassword: ''
+    });
+  };
+
+  // Soumission du formulaire (Création ou Modification)
+  const handleSubmitForm = async (e) => {
     e.preventDefault();
     setFeedback(null);
 
-    if (!profile.name.trim() || !profile.email.trim()) {
+    if (!formData.name.trim() || !formData.email.trim()) {
       setFeedback({ type: 'error', message: 'Le nom et l’adresse email sont obligatoires.' });
       return;
     }
 
-    if (password && password.length < 6) {
+    // Si création, mot de passe obligatoire
+    if (!editingId && !formData.password.trim()) {
+      setFeedback({ type: 'error', message: 'Le mot de passe est obligatoire pour un nouvel utilisateur.' });
+      return;
+    }
+
+    if (formData.password && formData.password.length < 6) {
       setFeedback({ type: 'error', message: 'Le mot de passe doit comporter au moins 6 caractères.' });
       return;
     }
 
-    if (password && password !== confirmPassword) {
+    if (formData.password && formData.password !== formData.confirmPassword) {
       setFeedback({ type: 'error', message: 'Les deux mots de passe ne correspondent pas.' });
       return;
     }
 
     setSaving(true);
     try {
-      const payload = {
-        id: profile.id,
-        name: profile.name.trim(),
-        email: profile.email.trim(),
-        phone: profile.phone ? profile.phone.trim() : '',
-        ...(password ? { password: password.trim() } : {})
-      };
+      if (editingId) {
+        // Modification
+        const payload = {
+          id: editingId,
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          role: formData.role || 'admin',
+          ...(formData.password ? { password: formData.password.trim() } : {})
+        };
 
-      const res = await adminApi.updateAdminProfile(payload);
-      if (res && res.success) {
-        setFeedback({
-          type: 'success',
-          message: 'Votre compte administrateur a été mis à jour avec succès !'
-        });
-        setPassword('');
-        setConfirmPassword('');
-        if (res.admin) setProfile(res.admin);
-        await loadAdminList();
+        const res = await adminApi.updateAdminProfile(payload);
+        if (res && res.success) {
+          setFeedback({
+            type: 'success',
+            message: `L'utilisateur "${formData.name.trim()}" a été mis à jour avec succès !`
+          });
+          handleCloseForm();
+          await loadAdminList();
+          if (Number(editingId) === Number(profile.id)) {
+            await loadProfile();
+          }
+        } else {
+          setFeedback({ type: 'error', message: res?.error || 'Erreur lors de la mise à jour.' });
+        }
       } else {
-        setFeedback({
-          type: 'error',
-          message: res?.error || 'Erreur lors de la mise à jour du compte.'
-        });
+        // Création
+        const payload = {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          password: formData.password.trim(),
+          role: formData.role || 'admin'
+        };
+
+        const res = await adminApi.createAdminAccount(payload);
+        if (res && res.success) {
+          setFeedback({
+            type: 'success',
+            message: `Nouvel utilisateur "${formData.name.trim()}" créé avec succès !`
+          });
+          handleCloseForm();
+          await loadAdminList();
+        } else {
+          setFeedback({ type: 'error', message: res?.error || 'Erreur lors de la création de l’utilisateur.' });
+        }
       }
     } catch (err) {
       setFeedback({ type: 'error', message: 'Une erreur inattendue est survenue.' });
@@ -114,133 +187,64 @@ export default function AdminAccount() {
     }
   };
 
-  const handleCreateAdminSubmit = async (e) => {
-    e.preventDefault();
-    setCreateFeedback(null);
-
-    if (!newAdmin.name.trim() || !newAdmin.email.trim() || !newAdmin.password.trim()) {
-      setCreateFeedback({ type: 'error', message: "Veuillez renseigner le nom, l'email et le mot de passe." });
-      return;
-    }
-
-    if (newAdmin.password.length < 6) {
-      setCreateFeedback({ type: 'error', message: 'Le mot de passe doit comporter au moins 6 caractères.' });
-      return;
-    }
-
-    if (newAdmin.password !== newAdmin.confirmPassword) {
-      setCreateFeedback({ type: 'error', message: 'Les mots de passe ne correspondent pas.' });
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const res = await adminApi.createAdminAccount({
-        name: newAdmin.name.trim(),
-        email: newAdmin.email.trim(),
-        phone: newAdmin.phone.trim(),
-        password: newAdmin.password.trim(),
-        role: newAdmin.role || 'admin'
+  // Préparation de la suppression
+  const handleOpenDelete = (adm) => {
+    if (Number(adm.id) === Number(profile.id)) {
+      setFeedback({
+        type: 'error',
+        message: 'Vous ne pouvez pas supprimer votre propre compte actuellement connecté.'
       });
-
-      if (res && res.success) {
-        const createdName = newAdmin.name.trim();
-        const createdEmail = newAdmin.email.trim();
-        setFeedback({
-          type: 'success',
-          message: `Nouveau compte administrateur créé avec succès pour ${createdName} (${createdEmail}) !`
-        });
-        setNewAdmin({
-          name: '',
-          email: '',
-          phone: '',
-          password: '',
-          confirmPassword: '',
-          role: 'admin'
-        });
-        setActiveTab('profile');
-        await loadAdminList();
-      } else {
-        setCreateFeedback({
-          type: 'error',
-          message: res?.error || 'Erreur lors de la création du compte administrateur.'
-        });
-      }
-    } catch (err) {
-      setCreateFeedback({ type: 'error', message: 'Une erreur inattendue est survenue.' });
-    } finally {
-      setCreating(false);
+      return;
     }
+    setDeleteModal({ open: true, admin: adm, deleting: false });
   };
 
-  const handleLogout = () => {
-    adminApi.logout();
-    navigate('/admin/login');
+  // Confirmation de suppression
+  const handleConfirmDelete = async () => {
+    if (!deleteModal.admin) return;
+    setDeleteModal((prev) => ({ ...prev, deleting: true }));
+
+    try {
+      const res = await adminApi.deleteAdminAccount(deleteModal.admin.id);
+      if (res && res.success) {
+        setFeedback({
+          type: 'success',
+          message: `L'utilisateur "${deleteModal.admin.name}" a été supprimé avec succès.`
+        });
+        setDeleteModal({ open: false, admin: null, deleting: false });
+        await loadAdminList();
+      } else {
+        setFeedback({
+          type: 'error',
+          message: res?.error || 'Erreur lors de la suppression de l’utilisateur.'
+        });
+        setDeleteModal((prev) => ({ ...prev, deleting: false }));
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: 'Erreur réseau lors de la suppression.' });
+      setDeleteModal((prev) => ({ ...prev, deleting: false }));
+    }
   };
 
   return (
     <AdminLayout>
-      {/* Page Header */}
+      {/* En-tête de la page */}
       <div className="page-header" style={{ marginBottom: '1.25rem' }}>
         <div className="page-title-wrap">
-          <h1>
-            {activeTab === 'create'
-              ? 'Créer un Compte Administrateur'
-              : 'Gestion du Compte Administrateur'}
-          </h1>
+          <h1>Utilisateurs</h1>
           <p className="breadcrumb-sub">
-            {activeTab === 'create'
-              ? 'Ajoutez un nouvel administrateur avec accès complet au panneau de gestion'
-              : 'Modifiez vos informations de connexion, votre adresse email et votre mot de passe'}
+            Gérez les comptes administrateurs et accès au panneau de gestion
           </p>
         </div>
       </div>
 
-      {/* Navigation Onglets En-Page (SANS AUCUN POP-UP) */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          marginBottom: '1.5rem',
-          borderBottom: '1px solid #e4e4e7',
-          paddingBottom: '0.75rem',
-          flexWrap: 'wrap'
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('profile');
-            setCreateFeedback(null);
-          }}
-          style={{
-            padding: '0.6rem 1.25rem',
-            borderRadius: '8px',
-            border: 'none',
-            fontWeight: activeTab === 'profile' ? 700 : 500,
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            backgroundColor: activeTab === 'profile' ? '#111111' : '#f4f4f5',
-            color: activeTab === 'profile' ? '#ffffff' : '#52525b',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <i className="flaticon-381-user-7" />
-          <span>Mon Profil</span>
-        </button>
-      </div>
-
-      {/* Message de notification globale inline */}
+      {/* Message de notification globale */}
       {feedback && (
         <div
           style={{
-            padding: '1rem 1.25rem',
+            padding: '0.9rem 1.25rem',
             borderRadius: '10px',
-            marginBottom: '1.5rem',
+            marginBottom: '1.25rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -264,7 +268,8 @@ export default function AdminAccount() {
               border: 'none',
               cursor: 'pointer',
               color: 'inherit',
-              fontSize: '1rem'
+              fontSize: '1.2rem',
+              lineHeight: 1
             }}
           >
             &times;
@@ -272,435 +277,351 @@ export default function AdminAccount() {
         </div>
       )}
 
-      {/* VUE 1 : MON PROFIL */}
-      {activeTab === 'profile' && (
-        <form onSubmit={handleSave}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-            {/* Colonne 1 : Coordonnées de l'Administrateur */}
-            <div className="admin-card">
-              <div className="card-header-custom">
-                <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <i className="flaticon-381-user-7" style={{ color: '#111111' }} />
-                  Informations Personnelles
-                </h4>
-                <span className="badge-custom bg-soft-info" style={{ fontWeight: 700 }}>
-                  {profile.role?.toUpperCase() || 'ADMIN'}
-                </span>
-              </div>
-
-              <div style={{ padding: '1.5rem' }}>
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                    Nom & Prénom de l’Administrateur *
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value={profile.name || ''}
-                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                    Adresse Email d’Accès *
-                  </label>
-                  <input
-                    type="email"
-                    className="form-control-custom"
-                    value={profile.email || ''}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                    required
-                  />
-                  <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem' }}>
-                    Sera utilisé pour vous connecter au panneau d'administration.
-                  </small>
-                </div>
-
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                    Numéro de Téléphone
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value={profile.phone || ''}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                    Rôle Système
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value="Administrateur Général (Accès complet MySQL)"
-                    disabled
-                    style={{ backgroundColor: '#f4f4f5', color: '#71717a', cursor: 'not-allowed' }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Colonne 2 : Sécurité & Mot de Passe */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div className="admin-card">
-                <div className="card-header-custom">
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <i className="flaticon-381-lock" style={{ color: '#111111' }} />
-                    Sécurité & Mot de Passe
-                  </h4>
-                </div>
-
-                <div style={{ padding: '1.5rem' }}>
-                  <div style={{ marginBottom: '1.25rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                      Nouveau Mot de Passe
-                    </label>
-                    <input
-                      type="password"
-                      className="form-control-custom"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Laisser vide pour ne pas modifier"
-                      autoComplete="new-password"
-                    />
-                    <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem' }}>
-                      Minimum 6 caractères si vous souhaitez le changer.
-                    </small>
-                  </div>
-
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                      Confirmer le Nouveau Mot de Passe
-                    </label>
-                    <input
-                      type="password"
-                      className="form-control-custom"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Répétez le mot de passe"
-                      autoComplete="new-password"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Boîte résumé & actions */}
-              <div className="admin-card" style={{ padding: '1.5rem', backgroundColor: '#fafafa' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <div>
-                    <h5 style={{ margin: 0, fontWeight: 700, color: '#111111' }}>Enregistrer vos coordonnées</h5>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#71717a' }}>
-                      Les changements prennent effet immédiatement sur votre session.
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="submit"
-                    className="btn-primary-custom"
-                    disabled={saving || loading}
-                    style={{
-                      padding: '0.75rem 1.75rem',
-                      opacity: saving ? 0.7 : 1,
-                      cursor: saving ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    <i className="flaticon-381-save" />
-                    <span>{saving ? 'Enregistrement en cours...' : 'Mettre à jour le compte'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn-light-custom"
-                    onClick={loadProfile}
-                    disabled={saving}
-                  >
-                    <i className="flaticon-381-refresh" /> Réinitialiser
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* VUE 2 : CRÉER UN ADMINISTRATEUR DIRECTEMENT DANS LA PAGE (PAS DE POP-UP) */}
-      {activeTab === 'create' && (
-        <form onSubmit={handleCreateAdminSubmit}>
-          {createFeedback && (
-            <div
-              style={{
-                padding: '1rem 1.25rem',
-                borderRadius: '10px',
-                marginBottom: '1.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: createFeedback.type === 'error' ? '#fff1f2' : '#ecfdf5',
-                border: `1px solid ${createFeedback.type === 'error' ? '#fecdd3' : '#a7f3d0'}`,
-                color: createFeedback.type === 'error' ? '#9f1239' : '#065f46'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <i
-                  className={createFeedback.type === 'error' ? 'flaticon-381-warning-1' : 'fas fa-check-circle'}
-                  style={{ fontSize: '1.1rem' }}
-                />
-                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{createFeedback.message}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCreateFeedback(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'inherit',
-                  fontSize: '1rem'
-                }}
-              >
-                &times;
-              </button>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-            {/* Colonne 1 : Coordonnées du nouvel admin */}
-            <div className="admin-card">
-              <div className="card-header-custom">
-                <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <i className="flaticon-381-user-8" style={{ color: '#111111' }} />
-                  Coordonnées du Nouvel Administrateur
-                </h4>
-                <span className="badge-custom bg-soft-primary" style={{ fontWeight: 700 }}>
-                  NOUVEAU COMPTE
-                </span>
-              </div>
-
-              <div style={{ padding: '1.5rem' }}>
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                    Nom & Prénom de l’Administrateur *
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value={newAdmin.name}
-                    onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                    Adresse Email d’Accès *
-                  </label>
-                  <input
-                    type="email"
-                    className="form-control-custom"
-                    value={newAdmin.email}
-                    onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
-                    required
-                  />
-                  <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem' }}>
-                    Sera utilisé comme identifiant pour se connecter au panneau d'administration.
-                  </small>
-                </div>
-
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                    Numéro de Téléphone (Optionnel)
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value={newAdmin.phone}
-                    onChange={(e) => setNewAdmin({ ...newAdmin, phone: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                    Rôle Attribué
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control-custom"
-                    value="Administrateur (Accès complet au tableau de bord)"
-                    disabled
-                    style={{ backgroundColor: '#f4f4f5', color: '#71717a', cursor: 'not-allowed' }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Colonne 2 : Sécurité & Validation */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div className="admin-card">
-                <div className="card-header-custom">
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <i className="flaticon-381-lock" style={{ color: '#111111' }} />
-                    Identifiants de Sécurité
-                  </h4>
-                </div>
-
-                <div style={{ padding: '1.5rem' }}>
-                  <div style={{ marginBottom: '1.25rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                      Mot de Passe *
-                    </label>
-                    <input
-                      type="password"
-                      className="form-control-custom"
-                      placeholder="Minimum 6 caractères"
-                      value={newAdmin.password}
-                      onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
-                      required
-                      autoComplete="new-password"
-                    />
-                    <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem' }}>
-                      Au moins 6 caractères requis pour sécuriser l'accès.
-                    </small>
-                  </div>
-
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
-                      Confirmer le Mot de Passe *
-                    </label>
-                    <input
-                      type="password"
-                      className="form-control-custom"
-                      placeholder="Répétez le mot de passe"
-                      value={newAdmin.confirmPassword}
-                      onChange={(e) => setNewAdmin({ ...newAdmin, confirmPassword: e.target.value })}
-                      required
-                      autoComplete="new-password"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Boîte résumé & actions */}
-              <div className="admin-card" style={{ padding: '1.5rem', backgroundColor: '#fafafa' }}>
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <h5 style={{ margin: '0 0 0.3rem 0', fontWeight: 700, color: '#111111' }}>
-                    Valider la création du compte
-                  </h5>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#71717a' }}>
-                    Le nouvel administrateur pourra immédiatement se connecter avec cet email et ce mot de passe.
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="submit"
-                    className="btn-primary-custom"
-                    disabled={creating}
-                    style={{
-                      padding: '0.75rem 1.75rem',
-                      opacity: creating ? 0.7 : 1,
-                      cursor: creating ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    <i className="flaticon-381-user-8" />
-                    <span>{creating ? 'Création en cours...' : 'Créer le compte admin'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn-light-custom"
-                    onClick={() => {
-                      setActiveTab('profile');
-                      setCreateFeedback(null);
-                    }}
-                    disabled={creating}
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* VUE 3 / TABLEAU : COMPTES ADMINISTRATEURS ENREGISTRÉS */}
-      {adminList.length > 0 && (
-        <div className="admin-card" style={{ marginTop: '2rem' }}>
+      {/* FORMULAIRE AJOUT / ÉDITION (AFFICHÉ UNIQUEMENT LORS D'UN CLIC SUR "NOUVEAU" OU "MODIFIER") */}
+      {isFormOpen && (
+        <div ref={formRef} className="admin-card" style={{ marginBottom: '1.75rem', border: '1.5px solid #111111' }}>
           <div className="card-header-custom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-              <i className="flaticon-381-user-7" style={{ color: '#111111' }} />
-              Comptes Administrateurs Enregistrés ({adminList.length})
+              <i className={editingId ? 'feather icon-edit-2' : 'flaticon-381-user-8'} style={{ color: '#111111' }} />
+              {editingId ? `Modifier l'Utilisateur : ${formData.name || ''}` : 'Ajouter un Nouvel Utilisateur'}
             </h4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {activeTab !== 'create' && (
-                <button
-                  type="button"
-                  className="btn-primary-custom"
-                  onClick={() => {
-                    setActiveTab('create');
-                    setCreateFeedback(null);
-                  }}
-                  style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            <button
+              type="button"
+              className="btn-light-custom"
+              onClick={handleCloseForm}
+              style={{ padding: '0.35rem 0.8rem', fontSize: '0.8rem' }}
+            >
+              <i className="feather icon-x" /> Fermer
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmitForm} style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
+                  Nom & Prénom *
+                </label>
+                <input
+                  type="text"
+                  className="form-control-custom"
+                  placeholder="Ex: Mohamed Benali"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
+                  Adresse Email d’Accès *
+                </label>
+                <input
+                  type="email"
+                  className="form-control-custom"
+                  placeholder="admin@leerbook.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
+                  Numéro de Téléphone
+                </label>
+                <input
+                  type="text"
+                  className="form-control-custom"
+                  placeholder="0550123456"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
+                  Rôle
+                </label>
+                <select
+                  className="form-control-custom"
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 >
-                  <i className="flaticon-381-user-8" />
-                  <span>Nouveau</span>
-                </button>
-              )}
+                  <option value="admin">Administrateur (Accès Complet)</option>
+                  <option value="manager">Gestionnaire (Commandes & Catalogue)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
+                  {editingId ? 'Nouveau Mot de Passe' : 'Mot de Passe *'}
+                </label>
+                <input
+                  type="password"
+                  className="form-control-custom"
+                  placeholder={editingId ? 'Laisser vide pour ne pas modifier' : 'Minimum 6 caractères'}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  autoComplete="new-password"
+                  required={!editingId}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#27272a', marginBottom: '0.4rem' }}>
+                  Confirmer le Mot de Passe {editingId ? '' : '*'}
+                </label>
+                <input
+                  type="password"
+                  className="form-control-custom"
+                  placeholder="Répétez le mot de passe"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  autoComplete="new-password"
+                  required={!editingId && Boolean(formData.password)}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #f1f5f9' }}>
+              <button
+                type="submit"
+                className="btn-primary-custom"
+                disabled={saving}
+                style={{ padding: '0.65rem 1.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <i className="flaticon-381-save" />
+                <span>{saving ? 'Enregistrement...' : editingId ? 'Mettre à jour l’utilisateur' : 'Créer l’utilisateur'}</span>
+              </button>
               <button
                 type="button"
                 className="btn-light-custom"
-                onClick={loadAdminList}
-                style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem' }}
+                onClick={handleCloseForm}
+                disabled={saving}
               >
-                <i className="flaticon-381-refresh" /> Actualiser
+                Annuler
               </button>
             </div>
+          </form>
+        </div>
+      )}
+
+      {/* TABLEAU PRINCIPAL : LISTE DES UTILISATEURS */}
+      <div className="admin-card">
+        <div className="card-header-custom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+            <i className="flaticon-381-user-7" style={{ color: '#111111' }} />
+            Comptes Utilisateurs Enregistrés ({adminList.length})
+          </h4>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn-primary-custom"
+              onClick={handleOpenCreate}
+              style={{ padding: '0.45rem 1rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            >
+              <i className="flaticon-381-user-8" />
+              <span>Nouveau</span>
+            </button>
+            <button
+              type="button"
+              className="btn-light-custom"
+              onClick={loadAdminList}
+              disabled={loading}
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}
+              title="Rafraîchir la liste"
+            >
+              <i className="flaticon-381-refresh" /> Actualiser
+            </button>
           </div>
-          <div className="table-responsive-custom">
-            <table className="table-custom">
-              <thead>
+        </div>
+
+        <div className="table-responsive-custom">
+          <table className="table-custom">
+            <thead>
+              <tr>
+                <th>Nom de l'Utilisateur</th>
+                <th>Adresse Email</th>
+                <th>Téléphone</th>
+                <th>Rôle</th>
+                <th>Date de Création</th>
+                <th>Statut</th>
+                <th style={{ textAlign: 'right', minWidth: '150px' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && adminList.length === 0 ? (
                 <tr>
-                  <th>Nom de l'Administrateur</th>
-                  <th>Adresse Email</th>
-                  <th>Téléphone</th>
-                  <th>Rôle</th>
-                  <th>Date de Création</th>
-                  <th>Statut</th>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: '#71717a' }}>
+                    <i className="flaticon-381-reload font-24 mb-2 d-block" />
+                    Chargement des utilisateurs...
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {adminList.map((adm) => (
-                  <tr key={adm.id}>
-                    <td>
-                      <strong style={{ color: '#111111' }}>{adm.name}</strong>
-                      {Number(adm.id) === Number(profile.id) && (
-                        <span className="badge-custom bg-soft-primary" style={{ marginLeft: '8px', fontSize: '0.7rem' }}>
-                          Vous
+              ) : adminList.length === 0 ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: '#71717a' }}>
+                    Aucun utilisateur trouvé.
+                  </td>
+                </tr>
+              ) : (
+                adminList.map((adm) => {
+                  const isCurrent = Number(adm.id) === Number(profile.id);
+
+                  return (
+                    <tr key={adm.id}>
+                      <td>
+                        <strong style={{ color: '#111111', fontSize: '0.9rem' }}>{adm.name}</strong>
+                        {isCurrent && (
+                          <span
+                            className="badge-custom bg-soft-primary"
+                            style={{ marginLeft: '8px', fontSize: '0.68rem', fontWeight: 700 }}
+                          >
+                            Vous
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ color: '#52525b' }}>{adm.email}</td>
+                      <td style={{ color: '#71717a' }}>{adm.phone || '—'}</td>
+                      <td>
+                        <span className="badge-custom bg-soft-info" style={{ fontWeight: 700, fontSize: '0.72rem' }}>
+                          {adm.role?.toUpperCase() || 'ADMIN'}
                         </span>
-                      )}
-                    </td>
-                    <td>{adm.email}</td>
-                    <td>{adm.phone || '—'}</td>
-                    <td>
-                      <span className="badge-custom bg-soft-info" style={{ fontWeight: 600 }}>
-                        {adm.role?.toUpperCase() || 'ADMIN'}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '0.82rem', color: '#71717a' }}>{adm.created_at || '—'}</td>
-                    <td>
-                      <span className="badge-custom bg-soft-success">Actif</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td style={{ fontSize: '0.82rem', color: '#71717a' }}>{adm.created_at || '—'}</td>
+                      <td>
+                        <span className="badge-custom bg-soft-success" style={{ fontWeight: 600 }}>Actif</span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <button
+                            type="button"
+                            className="btn-light-custom"
+                            onClick={() => handleStartEdit(adm)}
+                            style={{
+                              padding: '0.35rem 0.65rem',
+                              fontSize: '0.78rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              borderRadius: '6px'
+                            }}
+                            title="Modifier cet utilisateur"
+                          >
+                            <i className="feather icon-edit-2" style={{ fontSize: '0.8rem' }} />
+                            <span>Modifier</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDelete(adm)}
+                            disabled={isCurrent}
+                            style={{
+                              padding: '0.35rem 0.55rem',
+                              fontSize: '0.82rem',
+                              border: '1px solid #fee2e2',
+                              background: isCurrent ? '#f4f4f5' : '#fff1f2',
+                              color: isCurrent ? '#a1a1aa' : '#ef4444',
+                              borderRadius: '6px',
+                              cursor: isCurrent ? 'not-allowed' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.15s ease'
+                            }}
+                            title={isCurrent ? "Vous ne pouvez pas supprimer votre propre compte" : "Supprimer cet utilisateur"}
+                          >
+                            <i className="feather icon-trash-2" style={{ fontSize: '0.85rem' }} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODAL DE CONFIRMATION DE SUPPRESSION */}
+      {deleteModal.open && deleteModal.admin && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          <div
+            className="admin-card"
+            style={{
+              maxWidth: '440px',
+              width: '100%',
+              padding: '1.75rem',
+              borderRadius: '16px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: '#fee2e2',
+                color: '#ef4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.3rem',
+                marginBottom: '1rem'
+              }}
+            >
+              <i className="feather icon-trash-2" />
+            </div>
+
+            <h4 style={{ margin: '0 0 0.5rem 0', fontWeight: 800, color: '#111111' }}>
+              Supprimer cet utilisateur ?
+            </h4>
+
+            <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.88rem', color: '#52525b', lineHeight: 1.5 }}>
+              Êtes-vous sûr de vouloir supprimer définitivement le compte de{' '}
+              <strong style={{ color: '#111111' }}>{deleteModal.admin.name}</strong> ({deleteModal.admin.email}) ?
+              Cette action est irréversible.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-light-custom"
+                onClick={() => setDeleteModal({ open: false, admin: null, deleting: false })}
+                disabled={deleteModal.deleting}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleteModal.deleting}
+                style={{
+                  padding: '0.55rem 1.25rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: deleteModal.deleting ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {deleteModal.deleting ? 'Suppression...' : 'Confirmer la suppression'}
+              </button>
+            </div>
           </div>
         </div>
       )}

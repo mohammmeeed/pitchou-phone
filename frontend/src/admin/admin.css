@@ -34,6 +34,19 @@
   --admin-radius-md: 0.5rem;  /* 8px */
 }
 
+/* Ensure text selection in all inputs, textareas, and content is vibrant and readable */
+::selection {
+  background: #209f84 !important;
+  color: #ffffff !important;
+}
+
+input::selection,
+textarea::selection,
+select::selection {
+  background: #209f84 !important;
+  color: #ffffff !important;
+}
+
 /* Fix Mediqu 381 icons overriding DatingKit font */
 [class*="flaticon-381-"]:before,
 [class*="flaticon-381-"]:after,
@@ -509,6 +522,30 @@ i[class*="flaticon-381-"]:after {
 .live-shop-btn:hover {
   background: var(--admin-primary);
   color: #ffffff;
+}
+
+/* Topbar Icon Buttons (Plein écran, etc.) */
+.topbar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--admin-radius-md, 8px);
+  background: var(--admin-primary-light, rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--admin-border-color, #e4e4e7);
+  color: var(--admin-secondary, #18181b);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.topbar-icon-btn:hover,
+.topbar-icon-btn.active {
+  background: var(--admin-primary, #111111);
+  color: #ffffff;
+  border-color: var(--admin-primary, #111111);
+  transform: translateY(-1px);
 }
 
 /* Topbar User Avatar & Dropdown (Avatar sans image) */

@@ -24,6 +24,8 @@ const Home = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(() => datingCtx?.activeFilters?.search || '');
   const searchInputRef = useRef(null);
+  const searchBarRef = useRef(null);
+  const [searchBarHeight, setSearchBarHeight] = useState(215);
   const prevSearchParamRef = useRef(isSearchParamActive);
 
   useEffect(() => {
@@ -59,6 +61,15 @@ const Home = () => {
   const selectedCategories = Array.isArray(activeFilters.categories) ? activeFilters.categories : [];
   const selectedLanguages = Array.isArray(activeFilters.languages) ? activeFilters.languages : [];
   const currentMaxPrice = activeFilters.maxPrice !== undefined ? Number(activeFilters.maxPrice) : 6000;
+
+  useLayoutEffect(() => {
+    if (searchOpen && searchBarRef.current) {
+      const h = searchBarRef.current.offsetHeight;
+      if (h > 50) {
+        setSearchBarHeight(h);
+      }
+    }
+  }, [searchOpen, selectedCategories, selectedLanguages, currentMaxPrice]);
 
   // Catégories et Langues existantes dynamiques
   const defaultCategories = useMemo(() => [
@@ -607,27 +618,9 @@ const Home = () => {
         searchActive={searchOpen}
       />
 
-      {/* Overlay Backdrop transparent pour refermer la recherche en cliquant sur l'espace restant (cercle bleu) */}
-      {searchOpen && (
-        <div
-          className="home-search-backdrop"
-          onClick={handleCloseSearch}
-          style={{
-            position: 'fixed',
-            top: '60px',
-            left: 0,
-            right: 0,
-            bottom: '60px',
-            zIndex: 995,
-            background: 'transparent',
-            cursor: 'default'
-          }}
-          aria-label="Fermer la recherche"
-        />
-      )}
-
-      {/* Barre de Recherche et Filtres Coulissants (Descend depuis le haut de l'écran) */}
+      {/* Barre de Recherche et Filtres Coulissants (Descend depuis le haut de l'écran, épinglée et interactive sans bloquer le scroll) */}
       <div
+        ref={searchBarRef}
         className="home-sliding-search-bar"
         style={{
           transform: searchOpen ? 'translateY(0)' : 'translateY(-100%)',
@@ -654,7 +647,7 @@ const Home = () => {
               padding: 0
             }}
           />
-          {searchQuery && (
+          {searchQuery ? (
             <button
               type="button"
               onClick={handleClearSearch}
@@ -675,6 +668,29 @@ const Home = () => {
               aria-label="Effacer la recherche"
             >
               <i className="feather icon-x" style={{ fontSize: '13px' }}></i>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleCloseSearch}
+              style={{
+                border: 'none',
+                background: 'rgba(0, 0, 0, 0.06)',
+                borderRadius: '50%',
+                width: '22px',
+                height: '22px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                padding: 0,
+                color: '#888',
+                flexShrink: 0
+              }}
+              aria-label="Fermer la recherche"
+              title="Fermer la recherche"
+            >
+              <i className="feather icon-chevron-up" style={{ fontSize: '13px' }}></i>
             </button>
           )}
         </div>
@@ -799,9 +815,9 @@ const Home = () => {
       {/* Page Content : Vue Feed (Carte Unique) ou Vue Grille 2x2 (Scrollable) */}
       {viewMode === 'feed' ? (
         <div
-          className="home-card-wrapper"
+          className={`home-card-wrapper ${searchOpen ? 'search-active' : ''}`}
           style={{
-            top: searchOpen ? '265px' : '60px',
+            '--search-bar-offset': `${60 + searchBarHeight + 6}px`,
             transition: 'top 0.32s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         >
@@ -820,9 +836,9 @@ const Home = () => {
         <div
           ref={gridScrollAreaRef}
           onScroll={handleGridScroll}
-          className="home-grid-scroll-area"
+          className={`home-grid-scroll-area ${searchOpen ? 'search-active' : ''}`}
           style={{
-            top: searchOpen ? '265px' : '60px',
+            '--search-bar-offset': `${60 + searchBarHeight + 6}px`,
             transition: 'top 0.32s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         >

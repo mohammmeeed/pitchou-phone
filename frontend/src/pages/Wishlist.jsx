@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
@@ -257,6 +257,7 @@ const Wishlist = ({ defaultCategory = null }) => {
 
   // Pagination progressive (Infinite Scroll) pour affichage instantané des livres
   const [visibleBooksCount, setVisibleBooksCount] = useState(24);
+  const sentinelRef = useRef(null);
 
   // Réinitialiser le compteur et remonter en haut lors du changement de catégorie
   useEffect(() => {
@@ -264,28 +265,38 @@ const Wishlist = ({ defaultCategory = null }) => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [selectedCategory]);
 
-  // Détecteur de défilement (Infinite Scroll) fluide pour charger les livres suivants
+  // Détecteur de défilement proactif ultra-fluide (IntersectionObserver déclenche 600px à l'avance sans aucun arrêt)
   useEffect(() => {
     if (!selectedCategory) return;
 
+    const target = sentinelRef.current;
+    if (target && typeof IntersectionObserver !== 'undefined') {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0] && entries[0].isIntersecting) {
+            setVisibleBooksCount((prev) => (prev < filteredBooks.length ? prev + 24 : prev));
+          }
+        },
+        { rootMargin: '600px 0px' }
+      );
+      observer.observe(target);
+      return () => observer.disconnect();
+    }
+
+    // Fallback scroll listener
     const handleScroll = () => {
       const scrollHeight = document.documentElement.scrollHeight;
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const clientHeight = window.innerHeight || document.documentElement.clientHeight;
 
-      if (scrollTop + clientHeight >= scrollHeight - 500) {
-        setVisibleBooksCount((prev) => {
-          if (prev < filteredBooks.length) {
-            return prev + 24;
-          }
-          return prev;
-        });
+      if (scrollTop + clientHeight >= scrollHeight - 600) {
+        setVisibleBooksCount((prev) => (prev < filteredBooks.length ? prev + 24 : prev));
       }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [selectedCategory, filteredBooks.length]);
+  }, [selectedCategory, filteredBooks.length, visibleBooksCount]);
 
   // Livres affichés par tranche de 24 (chargement 0 milliseconde)
   const displayedBooks = useMemo(() => {
@@ -308,7 +319,7 @@ const Wishlist = ({ defaultCategory = null }) => {
         onBackClick={selectedCategory ? () => setSelectedCategory(null) : undefined}
       />
 
-      <div className="page-content space-top p-b80" style={{ minHeight: '100vh', overflowY: 'auto' }}>
+      <div className="page-content space-top" style={{ paddingBottom: 'calc(115px + env(safe-area-inset-bottom, 0px))' }}>
         <div className="container">
           
           {/* =========================================================================
@@ -661,6 +672,11 @@ const Wishlist = ({ defaultCategory = null }) => {
                         Affichage de {displayedBooks.length} sur {filteredBooks.length} livres...
                       </span>
                     </div>
+                  )}
+
+                  {/* Sentinelle invisible pour détection d'approche 600px avant le bas */}
+                  {visibleBooksCount < filteredBooks.length && (
+                    <div ref={sentinelRef} style={{ height: '20px', gridColumn: '1 / -1', pointerEvents: 'none' }} />
                   )}
                 </div>
               )}

@@ -563,12 +563,11 @@
 	}
 }
 
-input::selection {
-  background: transparent;
-  color: #fff; /* text color visible rahe */
+input::selection,
+textarea::selection {
+  background: var(--primary, #209f84) !important;
+  color: #ffffff !important;
 }
 input:-webkit-autofill {
-  -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
-  -webkit-text-fill-color: #fff !important; /* ya jo text color chahiye vo */
   transition: background-color 5000s ease-in-out 0s;
 }

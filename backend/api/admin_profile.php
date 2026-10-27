@@ -177,6 +177,35 @@ switch ($method) {
         ], JSON_UNESCAPED_UNICODE);
         break;
 
+    case 'DELETE':
+        $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+        if (!$id) {
+            $raw = file_get_contents('php://input');
+            $data = json_decode($raw, true) ?? [];
+            $id = intval($data['id'] ?? 0);
+        }
+
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'ID invalide.'], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        // Empêcher la suppression s'il ne reste qu'un seul administrateur
+        $countStmt = $db->query("SELECT COUNT(*) FROM users WHERE role = 'admin'");
+        $totalAdmins = (int)$countStmt->fetchColumn();
+        if ($totalAdmins <= 1) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Impossible de supprimer le seul administrateur existant.'], JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        $delStmt = $db->prepare("DELETE FROM users WHERE id = ? AND role = 'admin'");
+        $delStmt->execute([$id]);
+
+        echo json_encode(['success' => true, 'message' => 'Administrateur supprimé avec succès.'], JSON_UNESCAPED_UNICODE);
+        break;
+
     default:
         http_response_code(405);
         echo json_encode(['success' => false, 'error' => 'Méthode non autorisée']);

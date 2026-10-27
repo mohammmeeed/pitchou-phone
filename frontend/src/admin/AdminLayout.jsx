@@ -24,6 +24,69 @@ export default function AdminLayout({ children }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
+  // Mode Plein Écran (Fullscreen)
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = Boolean(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+      setIsFullscreen(isFull);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    try {
+      const isFull = Boolean(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+
+      if (!isFull) {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+          elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          elem.webkitRequestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+          elem.mozRequestFullScreen();
+        } else if (elem.msRequestFullscreen) {
+          elem.msRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+          document.msExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn('Erreur plein écran:', err);
+    }
+  };
+
   // Vérifier la session administrateur et charger le logo du site
   useEffect(() => {
     // Si non connecté, redirection immédiate vers la page de connexion admin
@@ -141,7 +204,7 @@ export default function AdminLayout({ children }) {
       category: 'Configuration & Profil',
       items: [
         {
-          title: 'Mon Compte Admin',
+          title: 'Utilisateurs',
           to: '/admin/account',
           icon: 'flaticon-381-user-7'
         },
@@ -249,11 +312,11 @@ export default function AdminLayout({ children }) {
       color: '#64748b'
     },
     {
-      title: 'Mon Compte Admin',
+      title: 'Utilisateurs',
       to: '/admin/account',
       icon: 'flaticon-381-user-7',
       category: 'Configuration & Profil',
-      keywords: 'compte profil admin mot de passe administrateurs sécurité utilisateurs',
+      keywords: 'utilisateurs compte profil admin mot de passe administrateurs sécurité',
       color: '#111827'
     }
   ], []);
@@ -514,17 +577,28 @@ export default function AdminLayout({ children }) {
               </div>
             </div>
 
-            <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
               <Link
                 to="/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="live-shop-btn"
-                title="Voir la boutique client (ouvrir dans un nouvel onglet)"
+                title="Visiter la boutique en direct (ouvrir dans un nouvel onglet)"
               >
-                <i className="feather icon-shopping-bag" />
+                <i className="feather icon-globe" style={{ fontSize: '1rem' }} />
                 <span>Boutique en Direct</span>
               </Link>
+
+              {/* Bouton Mode Plein Écran */}
+              <button
+                type="button"
+                className={`topbar-icon-btn ${isFullscreen ? 'active' : ''}`}
+                onClick={toggleFullscreen}
+                title={isFullscreen ? "Quitter le plein écran" : "Mode plein écran"}
+                aria-label={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
+              >
+                <i className={`feather ${isFullscreen ? 'icon-minimize-2' : 'icon-maximize-2'}`} style={{ fontSize: '1.05rem' }} />
+              </button>
 
               {/* Avatar sans image & Dropdown Déconnexion */}
               <div className="topbar-user-dropdown" ref={userMenuRef}>
@@ -561,13 +635,13 @@ export default function AdminLayout({ children }) {
                     </div>
 
                     <Link
-                      to="/admin/account"
+                      to="/admin/parameter"
                       className="user-menu-item"
                       onClick={() => setIsUserMenuOpen(false)}
-                      title="Gérer mon compte"
+                      title="Paramètres de la boutique"
                     >
-                      <i className="flaticon-381-user-7" style={{ color: '#0f172a' }} />
-                      <span>Mon Compte</span>
+                      <i className="flaticon-381-settings-2" style={{ color: '#0f172a', fontSize: '0.95rem' }} />
+                      <span>Paramètres</span>
                     </Link>
 
                     <div style={{ height: '1px', backgroundColor: '#f1f5f9', margin: '0.35rem 0' }} />

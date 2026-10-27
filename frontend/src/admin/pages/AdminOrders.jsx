@@ -177,102 +177,381 @@ export default function AdminOrders() {
 
   const handlePrintOrder = () => {
     if (!selectedOrder) return;
-    const slipElement = document.getElementById('printable-delivery-slip');
-    const slipHtml = slipElement ? slipElement.innerHTML : '';
 
-    // Ouvrir une fenêtre dédiée d'impression avec les styles intégrés
-    const printWindow = window.open('', '_blank', 'width=850,height=950');
-    if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html lang="fr">
-          <head>
-            <meta charset="utf-8" />
-            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-            <base href="\${window.location.origin}/" />
-            <title>Bon de Livraison - \${selectedOrder.order_number || ''}</title>
-            <style>
-              @page { size: A4 portrait; margin: 10mm; }
-              * { box-sizing: border-box; margin: 0; padding: 0; }
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                color: #0f172a;
-                background: #ffffff;
-                padding: 24px;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-              table { width: 100%; border-collapse: collapse; }
-              .print-toolbar {
-                display: flex;
-                justify-content: flex-end;
-                align-items: center;
-                gap: 12px;
-                margin-bottom: 24px;
-                padding-bottom: 14px;
-                border-bottom: 1px solid #e2e8f0;
-              }
-              .print-btn {
-                background: #0f172a;
-                color: #ffffff;
-                border: none;
-                padding: 10px 22px;
-                border-radius: 6px;
-                font-weight: 700;
-                font-size: 14px;
-                cursor: pointer;
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-              }
-              .print-btn:hover {
-                background: #1e293b;
-              }
-              .close-btn {
-                background: #f1f5f9;
-                color: #475569;
-                border: 1px solid #cbd5e1;
-                padding: 10px 18px;
-                border-radius: 6px;
-                font-weight: 600;
-                font-size: 14px;
-                cursor: pointer;
-              }
-              .close-btn:hover {
-                background: #e2e8f0;
-              }
-              @media print {
-                body { padding: 0 !important; }
-                .print-toolbar { display: none !important; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="print-toolbar">
-              <button class="close-btn" onclick="window.close()">Fermer</button>
-              <button class="print-btn" onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button>
-            </div>
-            <div class="printable-delivery-slip">
-              \${slipHtml}
-            </div>
-            <script>
-              setTimeout(function() {
-                try {
-                  window.focus();
-                  window.print();
-                } catch(e) {
-                  console.error(e);
-                }
-              }, 400);
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-    } else {
-      // Fallback si la popup est bloquée par le navigateur
+    const { subtotal, shipping, total } = getOrderBreakdown(selectedOrder);
+    const orderNum = selectedOrder.order_number?.startsWith('#')
+      ? selectedOrder.order_number
+      : `#${selectedOrder.order_number || ''}`;
+
+    // Supprimer l'ancienne iframe si elle existe déjà
+    const oldIframe = document.getElementById('delivery-slip-print-frame');
+    if (oldIframe) {
+      try { oldIframe.remove(); } catch (e) { /* ignore */ }
+    }
+
+    // Créer une iframe invisible dédiée à l'impression (aucun blocage de pop-up par les navigateurs)
+    const printIframe = document.createElement('iframe');
+    printIframe.id = 'delivery-slip-print-frame';
+    printIframe.setAttribute('style', 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;');
+    document.body.appendChild(printIframe);
+
+    const printHtml = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Bon de Livraison - ${orderNum}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #111827;
+      background: #ffffff;
+      padding: 0;
+      font-size: 13.5px;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .slip-box {
+      max-width: 720px;
+      margin: 0 auto;
+      border: 1.5px solid #111827;
+      padding: 22px 24px;
+      border-radius: 6px;
+    }
+    .slip-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #111827;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+    .store-info h2 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #111827;
+      letter-spacing: -0.5px;
+      text-transform: uppercase;
+    }
+    .store-info p {
+      font-size: 12px;
+      color: #4b5563;
+      margin-top: 2px;
+    }
+    .order-meta {
+      text-align: right;
+    }
+    .order-meta h1 {
+      font-size: 19px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #111827;
+    }
+    .order-meta .order-id {
+      font-size: 15px;
+      font-weight: 800;
+      color: #111827;
+      margin-top: 3px;
+    }
+    .order-meta .order-date {
+      font-size: 12px;
+      color: #4b5563;
+      margin-top: 2px;
+    }
+
+    /* Cadre Client et Adresse */
+    .section-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #374151;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 4px;
+    }
+    .client-box {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      background-color: #f9fafb;
+    }
+    .client-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+    }
+    .client-field-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+    }
+    .client-field-value {
+      font-size: 14px;
+      font-weight: 700;
+      color: #111827;
+      margin-top: 1px;
+    }
+
+    /* Tableau des Produits */
+    table.products-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 18px;
+    }
+    table.products-table th {
+      background-color: #f3f4f6;
+      border-top: 1.5px solid #111827;
+      border-bottom: 1.5px solid #111827;
+      padding: 9px 12px;
+      font-size: 11.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: left;
+    }
+    table.products-table td {
+      padding: 11px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+    }
+    .product-name {
+      font-weight: 700;
+      color: #111827;
+      font-size: 13.5px;
+    }
+
+    /* Totaux et Règlement */
+    .bottom-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-top: 10px;
+      gap: 16px;
+    }
+    .payment-box {
+      border: 1px dashed #9ca3af;
+      padding: 10px 14px;
+      border-radius: 6px;
+      max-width: 330px;
+      background: #fafafa;
+    }
+    .payment-box-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #4b5563;
+      margin-bottom: 3px;
+    }
+    .payment-box-val {
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+    }
+    .payment-box-sub {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 3px;
+    }
+
+    .totals-box {
+      width: 270px;
+      border: 1.5px solid #111827;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 7px 12px;
+      font-size: 12.5px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .totals-row.grand-total {
+      background-color: #111827;
+      color: #ffffff;
+      padding: 10px 12px;
+      border-bottom: none;
+    }
+    .totals-row.grand-total span {
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 12.5px;
+      text-transform: uppercase;
+    }
+    .totals-row.grand-total strong {
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 16.5px;
+    }
+
+    /* Signatures */
+    .signatures-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 28px;
+      padding-top: 14px;
+      border-top: 1px dashed #d1d5db;
+    }
+    .signature-card {
+      border: 1px dashed #9ca3af;
+      border-radius: 6px;
+      padding: 9px 12px;
+      height: 65px;
+    }
+    .signature-card-label {
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #4b5563;
+    }
+
+    .slip-footer {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="slip-box">
+    <div class="slip-header">
+      <div class="store-info">
+        ${shopLogo ? `<img src="${shopLogo}" style="max-height: 44px; max-width: 150px; object-fit: contain; margin-bottom: 4px; display: block;" onerror="this.style.display='none'" />` : ''}
+        <h2>${storeInfo.name || 'LeerBook'}</h2>
+        <p>Boutique en ligne &bull; Vente & Livraison</p>
+        ${storeInfo.phone ? `<p>Tél : ${storeInfo.phone}</p>` : ''}
+      </div>
+      <div class="order-meta">
+        <h1>BON DE LIVRAISON</h1>
+        <div class="order-id">Commande ${orderNum}</div>
+        <div class="order-date">Date : ${selectedOrder.created_at || new Date().toLocaleDateString('fr-FR')}</div>
+      </div>
+    </div>
+
+    <!-- Informations Client & Adresse de Livraison -->
+    <div class="client-box">
+      <div class="section-title">Informations du Client & Livraison</div>
+      <div class="client-grid">
+        <div>
+          <div class="client-field-label">Nom & Prénom</div>
+          <div class="client-field-value">${selectedOrder.customer_name || '—'}</div>
+        </div>
+        <div>
+          <div class="client-field-label">Numéro de Téléphone</div>
+          <div class="client-field-value" style="color: #0284c7;">${selectedOrder.customer_phone || '—'}</div>
+        </div>
+        <div style="grid-column: span 2;">
+          <div class="client-field-label">Wilaya / Adresse de Livraison</div>
+          <div class="client-field-value">${selectedOrder.customer_address || 'Non spécifiée'}</div>
+        </div>
+        ${selectedOrder.customer_email ? `
+        <div style="grid-column: span 2;">
+          <div class="client-field-label">Adresse Email</div>
+          <div class="client-field-value" style="font-size: 12.5px; font-weight: 500; color: #4b5563;">${selectedOrder.customer_email}</div>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+
+    <!-- Produit et Détail des Articles -->
+    <table class="products-table">
+      <thead>
+        <tr>
+          <th style="width: 35px;">#</th>
+          <th>Désignation du Produit</th>
+          <th style="width: 60px; text-align: center;">Qté</th>
+          <th style="width: 130px; text-align: right;">Prix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>
+            <div class="product-name">${selectedOrder.items_summary || 'Produit commandé'}</div>
+          </td>
+          <td style="text-align: center; font-weight: 700;">1</td>
+          <td style="text-align: right; font-weight: 800;">${subtotal.toLocaleString()} DA</td>
+        </tr>
+        <tr style="background-color: #fafafa;">
+          <td>2</td>
+          <td>
+            <div style="font-weight: 600; color: #4b5563;">Frais de Livraison (${selectedOrder.customer_address || 'Wilaya'})</div>
+          </td>
+          <td style="text-align: center; font-weight: 600;">1</td>
+          <td style="text-align: right; font-weight: 700; color: #374151;">${shipping === 0 ? 'Gratuit (0 DA)' : `${shipping.toLocaleString()} DA`}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Totaux et Mode de Règlement -->
+    <div class="bottom-section">
+      <div class="payment-box">
+        <div class="payment-box-title">Mode de Règlement</div>
+        <div class="payment-box-val">💵 ${selectedOrder.payment_method || 'Paiement à la livraison'}</div>
+        <div class="payment-box-sub">Montant à encaisser en espèces par le livreur lors de la livraison.</div>
+      </div>
+
+      <div class="totals-box">
+        <div class="totals-row">
+          <span style="color: #6b7280;">Prix des articles :</span>
+          <strong>${subtotal.toLocaleString()} DA</strong>
+        </div>
+        <div class="totals-row">
+          <span style="color: #6b7280;">Frais de livraison :</span>
+          <strong>${shipping === 0 ? '0 DA' : `${shipping.toLocaleString()} DA`}</strong>
+        </div>
+        <div class="totals-row grand-total">
+          <span>Total à payer :</span>
+          <strong>${total.toLocaleString()} DA</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signatures -->
+    <div class="signatures-grid">
+      <div class="signature-card">
+        <div class="signature-card-label">Visa / Cachet Transporteur :</div>
+      </div>
+      <div class="signature-card">
+        <div class="signature-card-label">Signature du Client :</div>
+      </div>
+    </div>
+
+    <div class="slip-footer">
+      Merci pour votre commande ! &bull; ${storeInfo.name || 'LeerBook'} &bull; Document officiel tenant lieu de bon de livraison
+    </div>
+  </div>
+</body>
+</html>`;
+
+    try {
+      const frameDoc = printIframe.contentWindow.document;
+      frameDoc.open();
+      frameDoc.write(printHtml);
+      frameDoc.close();
+
+      setTimeout(() => {
+        try {
+          printIframe.contentWindow.focus();
+          printIframe.contentWindow.print();
+        } catch (err) {
+          console.error('Erreur impression iframe:', err);
+          window.print();
+        }
+      }, 300);
+    } catch (err) {
+      console.error('Erreur préparation impression:', err);
       window.print();
     }
   };
@@ -554,173 +833,159 @@ export default function AdminOrders() {
               BON DE LIVRAISON IMPRIMABLE (AFFICHÉ UNIQUEMENT À L'IMPRESSION)
               ========================================================================= */}
           <div id="printable-delivery-slip" className="printable-delivery-slip">
-            {/* En-tête : Logo sélectionné dans l'admin & Titre du document */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderBottom: '2px solid #0f172a',
-                paddingBottom: '14px',
-                marginBottom: '18px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                {shopLogo ? (
-                  <img
-                    src={shopLogo}
-                    alt={storeInfo.name}
-                    style={{ maxHeight: '60px', maxWidth: '170px', objectFit: 'contain' }}
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  />
-                ) : null}
+            <div style={{ maxWidth: '720px', margin: '0 auto', border: '1.5px solid #111827', padding: '22px 24px', borderRadius: '6px' }}>
+              {/* En-tête : Boutique & Titre */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  borderBottom: '2px solid #111827',
+                  paddingBottom: '14px',
+                  marginBottom: '18px'
+                }}
+              >
                 <div>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', textTransform: 'capitalize' }}>
+                  {shopLogo ? (
+                    <img
+                      src={shopLogo}
+                      alt={storeInfo.name}
+                      style={{ maxHeight: '44px', maxWidth: '150px', objectFit: 'contain', marginBottom: '4px', display: 'block' }}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  ) : null}
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#111827', textTransform: 'uppercase' }}>
                     {storeInfo.name || 'LeerBook'}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#64748b' }}>Boutique en ligne &bull; Vente & Livraison Express</div>
-                  {storeInfo.phone && <div style={{ fontSize: '11px', color: '#475569' }}>Tél : {storeInfo.phone}</div>}
-                  {storeInfo.email && <div style={{ fontSize: '11px', color: '#475569' }}>Email : {storeInfo.email}</div>}
+                  <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '2px' }}>Boutique en ligne &bull; Vente & Livraison</div>
+                  {storeInfo.phone && <div style={{ fontSize: '12px', color: '#4b5563' }}>Tél : {storeInfo.phone}</div>}
                 </div>
-              </div>
 
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  BON DE LIVRAISON
-                </div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#fe2c55', marginTop: '3px' }}>
-                  Commande {selectedOrder.order_number.startsWith('#') ? selectedOrder.order_number : `#${selectedOrder.order_number}`}
-                </div>
-                <div style={{ fontSize: '12px', color: '#475569', marginTop: '2px' }}>
-                  Date : {selectedOrder.created_at || new Date().toLocaleDateString('fr-FR')}
-                </div>
-              </div>
-            </div>
-
-            {/* Cadres Expéditeur & Destinataire (Client) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '20px' }}>
-              {/* Expéditeur */}
-              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px 14px', backgroundColor: '#f8fafc' }}>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
-                  Expéditeur / Boutique
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{storeInfo.name || 'LeerBook'}</div>
-                {storeInfo.phone && <div style={{ fontSize: '12px', color: '#334155', marginTop: '3px' }}>Tél : {storeInfo.phone}</div>}
-                <div style={{ fontSize: '12px', color: '#334155', marginTop: '2px' }}>Service : Expédition & Livraison à domicile</div>
-              </div>
-
-              {/* Destinataire */}
-              <div style={{ border: '2px solid #0f172a', borderRadius: '8px', padding: '12px 14px', backgroundColor: '#ffffff' }}>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: '#fe2c55', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.5px' }}>
-                  Destinataire / Client
-                </div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
-                  {selectedOrder.customer_name}
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', marginTop: '3px' }}>
-                  Tél : <span style={{ color: '#0284c7' }}>{selectedOrder.customer_phone}</span>
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginTop: '3px' }}>
-                  Adresse / Wilaya : <strong>{selectedOrder.customer_address || 'Non spécifiée'}</strong>
-                </div>
-                {selectedOrder.customer_email && (
-                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                    Email : {selectedOrder.customer_email}
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '19px', fontWeight: 900, color: '#111827', textTransform: 'uppercase' }}>
+                    BON DE LIVRAISON
                   </div>
-                )}
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#111827', marginTop: '3px' }}>
+                    Commande {selectedOrder.order_number?.startsWith('#') ? selectedOrder.order_number : `#${selectedOrder.order_number}`}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '2px' }}>
+                    Date : {selectedOrder.created_at || new Date().toLocaleDateString('fr-FR')}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Tableau des Articles Commandés */}
-            <div style={{ marginBottom: '20px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #cbd5e1' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #0f172a' }}>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 800, color: '#0f172a', width: '40px' }}>N°</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>Désignation des Articles</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center', fontSize: '12px', fontWeight: 800, color: '#0f172a', width: '80px' }}>Qté</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '12px', fontWeight: 800, color: '#0f172a', width: '130px' }}>Montant (DA)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '10px 12px', fontSize: '13px', fontWeight: 600, color: '#475569' }}>1</td>
-                    <td style={{ padding: '10px 12px', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                      {selectedOrder.items_summary || 'Articles commandés'}
-                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 400, marginTop: '2px' }}>
-                        Édition authentique &bull; Emballage soigné
-                      </div>
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>1</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
-                      {orderSubtotal.toLocaleString()} DA
-                    </td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid #cbd5e1', backgroundColor: '#fafafa' }}>
-                    <td style={{ padding: '8px 12px', fontSize: '13px', fontWeight: 600, color: '#475569' }}>2</td>
-                    <td style={{ padding: '8px 12px', fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-                      Frais de Livraison ({selectedOrder.customer_address || 'Wilaya'})
-                    </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#334155' }}>1</td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#334155' }}>
-                      {orderShipping === 0 ? 'Gratuit (0 DA)' : `${orderShipping.toLocaleString()} DA`}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+              {/* Cadre Client & Adresse */}
+              <div style={{ border: '1px solid #d1d5db', borderRadius: '6px', padding: '12px 14px', marginBottom: '18px', backgroundColor: '#f9fafb' }}>
+                <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#374151', marginBottom: '8px', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px' }}>
+                  Informations du Client & Livraison
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Nom & Prénom</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginTop: '1px' }}>{selectedOrder.customer_name || '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Numéro de Téléphone</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0284c7', marginTop: '1px' }}>{selectedOrder.customer_phone || '—'}</div>
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Wilaya / Adresse de Livraison</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginTop: '1px' }}>{selectedOrder.customer_address || 'Non spécifiée'}</div>
+                  </div>
+                  {selectedOrder.customer_email && (
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Adresse Email</div>
+                      <div style={{ fontSize: '12.5px', fontWeight: 500, color: '#4b5563', marginTop: '1px' }}>{selectedOrder.customer_email}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-            {/* Mode de Règlement & Cadre Total Net à Encaisser */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '22px' }}>
-              <div style={{ maxWidth: '340px' }}>
-                <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 14px', backgroundColor: '#f8fafc' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>
+              {/* Tableau des Articles Commandés */}
+              <div style={{ marginBottom: '18px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f3f4f6', borderTop: '1.5px solid #111827', borderBottom: '1.5px solid #111827' }}>
+                      <th style={{ padding: '9px 12px', textAlign: 'left', fontSize: '11.5px', fontWeight: 800, color: '#111827', width: '35px' }}>#</th>
+                      <th style={{ padding: '9px 12px', textAlign: 'left', fontSize: '11.5px', fontWeight: 800, color: '#111827' }}>Désignation du Produit</th>
+                      <th style={{ padding: '9px 12px', textAlign: 'center', fontSize: '11.5px', fontWeight: 800, color: '#111827', width: '60px' }}>Qté</th>
+                      <th style={{ padding: '9px 12px', textAlign: 'right', fontSize: '11.5px', fontWeight: 800, color: '#111827', width: '130px' }}>Prix</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ padding: '11px 12px', borderBottom: '1px solid #e5e7eb', fontSize: '13px' }}>1</td>
+                      <td style={{ padding: '11px 12px', borderBottom: '1px solid #e5e7eb', fontSize: '13.5px', fontWeight: 700, color: '#111827' }}>
+                        {selectedOrder.items_summary || 'Produit commandé'}
+                      </td>
+                      <td style={{ padding: '11px 12px', borderBottom: '1px solid #e5e7eb', textAlign: 'center', fontSize: '13px', fontWeight: 700, color: '#111827' }}>1</td>
+                      <td style={{ padding: '11px 12px', borderBottom: '1px solid #e5e7eb', textAlign: 'right', fontSize: '13px', fontWeight: 800, color: '#111827' }}>
+                        {orderSubtotal.toLocaleString()} DA
+                      </td>
+                    </tr>
+                    <tr style={{ backgroundColor: '#fafafa' }}>
+                      <td style={{ padding: '11px 12px', borderBottom: '1px solid #e5e7eb', fontSize: '13px' }}>2</td>
+                      <td style={{ padding: '11px 12px', borderBottom: '1px solid #e5e7eb', fontSize: '13px', fontWeight: 600, color: '#4b5563' }}>
+                        Frais de Livraison ({selectedOrder.customer_address || 'Wilaya'})
+                      </td>
+                      <td style={{ padding: '11px 12px', borderBottom: '1px solid #e5e7eb', textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#4b5563' }}>1</td>
+                      <td style={{ padding: '11px 12px', borderBottom: '1px solid #e5e7eb', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#374151' }}>
+                        {orderShipping === 0 ? 'Gratuit (0 DA)' : `${orderShipping.toLocaleString()} DA`}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mode de Règlement & Totaux */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: '10px', gap: '16px' }}>
+                <div style={{ border: '1px dashed #9ca3af', borderRadius: '6px', padding: '10px 14px', maxWidth: '330px', backgroundColor: '#fafafa' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#4b5563', textTransform: 'uppercase', marginBottom: '3px' }}>
                     Mode de Règlement
                   </div>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                    💵 {selectedOrder.payment_method || 'Paiement à la livraison (Cash on Delivery)'}
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>
+                    💵 {selectedOrder.payment_method || 'Paiement à la livraison'}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                    Montant à encaisser en espèces par le livreur lors de la remise du colis.
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>
+                    Montant à encaisser en espèces par le livreur lors de la livraison.
+                  </div>
+                </div>
+
+                <div style={{ width: '270px', border: '1.5px solid #111827', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ padding: '7px 12px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', fontSize: '12.5px' }}>
+                    <span style={{ color: '#6b7280' }}>Prix des articles :</span>
+                    <strong style={{ color: '#111827' }}>{orderSubtotal.toLocaleString()} DA</strong>
+                  </div>
+                  <div style={{ padding: '7px 12px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', fontSize: '12.5px' }}>
+                    <span style={{ color: '#6b7280' }}>Frais de livraison :</span>
+                    <strong style={{ color: '#111827' }}>{orderShipping === 0 ? '0 DA' : `${orderShipping.toLocaleString()} DA`}</strong>
+                  </div>
+                  <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#111827', color: '#ffffff' }}>
+                    <span style={{ fontSize: '12.5px', fontWeight: 800, textTransform: 'uppercase' }}>Total à payer :</span>
+                    <span style={{ fontSize: '16.5px', fontWeight: 900, color: '#ffffff' }}>{orderTotal.toLocaleString()} DA</span>
                   </div>
                 </div>
               </div>
 
-              {/* Total à Encaisser */}
-              <div style={{ width: '280px', border: '2px solid #0f172a', borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', fontSize: '12px' }}>
-                  <span style={{ color: '#475569' }}>Sous-total articles :</span>
-                  <strong style={{ color: '#0f172a' }}>{orderSubtotal.toLocaleString()} DA</strong>
+              {/* Signatures */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '28px', paddingTop: '14px', borderTop: '1px dashed #d1d5db' }}>
+                <div style={{ border: '1px dashed #9ca3af', borderRadius: '6px', padding: '9px 12px', height: '65px' }}>
+                  <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#4b5563', textTransform: 'uppercase' }}>
+                    Visa / Cachet Transporteur :
+                  </div>
                 </div>
-                <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', fontSize: '12px' }}>
-                  <span style={{ color: '#475569' }}>Frais de livraison :</span>
-                  <strong style={{ color: '#0f172a' }}>{orderShipping.toLocaleString()} DA</strong>
-                </div>
-                <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0f172a', color: '#ffffff' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total à Encaisser :</span>
-                  <span style={{ fontSize: '18px', fontWeight: 900, color: '#ffffff' }}>{orderTotal.toLocaleString()} DA</span>
-                </div>
-              </div>
-            </div>
 
-            {/* Signatures & Reçu */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '20px', paddingTop: '14px', borderTop: '1px dashed #cbd5e1' }}>
-              <div style={{ border: '1px dashed #cbd5e1', borderRadius: '6px', padding: '10px 12px', height: '75px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                  Visa / Cachet du Transporteur :
+                <div style={{ border: '1px dashed #9ca3af', borderRadius: '6px', padding: '9px 12px', height: '65px' }}>
+                  <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#4b5563', textTransform: 'uppercase' }}>
+                    Signature du Client :
+                  </div>
                 </div>
               </div>
 
-              <div style={{ border: '1px dashed #cbd5e1', borderRadius: '6px', padding: '10px 12px', height: '75px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                  Signature & Réception du Client :
-                </div>
+              {/* Pied de page du bon de livraison */}
+              <div style={{ textAlign: 'center', marginTop: '18px', fontSize: '11px', color: '#6b7280' }}>
+                Merci pour votre commande ! &bull; {storeInfo.name || 'LeerBook'} &bull; Document officiel tenant lieu de bon de livraison
               </div>
-            </div>
-
-            {/* Pied de page du bon de livraison */}
-            <div style={{ textAlign: 'center', marginTop: '18px', fontSize: '11px', color: '#94a3b8' }}>
-              Merci pour votre commande ! &bull; {storeInfo.name || 'LeerBook'} &bull; Document officiel tenant lieu de bon de livraison
             </div>
           </div>
         </div>

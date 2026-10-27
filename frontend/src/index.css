@@ -49,7 +49,7 @@ body {
 
 /* Ensure padding-bottom on all scrollable pages so bottom content & buttons are never clipped behind fixed BottomNav or footers */
 .page-wrapper:not(.overflow-hidden) .page-content {
-  padding-bottom: 95px !important;
+  padding-bottom: calc(115px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* Safe scroll area for all container elements */
@@ -113,6 +113,10 @@ body::-webkit-scrollbar-thumb:hover,
   overflow: hidden !important;
   z-index: 2 !important;
   box-sizing: border-box !important;
+}
+
+.home-card-wrapper.search-active {
+  top: var(--search-bar-offset, 275px) !important;
 }
 
 .home-card-container {
@@ -561,7 +565,7 @@ body::-webkit-scrollbar-thumb:hover,
 .categories-grid-2x2 .dz-media-card.style-3 {
   border-radius: 14px !important;
   overflow: hidden !important;
-  height: clamp(105px, calc((100dvh - 200px) / 4), 165px) !important;
+  height: clamp(105px, calc((100vh - 200px) / 4), 165px) !important;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08) !important;
   transition: transform 0.15s ease !important;
 }
@@ -640,7 +644,7 @@ body::-webkit-scrollbar-thumb:hover,
 .categories-books-grid-2x4 .dz-media-card.style-3 {
   border-radius: 14px !important;
   overflow: hidden !important;
-  height: clamp(105px, calc((100dvh - 180px) / 4), 165px) !important;
+  height: clamp(105px, calc((100vh - 180px) / 4), 165px) !important;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08) !important;
   transition: transform 0.15s ease !important;
 }
@@ -1844,6 +1848,10 @@ button.btn-gradient:hover {
   margin: 0 auto;
   z-index: 2;
   padding: 10px 12px 35px 12px;
+}
+
+.home-grid-scroll-area.search-active {
+  top: var(--search-bar-offset, 275px) !important;
 }
 
 .home-grid-scroll-area::-webkit-scrollbar {
