@@ -4,9 +4,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AdminLayout from '../AdminLayout';
 import { adminApi } from '../services/adminApi';
+import AdminPagination from '../components/AdminPagination';
 
 export default function AdminCashflow() {
   const [entries, setEntries] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
   const [kpi, setKpi] = useState({
     total_ventes_encaissees: '98500.00',
     ventes_produits: '97000.00',
@@ -335,6 +338,9 @@ export default function AdminCashflow() {
       (item.order_type || '').toLowerCase().includes(q)
     );
   });
+
+  const totalPages = Math.ceil(filteredEntries.length / itemsPerPage) || 1;
+  const paginatedEntries = filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <AdminLayout>
@@ -931,7 +937,7 @@ export default function AdminCashflow() {
                   </td>
                 </tr>
               ) : (
-                filteredEntries.map((row) => {
+                paginatedEntries.map((row) => {
                   const isPositive = row.type === 'VENTE' || row.type === 'RECETTE' || row.type === 'VERSEMENT';
                   const isExpense = row.type === 'DEPENSE' || row.type === 'ACHAT';
 
@@ -1152,6 +1158,19 @@ export default function AdminCashflow() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Numérique */}
+        <AdminPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+          }}
+          totalItems={filteredEntries.length}
+          itemsPerPage={itemsPerPage}
+          itemLabel="écritures"
+        />
       </div>
     </div>
   )}

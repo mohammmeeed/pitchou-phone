@@ -8,7 +8,7 @@ import { adminApi } from '../services/adminApi';
 import { applyThemeColor } from '../../context/ThemeContext';
 
 export default function AdminParameter() {
-  const [activeTab, setActiveTab] = useState('store'); // 'store' | 'appearance' | 'smtp'
+  const [activeTab, setActiveTab] = useState('appearance'); // 'appearance' | 'smtp'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState(null); // { type: 'success' | 'error', text: string }
@@ -322,7 +322,6 @@ export default function AdminParameter() {
         }}
       >
         {[
-          { id: 'store', label: 'Boutique & Devise', icon: 'flaticon-381-box' },
           { id: 'appearance', label: 'Apparence & Design', icon: 'flaticon-381-layer-1' },
           { id: 'smtp', label: 'Configuration SMTP', icon: 'flaticon-381-send' }
         ].map((tab) => (
@@ -353,107 +352,6 @@ export default function AdminParameter() {
 
       {/* Conteneur des Cartes de Configuration (Full Width) */}
       <div style={{ width: '100%' }}>
-        
-        {/* CARTE 1 : BOUTIQUE & DEVISE */}
-        {activeTab === 'store' && (
-          <div className="admin-card" style={{ width: '100%' }}>
-            <div className="card-header-custom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                <i className="flaticon-381-box" style={{ color: '#111111' }} />
-                Boutique & Devise
-              </h4>
-              <span className="badge-custom bg-soft-primary" style={{ fontWeight: 700 }}>
-                GÉNÉRAL
-              </span>
-            </div>
-
-            <div className="card-body-custom" style={{ padding: '1.75rem' }}>
-              <form onSubmit={handleSave}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                  <div className="form-group-custom">
-                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                      Nom de la Boutique
-                    </label>
-                    <input
-                      type="text"
-                      className="form-control-custom"
-                      value={settings.store_name}
-                      onChange={(e) => setSettings({ ...settings, store_name: e.target.value })}
-                      placeholder="Ex: LeerBook"
-                    />
-                  </div>
-
-                  <div className="form-group-custom">
-                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                      Devise par Défaut
-                    </label>
-                    <input
-                      type="text"
-                      className="form-control-custom"
-                      value={settings.currency}
-                      disabled
-                      style={{ backgroundColor: '#f4f4f5', color: '#71717a', cursor: 'not-allowed' }}
-                    />
-                    <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem' }}>
-                      Fixée sur le Dinar Algérien (DA) pour les paiements locaux.
-                    </small>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                  <div className="form-group-custom">
-                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                      Frais de Livraison Standard (DA)
-                    </label>
-                    <input
-                      type="number"
-                      className="form-control-custom"
-                      value={settings.delivery_cost}
-                      onChange={(e) => setSettings({ ...settings, delivery_cost: e.target.value })}
-                      placeholder="500"
-                    />
-                  </div>
-
-                  <div className="form-group-custom">
-                    <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                      Téléphone Support / WhatsApp
-                    </label>
-                    <input
-                      type="text"
-                      className="form-control-custom"
-                      value={settings.admin_phone}
-                      onChange={(e) => setSettings({ ...settings, admin_phone: e.target.value })}
-                      placeholder="0550 12 34 56"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group-custom" style={{ marginBottom: '1.75rem' }}>
-                  <label className="form-label-custom" style={{ fontWeight: 700, color: '#27272a', marginBottom: '0.4rem', display: 'block' }}>
-                    Email de Contact Général
-                  </label>
-                  <input
-                    type="email"
-                    className="form-control-custom"
-                    value={settings.admin_email}
-                    onChange={(e) => setSettings({ ...settings, admin_email: e.target.value })}
-                    placeholder="admin@tiktokshop.dz"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn-primary-custom"
-                  disabled={saving}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 1.5rem' }}
-                >
-                  <i className="flaticon-381-save" />
-                  <span>{saving ? 'Enregistrement...' : 'Enregistrer les Modifications'}</span>
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
 
         {/* CARTE 2 : APPARENCE & DESIGN */}
         {activeTab === 'appearance' && (

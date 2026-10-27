@@ -181,6 +181,45 @@ function handleGet(?PDO $pdo): void {
     }
 }
 
+/**
+ * Récupère les colonnes existantes de la table products et migre automatiquement les colonnes manquantes
+ */
+function getProductColumns(PDO $pdo): array {
+    static $cols = null;
+    if ($cols !== null) {
+        return $cols;
+    }
+    $cols = [];
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM products");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        foreach ($rows as $row) {
+            $cols[strtolower($row['Field'])] = true;
+        }
+    } catch (Throwable $e) {}
+
+    // Tentatives d'auto-migration pour les colonnes récemment ajoutées
+    $missingToCreate = [
+        'purchase_price' => "ALTER TABLE products ADD COLUMN purchase_price DECIMAL(10,2) DEFAULT 0.00",
+        'categories'     => "ALTER TABLE products ADD COLUMN categories TEXT DEFAULT NULL",
+        'videos'         => "ALTER TABLE products ADD COLUMN videos TEXT DEFAULT NULL",
+        'languages'      => "ALTER TABLE products ADD COLUMN languages TEXT DEFAULT NULL",
+        'format'         => "ALTER TABLE products ADD COLUMN format VARCHAR(100) DEFAULT ''",
+        'location'       => "ALTER TABLE products ADD COLUMN location VARCHAR(150) DEFAULT ''"
+    ];
+
+    foreach ($missingToCreate as $colName => $alterSql) {
+        if (!isset($cols[$colName])) {
+            try {
+                $pdo->exec($alterSql);
+                $cols[$colName] = true;
+            } catch (Throwable $e) {}
+        }
+    }
+
+    return $cols;
+}
+
 function handlePost(?PDO $pdo): void {
     if ($pdo === null) {
         http_response_code(503);
@@ -195,72 +234,128 @@ function handlePost(?PDO $pdo): void {
         return;
     }
 
-    $languages = is_array($input['languages'] ?? null) 
-        ? implode(', ', array_filter($input['languages'])) 
-        : trim($input['languages'] ?? '');
+    try {
+        $existingCols = getProductColumns($pdo);
 
-    // Multi-categories
-    $categories = [];
-    if (!empty($input['categories'])) {
-        $categories = is_array($input['categories']) ? $input['categories'] : (json_decode($input['categories'], true) ?? [$input['categories']]);
-    } elseif (!empty($input['category'])) {
-        $categories = is_array($input['category']) ? $input['category'] : array_map('trim', explode(',', $input['category']));
+        $languages = is_array($input['languages'] ?? null) 
+            ? implode(', ', array_filter($input['languages'])) 
+            : trim($input['languages'] ?? '');
+
+        // Multi-categories
+        $categories = [];
+        if (!empty($input['categories'])) {
+            $categories = is_array($input['categories']) ? $input['categories'] : (json_decode($input['categories'], true) ?? [$input['categories']]);
+        } elseif (!empty($input['category'])) {
+            $categories = is_array($input['category']) ? $input['category'] : array_map('trim', explode(',', $input['category']));
+        }
+        $categories = array_values(array_filter($categories));
+        $categoriesStr = implode(', ', $categories);
+        $categoriesJson = !empty($categories) ? json_encode($categories, JSON_UNESCAPED_UNICODE) : null;
+
+        // Multi-images
+        $images = [];
+        if (!empty($input['images'])) {
+            $images = is_array($input['images']) ? $input['images'] : json_decode($input['images'], true) ?? [$input['images']];
+        } elseif (!empty($input['image'])) {
+            $images = [$input['image']];
+        }
+        $images = array_values(array_filter($images));
+        $mainImage = !empty($images) ? $images[0] : ($input['image'] ?? '/assets/images/books/book1.jpg');
+        $imagesJson = !empty($images) ? json_encode($images) : json_encode([$mainImage]);
+
+        // Multi-videos
+        $videos = [];
+        if (!empty($input['videos'])) {
+            $videos = is_array($input['videos']) ? $input['videos'] : json_decode($input['videos'], true) ?? [$input['videos']];
+        } elseif (!empty($input['video'])) {
+            $videos = [$input['video']];
+        }
+        $videos = array_values(array_filter($videos));
+        $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
+        $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
+
+        $purchasePrice = isset($input['purchase_price']) && $input['purchase_price'] !== '' ? (float)$input['purchase_price'] : 0.0;
+
+        // Construction dynamique de l'INSERT
+        $cols = ['name', 'price'];
+        $vals = [trim($input['name']), (float)$input['price']];
+
+        if (isset($existingCols['author'])) {
+            $cols[] = 'author';
+            $vals[] = trim($input['author'] ?? '');
+        }
+        if (isset($existingCols['format'])) {
+            $cols[] = 'format';
+            $vals[] = trim($input['format'] ?? '');
+        }
+        if (isset($existingCols['purchase_price'])) {
+            $cols[] = 'purchase_price';
+            $vals[] = $purchasePrice;
+        }
+        if (isset($existingCols['stock'])) {
+            $cols[] = 'stock';
+            $vals[] = (int)($input['stock'] ?? 10);
+        }
+        if (isset($existingCols['category'])) {
+            $cols[] = 'category';
+            $vals[] = $categoriesStr;
+        }
+        if (isset($existingCols['categories'])) {
+            $cols[] = 'categories';
+            $vals[] = $categoriesJson;
+        }
+        if (isset($existingCols['rating'])) {
+            $cols[] = 'rating';
+            $vals[] = (float)($input['rating'] ?? 5.0);
+        }
+        if (isset($existingCols['image'])) {
+            $cols[] = 'image';
+            $vals[] = $mainImage;
+        }
+        if (isset($existingCols['images'])) {
+            $cols[] = 'images';
+            $vals[] = $imagesJson;
+        }
+        if (isset($existingCols['video'])) {
+            $cols[] = 'video';
+            $vals[] = $mainVideo;
+        }
+        if (isset($existingCols['videos'])) {
+            $cols[] = 'videos';
+            $vals[] = $videosJson;
+        }
+        if (isset($existingCols['bio'])) {
+            $cols[] = 'bio';
+            $vals[] = trim($input['bio'] ?? '');
+        }
+        if (isset($existingCols['languages'])) {
+            $cols[] = 'languages';
+            $vals[] = $languages;
+        }
+        if (isset($existingCols['is_featured'])) {
+            $cols[] = 'is_featured';
+            $vals[] = (int)($input['is_featured'] ?? 1);
+        }
+
+        $placeholders = array_fill(0, count($cols), '?');
+        $sql = "INSERT INTO products (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($vals);
+
+        $newId = $pdo->lastInsertId();
+        http_response_code(201);
+        echo json_encode([
+            "success" => true, 
+            "message" => "Produit ajouté avec succès", 
+            "id" => $newId
+        ]);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode([
+            "success" => false, 
+            "message" => "Erreur lors de l'ajout du produit: " . $e->getMessage()
+        ]);
     }
-    $categories = array_values(array_filter($categories));
-    $categoriesStr = implode(', ', $categories);
-    $categoriesJson = !empty($categories) ? json_encode($categories, JSON_UNESCAPED_UNICODE) : null;
-
-    // Multi-images
-    $images = [];
-    if (!empty($input['images'])) {
-        $images = is_array($input['images']) ? $input['images'] : json_decode($input['images'], true) ?? [$input['images']];
-    } elseif (!empty($input['image'])) {
-        $images = [$input['image']];
-    }
-    $images = array_values(array_filter($images));
-    $mainImage = !empty($images) ? $images[0] : ($input['image'] ?? '/assets/images/books/book1.jpg');
-    $imagesJson = !empty($images) ? json_encode($images) : json_encode([$mainImage]);
-
-    // Multi-videos
-    $videos = [];
-    if (!empty($input['videos'])) {
-        $videos = is_array($input['videos']) ? $input['videos'] : json_decode($input['videos'], true) ?? [$input['videos']];
-    } elseif (!empty($input['video'])) {
-        $videos = [$input['video']];
-    }
-    $videos = array_values(array_filter($videos));
-    $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
-    $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
-
-    $purchasePrice = isset($input['purchase_price']) && $input['purchase_price'] !== '' ? (float)$input['purchase_price'] : 0.0;
-
-    $stmt = $pdo->prepare("INSERT INTO products (name, author, format, price, purchase_price, stock, category, categories, rating, image, images, video, videos, bio, languages, is_featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([
-        trim($input['name']),
-        trim($input['author'] ?? ''),
-        trim($input['format'] ?? ''),
-        (float)$input['price'],
-        $purchasePrice,
-        (int)($input['stock'] ?? 10),
-        $categoriesStr,
-        $categoriesJson,
-        (float)($input['rating'] ?? 5.0),
-        $mainImage,
-        $imagesJson,
-        $mainVideo,
-        $videosJson,
-        trim($input['bio'] ?? ''),
-        $languages,
-        (int)($input['is_featured'] ?? 1)
-    ]);
-
-    $newId = $pdo->lastInsertId();
-    http_response_code(201);
-    echo json_encode([
-        "success" => true, 
-        "message" => "Produit ajouté avec succès", 
-        "id" => $newId
-    ]);
 }
 
 function handlePut(?PDO $pdo): void {
@@ -269,7 +364,9 @@ function handlePut(?PDO $pdo): void {
         echo json_encode(["success" => false, "message" => "Base de données non connectée"]);
         return;
     }
-    $input = json_decode(file_get_contents('php://input'), true);
+
+    $raw = file_get_contents('php://input');
+    $input = json_decode($raw, true);
     $id = (int)($_GET['id'] ?? ($input['id'] ?? 0));
 
     if (!$id) {
@@ -278,66 +375,153 @@ function handlePut(?PDO $pdo): void {
         return;
     }
 
-    $languages = is_array($input['languages'] ?? null) 
-        ? implode(', ', array_filter($input['languages'])) 
-        : trim($input['languages'] ?? '');
+    try {
+        $existingCols = getProductColumns($pdo);
 
-    // Multi-categories
-    $categories = [];
-    if (isset($input['categories'])) {
-        $categories = is_array($input['categories']) ? $input['categories'] : (json_decode($input['categories'], true) ?? [$input['categories']]);
-    } elseif (!empty($input['category'])) {
-        $categories = is_array($input['category']) ? $input['category'] : array_map('trim', explode(',', $input['category']));
+        $languages = is_array($input['languages'] ?? null) 
+            ? implode(', ', array_filter($input['languages'])) 
+            : trim($input['languages'] ?? '');
+
+        // Multi-categories
+        $categories = [];
+        if (isset($input['categories'])) {
+            $categories = is_array($input['categories']) ? $input['categories'] : (json_decode($input['categories'], true) ?? [$input['categories']]);
+        } elseif (!empty($input['category'])) {
+            $categories = is_array($input['category']) ? $input['category'] : array_map('trim', explode(',', $input['category']));
+        }
+        $categories = array_values(array_filter($categories));
+        $categoriesStr = implode(', ', $categories);
+        $categoriesJson = !empty($categories) ? json_encode($categories, JSON_UNESCAPED_UNICODE) : null;
+
+        // Multi-images
+        $images = [];
+        if (isset($input['images'])) {
+            $images = is_array($input['images']) ? $input['images'] : json_decode($input['images'], true) ?? [$input['images']];
+        } elseif (!empty($input['image'])) {
+            $images = [$input['image']];
+        }
+        $images = array_values(array_filter($images));
+        $mainImage = !empty($images) ? $images[0] : ($input['image'] ?? '/assets/images/books/book1.jpg');
+        $imagesJson = !empty($images) ? json_encode($images) : json_encode([$mainImage]);
+
+        // Multi-videos
+        $videos = [];
+        if (isset($input['videos'])) {
+            $videos = is_array($input['videos']) ? $input['videos'] : json_decode($input['videos'], true) ?? [$input['videos']];
+        } elseif (!empty($input['video'])) {
+            $videos = [$input['video']];
+        }
+        $videos = array_values(array_filter($videos));
+        $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
+        $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
+
+        $purchasePrice = isset($input['purchase_price']) && $input['purchase_price'] !== '' ? (float)$input['purchase_price'] : 0.0;
+
+        // Construction dynamique de la requête UPDATE en fonction des colonnes réelles
+        $fields = [];
+        $params = [];
+
+        if (isset($input['name'])) {
+            $fields[] = "name = ?";
+            $params[] = trim($input['name']);
+        }
+        if (isset($existingCols['author'])) {
+            $fields[] = "author = ?";
+            $params[] = trim($input['author'] ?? '');
+        }
+        if (isset($existingCols['format'])) {
+            $fields[] = "format = ?";
+            $params[] = trim($input['format'] ?? '');
+        }
+        if (isset($input['price'])) {
+            $fields[] = "price = ?";
+            $params[] = (float)$input['price'];
+        }
+        if (isset($existingCols['purchase_price'])) {
+            $fields[] = "purchase_price = ?";
+            $params[] = $purchasePrice;
+        }
+        if (isset($existingCols['stock'])) {
+            $fields[] = "stock = ?";
+            $params[] = isset($input['stock']) ? (int)$input['stock'] : 0;
+        }
+        if (isset($existingCols['category'])) {
+            $fields[] = "category = ?";
+            $params[] = $categoriesStr;
+        }
+        if (isset($existingCols['categories'])) {
+            $fields[] = "categories = ?";
+            $params[] = $categoriesJson;
+        }
+        if (isset($existingCols['image'])) {
+            $fields[] = "image = ?";
+            $params[] = $mainImage;
+        }
+        if (isset($existingCols['images'])) {
+            $fields[] = "images = ?";
+            $params[] = $imagesJson;
+        }
+        if (isset($existingCols['video'])) {
+            $fields[] = "video = ?";
+            $params[] = $mainVideo;
+        }
+        if (isset($existingCols['videos'])) {
+            $fields[] = "videos = ?";
+            $params[] = $videosJson;
+        }
+        if (isset($existingCols['bio'])) {
+            $fields[] = "bio = ?";
+            $params[] = trim($input['bio'] ?? '');
+        }
+        if (isset($existingCols['languages'])) {
+            $fields[] = "languages = ?";
+            $params[] = $languages;
+        }
+        if (isset($existingCols['is_featured'])) {
+            $fields[] = "is_featured = ?";
+            $params[] = (int)($input['is_featured'] ?? 1);
+        }
+
+        if (empty($fields)) {
+            echo json_encode(["success" => true, "message" => "Aucune modification à apporter"]);
+            return;
+        }
+
+        $params[] = $id;
+        $sql = "UPDATE products SET " . implode(', ', $fields) . " WHERE id = ?";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        // Mettre à jour le fichier fallback si existant
+        $fallbackFile = __DIR__ . '/../database/products_fallback.json';
+        if (file_exists($fallbackFile)) {
+            $fb = json_decode(file_get_contents($fallbackFile), true) ?? [];
+            foreach ($fb as &$prod) {
+                if ((int)($prod['id'] ?? 0) === $id) {
+                    $prod['languages'] = $languages;
+                    if (isset($input['name'])) $prod['name'] = trim($input['name']);
+                    if (isset($input['author'])) $prod['author'] = trim($input['author']);
+                    if (isset($input['price'])) $prod['price'] = (float)$input['price'];
+                    if (isset($input['stock'])) $prod['stock'] = (int)$input['stock'];
+                    if (!empty($categories)) {
+                        $prod['categories'] = $categories;
+                        $prod['category'] = $categoriesStr;
+                    }
+                    break;
+                }
+            }
+            unset($prod);
+            @file_put_contents($fallbackFile, json_encode($fb, JSON_UNESCAPED_UNICODE));
+        }
+
+        echo json_encode(["success" => true, "message" => "Produit mis à jour avec succès"]);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode([
+            "success" => false, 
+            "message" => "Erreur lors de la mise à jour: " . $e->getMessage()
+        ]);
     }
-    $categories = array_values(array_filter($categories));
-    $categoriesStr = implode(', ', $categories);
-    $categoriesJson = !empty($categories) ? json_encode($categories, JSON_UNESCAPED_UNICODE) : null;
-
-    // Multi-images
-    $images = [];
-    if (isset($input['images'])) {
-        $images = is_array($input['images']) ? $input['images'] : json_decode($input['images'], true) ?? [$input['images']];
-    } elseif (!empty($input['image'])) {
-        $images = [$input['image']];
-    }
-    $images = array_values(array_filter($images));
-    $mainImage = !empty($images) ? $images[0] : ($input['image'] ?? '/assets/images/books/book1.jpg');
-    $imagesJson = !empty($images) ? json_encode($images) : json_encode([$mainImage]);
-
-    // Multi-videos
-    $videos = [];
-    if (isset($input['videos'])) {
-        $videos = is_array($input['videos']) ? $input['videos'] : json_decode($input['videos'], true) ?? [$input['videos']];
-    } elseif (!empty($input['video'])) {
-        $videos = [$input['video']];
-    }
-    $videos = array_values(array_filter($videos));
-    $mainVideo = !empty($videos) ? $videos[0] : ($input['video'] ?? null);
-    $videosJson = !empty($videos) ? json_encode($videos) : ($mainVideo ? json_encode([$mainVideo]) : null);
-
-    $purchasePrice = isset($input['purchase_price']) && $input['purchase_price'] !== '' ? (float)$input['purchase_price'] : 0.0;
-
-    $stmt = $pdo->prepare("UPDATE products SET name = ?, author = ?, format = ?, price = ?, purchase_price = ?, stock = ?, category = ?, categories = ?, image = ?, images = ?, video = ?, videos = ?, bio = ?, languages = ?, is_featured = ? WHERE id = ?");
-    $stmt->execute([
-        trim($input['name']),
-        trim($input['author'] ?? ''),
-        trim($input['format'] ?? ''),
-        (float)$input['price'],
-        $purchasePrice,
-        (isset($input['stock']) ? (int)$input['stock'] : 0),
-        $categoriesStr,
-        $categoriesJson,
-        $mainImage,
-        $imagesJson,
-        $mainVideo,
-        $videosJson,
-        trim($input['bio'] ?? ''),
-        $languages,
-        (int)($input['is_featured'] ?? 1),
-        $id
-    ]);
-
-    echo json_encode(["success" => true, "message" => "Produit mis à jour avec succès"]);
 }
 
 function handleDelete(?PDO $pdo): void {
@@ -353,8 +537,16 @@ function handleDelete(?PDO $pdo): void {
         return;
     }
 
-    $stmt = $pdo->prepare("DELETE FROM products WHERE id = ?");
-    $stmt->execute([$id]);
+    try {
+        $stmt = $pdo->prepare("DELETE FROM products WHERE id = ?");
+        $stmt->execute([$id]);
 
-    echo json_encode(["success" => true, "message" => "Produit supprimé avec succès"]);
+        echo json_encode(["success" => true, "message" => "Produit supprimé avec succès"]);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode([
+            "success" => false, 
+            "message" => "Erreur lors de la suppression: " . $e->getMessage()
+        ]);
+    }
 }

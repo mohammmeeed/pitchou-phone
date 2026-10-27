@@ -1,9 +1,11 @@
 // frontend/src/admin/pages/AdminProducts.jsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AdminLayout from '../AdminLayout';
 import { adminApi } from '../services/adminApi';
+import AdminPagination from '../components/AdminPagination';
 
-export default function AdminProducts() {
+export default function AdminProducts({ initialView }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -59,8 +61,22 @@ export default function AdminProducts() {
     }
   }, [isFormCatDropdownOpen]);
 
-  // In-Page View State: 'list' (Catalogue table) or 'form' (Integrated form card, NO pop-up!)
-  const [viewMode, setViewMode] = useState('list');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // In-Page View State: 'list' (Catalogue table), 'form' (Integrated form card) or 'attributes'
+  const isAttributesRoute = location.pathname === '/admin/attributes' || location.search.includes('view=attributes') || initialView === 'attributes';
+  const [viewMode, setViewMode] = useState(() => (isAttributesRoute ? 'attributes' : 'list'));
+
+  // Synchroniser viewMode lors des navigations (ex: clic dans la sidebar)
+  useEffect(() => {
+    if (location.pathname === '/admin/attributes' || location.search.includes('view=attributes')) {
+      setViewMode('attributes');
+    } else if (location.pathname === '/admin/products' && !location.search.includes('view=attributes')) {
+      setViewMode('list');
+    }
+  }, [location.pathname, location.search]);
+
   const [editingProduct, setEditingProduct] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
   const [formError, setFormError] = useState('');
@@ -904,7 +920,13 @@ export default function AdminProducts() {
               <button
                 type="button"
                 className="btn-light-custom"
-                onClick={() => setViewMode(editingProduct ? 'form' : 'list')}
+                onClick={() => {
+                  if (location.pathname === '/admin/attributes') {
+                    navigate('/admin/products');
+                  } else {
+                    setViewMode(editingProduct ? 'form' : 'list');
+                  }
+                }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
               >
                 <i className="fas fa-arrow-left" /> {editingProduct ? 'Retour au Produit' : 'Retour au Catalogue'}
@@ -2122,11 +2144,11 @@ export default function AdminProducts() {
                 </p>
               </div>
 
-              {/* Bouton Paramètres des Attributs (Positionné exactement là où entouré en bleu par l'utilisateur !) */}
+              {/* Bouton Paramètres des Attributs */}
               <button
                 type="button"
                 className="btn-light-custom"
-                onClick={() => setViewMode('attributes')}
+                onClick={() => navigate('/admin/attributes')}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -3361,7 +3383,7 @@ export default function AdminProducts() {
               <button
                 type="button"
                 className="btn-light-custom"
-                onClick={() => setViewMode('attributes')}
+                onClick={() => navigate('/admin/attributes')}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -3917,65 +3939,18 @@ export default function AdminProducts() {
               </table>
             </div>
 
-            {/* Contrôles de Pagination Fluide */}
-            {filteredProducts.length > itemsPerPage && (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '1rem 1.5rem',
-                  borderTop: '1px solid #f0f0f0',
-                  flexWrap: 'wrap',
-                  gap: '1rem'
-                }}
-              >
-                <div style={{ fontSize: '0.88rem', color: '#666' }}>
-                  Affichage de <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> à{' '}
-                  <strong>{Math.min(currentPage * itemsPerPage, filteredProducts.length)}</strong> sur{' '}
-                  <strong>{filteredProducts.length.toLocaleString('fr-FR')}</strong> livres
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn-light-custom"
-                    disabled={currentPage <= 1}
-                    onClick={() => {
-                      setCurrentPage((prev) => Math.max(1, prev - 1));
-                      window.scrollTo({ top: 400, behavior: 'smooth' });
-                    }}
-                    style={{
-                      padding: '0.4rem 0.85rem',
-                      fontSize: '0.85rem',
-                      cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
-                      opacity: currentPage <= 1 ? 0.5 : 1
-                    }}
-                  >
-                    ← Précédent
-                  </button>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 600, padding: '0 0.5rem', color: '#18181b' }}>
-                    Page {currentPage} / {totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn-light-custom"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => {
-                      setCurrentPage((prev) => Math.min(totalPages, prev + 1));
-                      window.scrollTo({ top: 400, behavior: 'smooth' });
-                    }}
-                    style={{
-                      padding: '0.4rem 0.85rem',
-                      fontSize: '0.85rem',
-                      cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
-                      opacity: currentPage >= totalPages ? 0.5 : 1
-                    }}
-                  >
-                    Suivant →
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Contrôles de Pagination Numérique Fluide (1 2 ... 60 61 ... 127 128) */}
+            <AdminPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                window.scrollTo({ top: 400, behavior: 'smooth' });
+              }}
+              totalItems={filteredProducts.length}
+              itemsPerPage={itemsPerPage}
+              itemLabel="livres"
+            />
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminLayout from '../AdminLayout';
 import { adminApi } from '../services/adminApi';
+import AdminPagination from '../components/AdminPagination';
 
 const STATUS_OPTIONS = ['Tous', 'En attente', 'Confirmée', 'Expédiée', 'Livrée', 'Annulée'];
 
@@ -15,6 +16,10 @@ export default function AdminOrders() {
   const [selectedStatus, setSelectedStatus] = useState(initialStatus);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
+  const totalPages = Math.ceil(orders.length / itemsPerPage) || 1;
+  const paginatedOrders = orders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // Logo et informations de la boutique (sélectionnés dans le panneau d'administration)
   const [shopLogo, setShopLogo] = useState(() => localStorage.getItem('shop_logo_image') || '');
@@ -73,6 +78,7 @@ export default function AdminOrders() {
 
   const handleSelectStatus = (status) => {
     setSelectedStatus(status);
+    setCurrentPage(1);
     const nextParams = new URLSearchParams(searchParams);
     if (status === 'Tous') {
       nextParams.delete('status');
@@ -169,6 +175,108 @@ export default function AdminOrders() {
     return { subtotal, shipping, total };
   };
 
+  const handlePrintOrder = () => {
+    if (!selectedOrder) return;
+    const slipElement = document.getElementById('printable-delivery-slip');
+    const slipHtml = slipElement ? slipElement.innerHTML : '';
+
+    // Ouvrir une fenêtre dédiée d'impression avec les styles intégrés
+    const printWindow = window.open('', '_blank', 'width=850,height=950');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="fr">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <base href="\${window.location.origin}/" />
+            <title>Bon de Livraison - \${selectedOrder.order_number || ''}</title>
+            <style>
+              @page { size: A4 portrait; margin: 10mm; }
+              * { box-sizing: border-box; margin: 0; padding: 0; }
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                color: #0f172a;
+                background: #ffffff;
+                padding: 24px;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              table { width: 100%; border-collapse: collapse; }
+              .print-toolbar {
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 24px;
+                padding-bottom: 14px;
+                border-bottom: 1px solid #e2e8f0;
+              }
+              .print-btn {
+                background: #0f172a;
+                color: #ffffff;
+                border: none;
+                padding: 10px 22px;
+                border-radius: 6px;
+                font-weight: 700;
+                font-size: 14px;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+              }
+              .print-btn:hover {
+                background: #1e293b;
+              }
+              .close-btn {
+                background: #f1f5f9;
+                color: #475569;
+                border: 1px solid #cbd5e1;
+                padding: 10px 18px;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 14px;
+                cursor: pointer;
+              }
+              .close-btn:hover {
+                background: #e2e8f0;
+              }
+              @media print {
+                body { padding: 0 !important; }
+                .print-toolbar { display: none !important; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="print-toolbar">
+              <button class="close-btn" onclick="window.close()">Fermer</button>
+              <button class="print-btn" onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button>
+            </div>
+            <div class="printable-delivery-slip">
+              \${slipHtml}
+            </div>
+            <script>
+              setTimeout(function() {
+                try {
+                  window.focus();
+                  window.print();
+                } catch(e) {
+                  console.error(e);
+                }
+              }, 400);
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+    } else {
+      // Fallback si la popup est bloquée par le navigateur
+      window.print();
+    }
+  };
+
   const { subtotal: orderSubtotal, shipping: orderShipping, total: orderTotal } = getOrderBreakdown(selectedOrder);
 
   return (
@@ -207,7 +315,7 @@ export default function AdminOrders() {
                 <button
                   type="button"
                   className="btn-primary-custom"
-                  onClick={() => window.print()}
+                  onClick={handlePrintOrder}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                 >
                   <i className="fas fa-print" /> Imprimer le Bon de Livraison
@@ -445,7 +553,7 @@ export default function AdminOrders() {
           {/* =========================================================================
               BON DE LIVRAISON IMPRIMABLE (AFFICHÉ UNIQUEMENT À L'IMPRESSION)
               ========================================================================= */}
-          <div className="printable-delivery-slip">
+          <div id="printable-delivery-slip" className="printable-delivery-slip">
             {/* En-tête : Logo sélectionné dans l'admin & Titre du document */}
             <div
               style={{
@@ -691,7 +799,7 @@ export default function AdminOrders() {
                       </td>
                     </tr>
                   ) : (
-                    orders.map((ord) => (
+                    paginatedOrders.map((ord) => (
                       <tr key={ord.id}>
                         <td>
                           <button
@@ -798,6 +906,19 @@ export default function AdminOrders() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Numérique */}
+            <AdminPagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(orders.length / itemsPerPage) || 1}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                window.scrollTo({ top: 300, behavior: 'smooth' });
+              }}
+              totalItems={orders.length}
+              itemsPerPage={itemsPerPage}
+              itemLabel="commandes"
+            />
           </div>
         </div>
       )}

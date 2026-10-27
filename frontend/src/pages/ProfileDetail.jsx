@@ -43,6 +43,13 @@ const ProfileDetail = () => {
         if (isMounted && json && json.success) {
           const raw = id ? json.data : (Array.isArray(json.data) ? json.data[0] : null);
           if (raw) {
+            const rawStock = Number(raw.stock) || 0;
+            if (rawStock <= 0) {
+              // Livre à stock 0 : ne pas afficher sur le site public
+              navigate('/', { replace: true });
+              return;
+            }
+
             let parsedImages = [];
             if (Array.isArray(raw.images)) {
               parsedImages = raw.images;
@@ -68,7 +75,7 @@ const ProfileDetail = () => {
               author: raw.author || '',
               format: raw.format || '',
               price: Number(raw.price) || 0,
-              stock: raw.stock || 10,
+              stock: rawStock,
               category: raw.category || '',
               rating: raw.rating || 4.8,
               image: parsedImages[0] || raw.image || '/assets/images/books/book1.jpg',

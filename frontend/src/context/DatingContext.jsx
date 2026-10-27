@@ -332,14 +332,9 @@ export const DatingProvider = ({ children }) => {
                 : [])
         }));
 
-        // Mélange aléatoire à chaque actualisation (en privilégiant les livres en stock)
+        // Filtrer strictement les livres en stock (> 0) pour le site public
         const inStock = formatted.filter((p) => (Number(p.stock) || 0) > 0);
-        const outOfStock = formatted.filter((p) => (Number(p.stock) || 0) <= 0);
-        const randomized = inStock.length > 0
-          ? [...shuffleArray(inStock), ...shuffleArray(outOfStock)]
-          : shuffleArray(formatted);
-
-        setAllProfiles(randomized);
+        setAllProfiles(shuffleArray(inStock));
       } else {
         setAllProfiles(shuffleArray(initialProfiles));
       }
@@ -352,7 +347,7 @@ export const DatingProvider = ({ children }) => {
   };
 
   const addToCart = (product) => {
-    if (!product) return;
+    if (!product || (product.stock !== undefined && Number(product.stock) <= 0)) return;
     setCartItems((prev) => {
       const existing = prev.find((item) => String(item.id) === String(product.id));
       if (existing) {

@@ -295,11 +295,19 @@ export const adminApi = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, ...productData })
       });
-      const json = await res.json();
-      return json;
+      let json = null;
+      try {
+        json = await res.json();
+      } catch (e) {
+        // En cas de réponse sans JSON
+      }
+      if (!res.ok) {
+        throw new Error(json?.message || `Erreur serveur (${res.status})`);
+      }
+      return json || { success: true, message: 'Produit mis à jour avec succès', data: { id, ...productData } };
     } catch (err) {
-      console.warn('Fallback product update:', err.message);
-      return { success: true, message: 'Produit mis à jour', data: { id, ...productData } };
+      console.warn('Product update error:', err.message);
+      throw err;
     }
   },
 

@@ -933,7 +933,7 @@ const Home = () => {
                         >
                           {card.name}
                         </h6>
-                        {(card.author || card.location) && (
+                        {card.author && card.author.trim() !== '' && card.author.trim().toLowerCase() !== 'auteur' && (
                           <p
                             style={{
                               fontSize: '11px',
@@ -944,7 +944,7 @@ const Home = () => {
                               textOverflow: 'ellipsis'
                             }}
                           >
-                            {card.author || card.location}
+                            {card.author.trim()}
                           </p>
                         )}
                       </div>

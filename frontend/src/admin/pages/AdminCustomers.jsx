@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import AdminLayout from '../AdminLayout';
 import { adminApi } from '../services/adminApi';
+import AdminPagination from '../components/AdminPagination';
 import { ALGERIA_CITIES } from '../../data/algeriaCities';
 
 export default function AdminCustomers() {
@@ -10,6 +11,8 @@ export default function AdminCustomers() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [editForm, setEditForm] = useState({
     fullName: '',
@@ -201,6 +204,9 @@ export default function AdminCustomers() {
       (c.phone || '').includes(search) ||
       (c.address && c.address.toLowerCase().includes(search.toLowerCase()))
   );
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+  const paginatedCustomers = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // =========================================================================
   // VUE 2 : PAGE COMPLÈTE D'ÉDITION DU CLIENT
@@ -579,7 +585,7 @@ export default function AdminCustomers() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((c) => (
+                paginatedCustomers.map((c) => (
                   <tr key={c.id}>
                     <td><strong style={{ color: '#111111' }}>#{c.id}</strong></td>
                     <td>
@@ -674,6 +680,19 @@ export default function AdminCustomers() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Numérique */}
+        <AdminPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+          }}
+          totalItems={filtered.length}
+          itemsPerPage={itemsPerPage}
+          itemLabel="clients"
+        />
       </div>
     </AdminLayout>
   );

@@ -5,17 +5,28 @@ import BottomNav from '../components/BottomNav';
 import BookDetailBottomSheet from '../components/BookDetailBottomSheet';
 import { useDating } from '../context/DatingContext';
 
-// Helper pour créer un slug URL propre et lisible (ex: "Nouvel arrivage" -> "nouvel-arrivage")
+// Helper pour créer un slug URL propre et lisible (gère le français, l'arabe, les accents et les émojis)
 export const slugifyCategory = (name) => {
   if (!name) return '';
   if (name === '__favorites__') return 'favoris';
-  return String(name)
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  let str = String(name).trim().toLowerCase();
+
+  // Supprimer les marques diacritiques (accents latins é, è, etc.)
+  str = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Conserver TOUTES les lettres et chiffres de toutes les langues (\p{L} et \p{N} avec drapeau unicode u)
+  // et remplacer les espaces, symboles et emojis par des tirets
+  str = str.replace(/[^\p{L}\p{N}]+/gu, '-');
+
+  // Supprimer les tirets au début et à la fin
+  str = str.replace(/^-+|-+$/g, '');
+
+  // Sécurité de secours si la catégorie ne contenait que des symboles ou émojis
+  if (!str) {
+    str = encodeURIComponent(String(name).trim());
+  }
+
+  return str;
 };
 
 const Wishlist = ({ defaultCategory = null }) => {
@@ -130,7 +141,12 @@ const Wishlist = ({ defaultCategory = null }) => {
   // Résoudre le nom réel de la catégorie à partir du slug d'URL ou du paramètre
   const selectedCategory = useMemo(() => {
     if (!rawParam) return null;
-    const cleanParam = decodeURIComponent(rawParam).trim();
+    let cleanParam = '';
+    try {
+      cleanParam = decodeURIComponent(rawParam).trim();
+    } catch (e) {
+      cleanParam = String(rawParam).trim();
+    }
     if (cleanParam === 'favoris' || cleanParam === '__favorites__') {
       return '__favorites__';
     }
@@ -138,10 +154,28 @@ const Wishlist = ({ defaultCategory = null }) => {
     const paramSlug = slugifyCategory(cleanParam);
 
     // 1. Chercher dans categoriesList
-    const match = categoriesList.find((cat) => slugifyCategory(cat.name) === paramSlug || cat.name.toLowerCase() === cleanParam.toLowerCase());
+    const match = categoriesList.find((cat) => {
+      if (!cat || !cat.name) return false;
+      return (
+        slugifyCategory(cat.name) === paramSlug || 
+        cat.name.toLowerCase().trim() === cleanParam.toLowerCase() ||
+        slugifyCategory(cat.name) === cleanParam.toLowerCase()
+      );
+    });
     if (match) return match.name;
 
-    // 2. Chercher dans allProfiles
+    // 2. Chercher dans dbCategories
+    const dbMatch = dbCategories.find((cat) => {
+      const c = (cat || '').trim();
+      return (
+        slugifyCategory(c) === paramSlug || 
+        c.toLowerCase() === cleanParam.toLowerCase() ||
+        slugifyCategory(c) === cleanParam.toLowerCase()
+      );
+    });
+    if (dbMatch) return dbMatch;
+
+    // 3. Chercher dans allProfiles
     for (const book of allProfiles) {
       const bCats = Array.isArray(book.categories) && book.categories.length > 0
         ? book.categories
@@ -149,21 +183,26 @@ const Wishlist = ({ defaultCategory = null }) => {
             ? book.category.split(',').map((s) => s.trim())
             : (Array.isArray(book.interests) ? book.interests : []));
       for (const c of bCats) {
-        if (slugifyCategory(c) === paramSlug || (c || '').toLowerCase().trim() === cleanParam.toLowerCase()) {
+        if (
+          slugifyCategory(c) === paramSlug || 
+          (c || '').toLowerCase().trim() === cleanParam.toLowerCase() ||
+          slugifyCategory(c) === cleanParam.toLowerCase()
+        ) {
           return c;
         }
       }
     }
 
     return cleanParam.replace(/-/g, ' ');
-  }, [rawParam, categoriesList, allProfiles]);
+  }, [rawParam, categoriesList, dbCategories, allProfiles]);
 
   const setSelectedCategory = (cat) => {
     if (cat) {
       if (cat === '__favorites__') {
         navigate('/categories/favoris');
       } else {
-        navigate(`/categories/${slugifyCategory(cat)}`);
+        const slug = slugifyCategory(cat);
+        navigate(`/categories/${slug || encodeURIComponent(cat)}`);
       }
     } else {
       navigate('/categories');
@@ -197,6 +236,8 @@ const Wishlist = ({ defaultCategory = null }) => {
     }
 
     const selLower = selectedCategory.toLowerCase().trim();
+    const selSlug = slugifyCategory(selectedCategory);
+
     return allProfiles.filter((book) => {
       const bCats = Array.isArray(book.categories) && book.categories.length > 0
         ? book.categories
@@ -204,7 +245,13 @@ const Wishlist = ({ defaultCategory = null }) => {
             ? book.category.split(',').map((s) => s.trim())
             : (Array.isArray(book.interests) ? book.interests : []));
 
-      return bCats.some((c) => (c || '').toLowerCase().trim() === selLower);
+      return bCats.some((c) => {
+        const cTrimmed = (c || '').trim();
+        if (!cTrimmed) return false;
+        if (cTrimmed.toLowerCase() === selLower) return true;
+        if (selSlug && slugifyCategory(cTrimmed) === selSlug) return true;
+        return false;
+      });
     });
   }, [selectedCategory, likedList, allProfiles]);
 
@@ -569,7 +616,7 @@ const Wishlist = ({ defaultCategory = null }) => {
                             >
                               {card.name}
                             </h6>
-                            {(card.author || card.school || card.location) && (
+                            {card.author && card.author.trim() !== '' && card.author.trim().toLowerCase() !== 'auteur' && (
                               <p
                                 style={{
                                   fontSize: '11px',
@@ -580,7 +627,7 @@ const Wishlist = ({ defaultCategory = null }) => {
                                   textOverflow: 'ellipsis'
                                 }}
                               >
-                                {card.author || card.school || card.location}
+                                {card.author.trim()}
                               </p>
                             )}
                           </div>

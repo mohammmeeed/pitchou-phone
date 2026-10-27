@@ -95,7 +95,7 @@ export default function AdminAccount() {
       if (res && res.success) {
         setFeedback({
           type: 'success',
-          message: 'Votre compte administrateur a été mis à jour avec succès dans la base de données !'
+          message: 'Votre compte administrateur a été mis à jour avec succès !'
         });
         setPassword('');
         setConfirmPassword('');
@@ -232,56 +232,6 @@ export default function AdminAccount() {
           <i className="flaticon-381-user-7" />
           <span>Mon Profil</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('create');
-            setCreateFeedback(null);
-          }}
-          style={{
-            padding: '0.6rem 1.25rem',
-            borderRadius: '8px',
-            border: 'none',
-            fontWeight: activeTab === 'create' ? 700 : 500,
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            backgroundColor: activeTab === 'create' ? '#111111' : '#f4f4f5',
-            color: activeTab === 'create' ? '#ffffff' : '#52525b',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <i className="flaticon-381-user-8" />
-          <span>+ Créer un Administrateur</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('list');
-            setCreateFeedback(null);
-          }}
-          style={{
-            padding: '0.6rem 1.25rem',
-            borderRadius: '8px',
-            border: 'none',
-            fontWeight: activeTab === 'list' ? 700 : 500,
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            backgroundColor: activeTab === 'list' ? '#111111' : '#f4f4f5',
-            color: activeTab === 'list' ? '#ffffff' : '#52525b',
-            transition: 'all 0.15s ease'
-          }}
-        >
-          <i className="flaticon-381-list" />
-          <span>Tous les Administrateurs ({adminList.length})</span>
-        </button>
       </div>
 
       {/* Message de notification globale inline */}
@@ -348,7 +298,6 @@ export default function AdminAccount() {
                     className="form-control-custom"
                     value={profile.name || ''}
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    placeholder="Ex: Administrateur Principal"
                     required
                   />
                 </div>
@@ -362,7 +311,6 @@ export default function AdminAccount() {
                     className="form-control-custom"
                     value={profile.email || ''}
                     onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                    placeholder="admin@tiktokshop.dz"
                     required
                   />
                   <small style={{ color: '#71717a', display: 'block', marginTop: '0.3rem' }}>
@@ -379,7 +327,6 @@ export default function AdminAccount() {
                     className="form-control-custom"
                     value={profile.phone || ''}
                     onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                    placeholder="0550123456"
                   />
                 </div>
 
@@ -544,7 +491,6 @@ export default function AdminAccount() {
                   <input
                     type="text"
                     className="form-control-custom"
-                    placeholder="Ex: Sarah Benali"
                     value={newAdmin.name}
                     onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
                     required
@@ -558,7 +504,6 @@ export default function AdminAccount() {
                   <input
                     type="email"
                     className="form-control-custom"
-                    placeholder="admin2@tiktokshop.dz"
                     value={newAdmin.email}
                     onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
                     required
@@ -575,7 +520,6 @@ export default function AdminAccount() {
                   <input
                     type="text"
                     className="form-control-custom"
-                    placeholder="0770123456"
                     value={newAdmin.phone}
                     onChange={(e) => setNewAdmin({ ...newAdmin, phone: e.target.value })}
                   />

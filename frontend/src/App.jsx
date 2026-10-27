@@ -195,6 +195,7 @@ function App() {
             <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
             <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
             <Route path="/admin/products" element={<AdminProtectedRoute><AdminProducts /></AdminProtectedRoute>} />
+            <Route path="/admin/attributes" element={<AdminProtectedRoute><AdminProducts initialView="attributes" /></AdminProtectedRoute>} />
             <Route path="/admin/orders" element={<AdminProtectedRoute><AdminOrders /></AdminProtectedRoute>} />
             <Route path="/admin/cashflow" element={<AdminProtectedRoute><AdminCashflow /></AdminProtectedRoute>} />
             <Route path="/admin/journal" element={<Navigate to="/admin/cashflow" replace />} />

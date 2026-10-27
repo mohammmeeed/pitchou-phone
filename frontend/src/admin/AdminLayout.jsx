@@ -20,6 +20,10 @@ export default function AdminLayout({ children }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const searchRef = useRef(null);
 
+  // Menu utilisateur (Avatar sans image avec dropdown Déconnexion)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
   // Vérifier la session administrateur et charger le logo du site
   useEffect(() => {
     // Si non connecté, redirection immédiate vers la page de connexion admin
@@ -58,6 +62,24 @@ export default function AdminLayout({ children }) {
     return () => window.removeEventListener('shop_logo_changed', handleLogoChange);
   }, [navigate]);
 
+  // Fermer les menus lors d'un changement de page ou touche Échap
+  useEffect(() => {
+    setIsMobileOpen(false);
+    setIsUserMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsMobileOpen(false);
+        setIsSearchOpen(false);
+        setIsUserMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleLogout = () => {
     sessionStorage.setItem('admin_explicit_logout', 'true');
     adminApi.logout();
@@ -82,6 +104,11 @@ export default function AdminLayout({ children }) {
           title: 'Gestion des Produits',
           to: '/admin/products',
           icon: 'flaticon-381-box'
+        },
+        {
+          title: 'Paramètres des Attributs',
+          to: '/admin/attributes',
+          icon: 'fas fa-sliders-h'
         }
       ]
     },
@@ -135,11 +162,14 @@ export default function AdminLayout({ children }) {
     return location.pathname.startsWith(path);
   };
 
-  // Gestion de la fermeture du dropdown lors d'un clic extérieur ou changement de page
+  // Gestion de la fermeture des dropdowns lors d'un clic extérieur ou changement de page
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setIsSearchOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -149,6 +179,7 @@ export default function AdminLayout({ children }) {
   useEffect(() => {
     setIsSearchOpen(false);
     setSearchTerm('');
+    setIsUserMenuOpen(false);
   }, [location.pathname]);
 
   // Liste exhaustive des sections d'administration avec métadonnées et mots-clés
@@ -170,9 +201,9 @@ export default function AdminLayout({ children }) {
       color: '#fe2c55'
     },
     {
-      title: 'Paramètres des Attributs & Wilayas',
-      to: '/admin/products?view=attributes',
-      icon: 'fas fa-tags',
+      title: 'Paramètres des Attributs',
+      to: '/admin/attributes',
+      icon: 'fas fa-sliders-h',
       category: 'Catalogue & Stock',
       keywords: 'attributs catégories langues wilayas frais livraison tarifs',
       color: '#fe2c55'
@@ -276,7 +307,7 @@ export default function AdminLayout({ children }) {
         {/* Left Sidebar Navigation */}
         <aside className={`admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
           <div className="sidebar-header">
-            <Link to="/admin" className="sidebar-brand">
+            <Link to="/admin" className="sidebar-brand" onClick={() => setIsMobileOpen(false)}>
               <div
                 className="brand-icon"
                 style={{
@@ -311,6 +342,18 @@ export default function AdminLayout({ children }) {
                 </div>
               )}
             </Link>
+            <button
+              type="button"
+              className="sidebar-close-btn"
+              onClick={() => setIsMobileOpen(false)}
+              aria-label="Fermer le menu"
+              title="Fermer le menu"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
 
           <ul className="sidebar-menu">
@@ -336,74 +379,16 @@ export default function AdminLayout({ children }) {
               </React.Fragment>
             ))}
           </ul>
-
-          {/* Sidebar Footer : Élimination totale de l'avatar photo & Gestion du compte */}
-          <div className="sidebar-footer" style={{ padding: '0.85rem' }}>
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '10px',
-                border: '1px solid #e4e4e7',
-                padding: '0.75rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.65rem'
-              }}
-            >
-              {!isCollapsed ? (
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <Link
-                    to="/admin/account"
-                    className="btn-light-custom"
-                    style={{
-                      flex: 1,
-                      padding: '0.45rem 0.6rem',
-                      fontSize: '0.8rem',
-                      justifyContent: 'center',
-                      textDecoration: 'none'
-                    }}
-                    title="Gérer mon compte"
-                  >
-                    <i className="flaticon-381-user-7" style={{ fontSize: '0.78rem' }} /> Mon Compte
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="btn-light-custom"
-                    style={{
-                      padding: '0.45rem 0.7rem',
-                      fontSize: '0.8rem',
-                      color: '#e11d48',
-                      borderColor: '#fecdd3',
-                      backgroundColor: '#fff1f2',
-                      cursor: 'pointer'
-                    }}
-                    title="Se déconnecter"
-                  >
-                    <i className="flaticon-381-exit" style={{ fontSize: '0.78rem' }} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="btn-light-custom"
-                  style={{
-                    padding: '0.5rem',
-                    color: '#e11d48',
-                    justifyContent: 'center',
-                    border: 'none',
-                    cursor: 'pointer',
-                    width: '100%'
-                  }}
-                  title="Déconnexion"
-                >
-                  <i className="flaticon-381-exit" />
-                </button>
-              )}
-            </div>
-          </div>
         </aside>
+
+        {/* Backdrop overlay mobile pour fermer au clic en dehors */}
+        {isMobileOpen && (
+          <div
+            className="admin-sidebar-backdrop"
+            onClick={() => setIsMobileOpen(false)}
+            aria-label="Fermer le menu"
+          />
+        )}
 
         {/* Main Content Body */}
         <div className={`admin-main ${isCollapsed ? 'collapsed' : ''}`}>
@@ -529,7 +514,7 @@ export default function AdminLayout({ children }) {
               </div>
             </div>
 
-            <div className="topbar-right">
+            <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
               <Link
                 to="/"
                 target="_blank"
@@ -541,24 +526,67 @@ export default function AdminLayout({ children }) {
                 <span>Boutique en Direct</span>
               </Link>
 
-              {/* Bouton Déconnexion Topbar */}
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="btn-light-custom"
-                style={{
-                  padding: '0.45rem 0.85rem',
-                  fontSize: '0.82rem',
-                  color: '#e11d48',
-                  borderColor: '#fecdd3',
-                  backgroundColor: '#fff1f2',
-                  cursor: 'pointer'
-                }}
-                title="Se déconnecter"
-              >
-                <i className="flaticon-381-exit" />
-                <span>Déconnexion</span>
-              </button>
+              {/* Avatar sans image & Dropdown Déconnexion */}
+              <div className="topbar-user-dropdown" ref={userMenuRef}>
+                <button
+                  type="button"
+                  className="topbar-avatar-btn"
+                  onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                  aria-expanded={isUserMenuOpen}
+                  title="Compte Administrateur"
+                >
+                  <div className="topbar-avatar-circle">
+                    <i className="flaticon-381-user-7" />
+                  </div>
+                  <i
+                    className="fas fa-chevron-down"
+                    style={{
+                      fontSize: '0.68rem',
+                      color: '#64748b',
+                      transition: 'transform 0.2s ease',
+                      transform: isUserMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+                    }}
+                  />
+                </button>
+
+                {isUserMenuOpen && (
+                  <div className="user-dropdown-menu">
+                    <div style={{ padding: '0.6rem 0.75rem', borderBottom: '1px solid #f1f5f9', marginBottom: '0.35rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>
+                        {currentAdmin?.name || 'Administrateur'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                        {currentAdmin?.email || 'admin@leerbook.com'}
+                      </div>
+                    </div>
+
+                    <Link
+                      to="/admin/account"
+                      className="user-menu-item"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      title="Gérer mon compte"
+                    >
+                      <i className="flaticon-381-user-7" style={{ color: '#0f172a' }} />
+                      <span>Mon Compte</span>
+                    </Link>
+
+                    <div style={{ height: '1px', backgroundColor: '#f1f5f9', margin: '0.35rem 0' }} />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="user-menu-logout-btn"
+                      title="Se déconnecter"
+                    >
+                      <i className="flaticon-381-exit" style={{ fontSize: '0.85rem' }} />
+                      <span>Déconnexion</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </header> 
 

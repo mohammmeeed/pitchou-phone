@@ -95,6 +95,29 @@ i[class*="flaticon-381-"]:after {
   border-bottom: 1px solid var(--admin-border-color);
 }
 
+.sidebar-close-btn {
+  display: none;
+}
+
+.admin-sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 999;
+  cursor: pointer;
+  animation: adminFadeInBackdrop 0.2s ease;
+}
+
+@keyframes adminFadeInBackdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .sidebar-brand {
   display: flex;
   align-items: center;
@@ -488,6 +511,118 @@ i[class*="flaticon-381-"]:after {
   color: #ffffff;
 }
 
+/* Topbar User Avatar & Dropdown (Avatar sans image) */
+.topbar-user-dropdown {
+  position: relative;
+}
+
+.topbar-avatar-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 3px 6px 3px 3px;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.topbar-avatar-btn:hover,
+.topbar-avatar-btn[aria-expanded="true"] {
+  background: #f4f4f5;
+  border-color: #e4e4e7;
+}
+
+.topbar-avatar-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #18181b 0%, #27272a 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease;
+}
+
+.topbar-avatar-btn:hover .topbar-avatar-circle {
+  transform: scale(1.05);
+}
+
+.user-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 220px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e4e4e7;
+  padding: 0.5rem;
+  z-index: 1050;
+  animation: userDropdownFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes userDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.86rem;
+  color: #334155;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  width: 100%;
+  border: none;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.user-menu-item:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.user-menu-logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.86rem;
+  color: #e11d48;
+  background-color: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.user-menu-logout-btn:hover {
+  background-color: #ffe4e6;
+  border-color: #fda4af;
+  color: #be123c;
+}
+
 /* Page Content Body */
 .admin-content-body {
   padding: 2rem;
@@ -878,6 +1013,30 @@ i[class*="flaticon-381-"]:after {
   .topbar-search {
     width: 200px;
   }
+  .sidebar-header {
+    padding: 0 1rem;
+  }
+  .sidebar-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    margin-left: 0.5rem;
+    border: 1px solid #e4e4e7;
+    background: #f4f4f5;
+    border-radius: 8px;
+    color: #18181b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+  .sidebar-close-btn:hover,
+  .sidebar-close-btn:active {
+    background: #e4e4e7;
+    color: #000000;
+  }
 }
 
 /* ==========================================================================
@@ -981,6 +1140,125 @@ i[class*="flaticon-381-"]:after {
   display: none;
 }
 
+/* ==========================================================================
+   Admin Numeric Pagination (1 2 ... 60 61 ... 127 128)
+   ========================================================================== */
+.admin-pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+  gap: 1rem;
+  background-color: #ffffff;
+}
+
+.admin-pagination-info {
+  font-size: 0.88rem;
+  color: #52525b;
+}
+
+.admin-pagination-info strong {
+  color: #18181b;
+  font-weight: 700;
+}
+
+.admin-pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.admin-pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.admin-pagination-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid #e4e4e7;
+  background: #ffffff;
+  color: #18181b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.admin-pagination-arrow:hover:not(:disabled) {
+  background: #f4f4f5;
+  border-color: #d4d4d8;
+}
+
+.admin-pagination-arrow:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #f4f4f5;
+}
+
+.admin-pagination-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 0.5rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid #e4e4e7;
+  background: #ffffff;
+  color: #27272a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.admin-pagination-num:hover:not(.active) {
+  background: #f4f4f5;
+  border-color: #d4d4d8;
+}
+
+.admin-pagination-num.active {
+  background: #18181b;
+  color: #ffffff;
+  border-color: #18181b;
+  box-shadow: 0 2px 6px rgba(24, 24, 27, 0.2);
+}
+
+.admin-pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 36px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #a1a1aa;
+  letter-spacing: 1px;
+  user-select: none;
+}
+
+@media (max-width: 768px) {
+  .admin-pagination-container {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.85rem 1rem;
+  }
+  .admin-pagination-nav {
+    justify-content: center;
+  }
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -992,14 +1270,38 @@ i[class*="flaticon-381-"]:after {
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
+  #root,
+  .mediqu-admin,
+  .admin-shell,
+  .admin-main,
+  .admin-content-body {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+    flex: none !important;
+  }
+
   /* Masquer tous les éléments d'interface web standard */
   .no-print,
   .admin-sidebar,
+  .admin-sidebar-backdrop,
   .admin-topbar,
   .admin-toast,
   .page-header,
@@ -1009,24 +1311,10 @@ i[class*="flaticon-381-"]:after {
     display: none !important;
   }
 
-  /* Réinitialiser les conteneurs d'administration */
-  .mediqu-admin,
-  .admin-shell,
-  .admin-main,
-  .admin-content-body {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-    overflow: visible !important;
-  }
-
   /* Afficher uniquement le bon de livraison épuré */
   .printable-delivery-slip {
     display: block !important;
+    position: static !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto !important;
@@ -1036,6 +1324,7 @@ i[class*="flaticon-381-"]:after {
     color: #0f172a !important;
     font-size: 13px !important;
     line-height: 1.4 !important;
+    overflow: visible !important;
   }
 }
 
