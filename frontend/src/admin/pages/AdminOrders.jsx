@@ -110,7 +110,7 @@ export default function AdminOrders() {
     try {
       await adminApi.updateOrderStatus(orderId, newStatus);
       if (newStatus === 'Livrée') {
-        showToast(`Statut mis à jour : Livrée (ajoutée automatiquement au Journal de Caisse)`);
+        showToast('Statut mis à jour : Livrée (stock décrémenté & synchronisée en Caisse)');
       } else {
         showToast(`Statut mis à jour : ${newStatus}`);
       }
@@ -199,22 +199,26 @@ export default function AdminOrders() {
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <title>Bon de Livraison - ${orderNum}</title>
+  <title>&nbsp;</title>
   <style>
     @page {
       size: A4 portrait;
-      margin: 12mm 15mm;
+      margin: 0; /* Supprime complètement les en-têtes et pieds de page du navigateur (date, URL, titre, pagination) */
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      color: #111827;
-      background: #ffffff;
+    html, body {
+      margin: 0;
       padding: 0;
+      background: #ffffff;
+      color: #111827;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 13.5px;
       line-height: 1.45;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
+    }
+    body {
+      padding: 12mm 15mm;
     }
     .slip-box {
       max-width: 720px;

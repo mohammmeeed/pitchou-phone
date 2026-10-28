@@ -1299,7 +1299,7 @@ i[class*="flaticon-381-"]:after {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm 10mm;
+    margin: 0 !important;
   }
 
   html, body {

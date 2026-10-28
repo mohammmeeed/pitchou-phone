@@ -300,8 +300,10 @@ function handlePut(?PDO $pdo): void {
         $updated = false;
         foreach ($orders as &$ord) {
             if ((int)($ord['id'] ?? 0) === $id) {
+                $oldStatus = $ord['status'] ?? '';
                 $ord['status'] = $newStatus;
                 $updated = true;
+                syncOrderStock(null, $ord, $oldStatus, $newStatus);
                 break;
             }
         }
@@ -316,11 +318,24 @@ function handlePut(?PDO $pdo): void {
         return;
     }
 
+    $oldStmt = $pdo->prepare("SELECT * FROM orders WHERE id = ?");
+    $oldStmt->execute([$id]);
+    $oldOrder = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$oldOrder) {
+        http_response_code(404);
+        echo json_encode(["success" => false, "message" => "Commande introuvable"]);
+        return;
+    }
+
+    $oldStatus = trim($oldOrder['status'] ?? '');
+
     $stmt = $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?");
     $stmt->execute([$newStatus, $id]);
 
     syncCustomerStatsFromOrders($pdo);
     syncOrderToCashflow($pdo, $id, $newStatus);
+    syncOrderStock($pdo, $oldOrder, $oldStatus, $newStatus);
 
     echo json_encode(["success" => true, "message" => "Statut de la commande mis à jour avec succès"]);
 }
@@ -341,22 +356,42 @@ function handleDelete(?PDO $pdo): void {
         if (file_exists($fallbackFile)) {
             $orders = json_decode(file_get_contents($fallbackFile), true) ?? [];
         }
+        $deletedOrder = null;
+        foreach ($orders as $o) {
+            if ((int)($o['id'] ?? 0) === $id) {
+                $deletedOrder = $o;
+                break;
+            }
+        }
+        if ($deletedOrder) {
+            $st = mb_strtolower(trim($deletedOrder['status'] ?? ''));
+            if ($st === 'livrée' || $st === 'livree') {
+                syncOrderStock(null, $deletedOrder, 'Livrée', 'Annulée');
+            }
+        }
         $filtered = array_values(array_filter($orders, fn($o) => (int)($o['id'] ?? 0) !== $id));
         @file_put_contents($fallbackFile, json_encode($filtered, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         echo json_encode(["success" => true, "message" => "Commande supprimée"]);
         return;
     }
 
-    $orderStmt = $pdo->prepare("SELECT order_number FROM orders WHERE id = ?");
+    $orderStmt = $pdo->prepare("SELECT * FROM orders WHERE id = ?");
     $orderStmt->execute([$id]);
-    $orderNumber = $orderStmt->fetchColumn();
+    $order = $orderStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($order) {
+        $st = mb_strtolower(trim($order['status'] ?? ''));
+        if ($st === 'livrée' || $st === 'livree') {
+            syncOrderStock($pdo, $order, 'Livrée', 'Annulée');
+        }
+    }
 
     $stmt = $pdo->prepare("DELETE FROM orders WHERE id = ?");
     $stmt->execute([$id]);
 
     syncCustomerStatsFromOrders($pdo);
-    if ($orderNumber) {
-        removeOrderFromCashflow($pdo, $orderNumber);
+    if (!empty($order['order_number'])) {
+        removeOrderFromCashflow($pdo, $order['order_number']);
     }
 
     echo json_encode(["success" => true, "message" => "Commande supprimée"]);
@@ -489,6 +524,111 @@ function calculateOrderProfit(PDO $pdo, array $order): float {
 
     return round($subtotal * 0.35, 2);
 }
+
+/**
+ * Met à jour le stock des produits lors du changement de statut d'une commande :
+ * - Décrémente le stock UNIQUEMENT lorsque le statut passe à "Livrée" (Livree).
+ * - Restaure (incrémente) le stock si une commande "Livrée" est remise en attente ou annulée.
+ * - Ne touche pas au stock à la création de la commande.
+ */
+function syncOrderStock(?PDO $pdo, array $order, string $oldStatus, string $newStatus): void {
+    $oldStatusNorm = mb_strtolower(trim($oldStatus));
+    $newStatusNorm = mb_strtolower(trim($newStatus));
+
+    $isOldDelivered = ($oldStatusNorm === 'livrée' || $oldStatusNorm === 'livree');
+    $isNewDelivered = ($newStatusNorm === 'livrée' || $newStatusNorm === 'livree');
+
+    // Aucun changement d'état "Livrée" : ne rien faire
+    if ($isOldDelivered === $isNewDelivered) {
+        return;
+    }
+
+    $itemsSummary = trim($order['items_summary'] ?? '');
+    if (empty($itemsSummary)) {
+        return;
+    }
+
+    $items = [];
+    $parts = explode(',', $itemsSummary);
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if (empty($part)) continue;
+        if (preg_match('/^(\d+)\s*x\s*(.+)$/i', $part, $m)) {
+            $qty = max(1, (int)$m[1]);
+            $title = trim($m[2]);
+        } else {
+            $qty = 1;
+            $title = $part;
+        }
+        if (!empty($title)) {
+            $items[] = [
+                'title' => $title,
+                'qty' => $qty
+            ];
+        }
+    }
+
+    if (empty($items)) {
+        return;
+    }
+
+    $isDecrement = ($isNewDelivered && !$isOldDelivered);
+
+    if ($pdo !== null) {
+        try {
+            // Vérifier et assurer que la colonne stock existe dans products
+            $cols = $pdo->query("SHOW COLUMNS FROM products LIKE 'stock'")->fetchAll();
+            if (empty($cols)) {
+                $pdo->exec("ALTER TABLE products ADD COLUMN stock INT DEFAULT 10");
+            }
+
+            $searchStmt = $pdo->prepare("SELECT id, name, stock FROM products WHERE name = ? OR name LIKE ? LIMIT 1");
+            $updateStmt = $pdo->prepare("UPDATE products SET stock = GREATEST(0, stock + ?) WHERE id = ?");
+
+            foreach ($items as $item) {
+                $title = $item['title'];
+                $qty = $item['qty'];
+                $delta = $isDecrement ? (-1 * $qty) : $qty;
+
+                $searchStmt->execute([$title, '%' . $title . '%']);
+                $product = $searchStmt->fetch(PDO::FETCH_ASSOC);
+                if ($product) {
+                    $updateStmt->execute([$delta, (int)$product['id']]);
+                }
+            }
+        } catch (Throwable $e) {
+            error_log("Erreur syncOrderStock MySQL: " . $e->getMessage());
+        }
+    } else {
+        $fallbackProductsFile = __DIR__ . '/../database/products_fallback.json';
+        if (file_exists($fallbackProductsFile)) {
+            $products = json_decode(file_get_contents($fallbackProductsFile), true);
+            if (is_array($products)) {
+                $modified = false;
+                foreach ($items as $item) {
+                    $targetTitle = mb_strtolower($item['title']);
+                    $qty = $item['qty'];
+                    $delta = $isDecrement ? (-1 * $qty) : $qty;
+
+                    foreach ($products as &$p) {
+                        $pName = mb_strtolower($p['name'] ?? '');
+                        if ($pName === $targetTitle || stripos($pName, $targetTitle) !== false || stripos($targetTitle, $pName) !== false) {
+                            $currentStock = isset($p['stock']) ? (int)$p['stock'] : 0;
+                            $p['stock'] = max(0, $currentStock + $delta);
+                            $modified = true;
+                            break;
+                        }
+                    }
+                    unset($p);
+                }
+                if ($modified) {
+                    @file_put_contents($fallbackProductsFile, json_encode($products, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+                }
+            }
+        }
+    }
+}
+
 
 
 
