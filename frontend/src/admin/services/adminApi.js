@@ -734,14 +734,7 @@ export const adminApi = {
       const savedLangs = localStorage.getItem('tiktok_shop_languages');
       const savedWilayas = localStorage.getItem('tiktok_shop_wilayas');
       return {
-        categories: savedCats ? JSON.parse(savedCats) : [
-          'Roman & Littérature',
-          'Développement Personnel',
-          'Histoire & Récits',
-          'Fantasy & Mystère',
-          'Philosophie & Poésie',
-          'Roman Graphique'
-        ],
+        categories: savedCats ? JSON.parse(savedCats) : [],
         languages: savedLangs ? JSON.parse(savedLangs) : ['Français', 'Anglais', 'Arabe'],
         wilayas: savedWilayas ? JSON.parse(savedWilayas) : []
       };

@@ -8,7 +8,7 @@ class Database {
     // Paramètres MySQL configurables
     private static string $host = '127.0.0.1';
     private static int $port = 3306;
-    private static string $dbName = 'tiktok_shop';
+    private static string $dbName = 'pitchou-db';
     private static string $username = 'root';
     private static string $password = '';
     private static string $charset = 'utf8mb4';
@@ -73,7 +73,10 @@ class Database {
     }
 
     private static function initMySQLSchema(PDO $pdo): void {
-        $sqlFile = __DIR__ . '/../database/tiktok_shop.sql';
+        $sqlFile = __DIR__ . '/../database/pitchou-db.sql';
+        if (!file_exists($sqlFile)) {
+            $sqlFile = __DIR__ . '/../database/tiktok_shop.sql';
+        }
         if (file_exists($sqlFile)) {
             $sql = file_get_contents($sqlFile);
             $pdo->exec($sql);

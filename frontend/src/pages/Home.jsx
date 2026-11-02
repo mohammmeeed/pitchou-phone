@@ -72,14 +72,7 @@ const Home = () => {
   }, [searchOpen, selectedCategories, selectedLanguages, currentMaxPrice]);
 
   // Catégories et Langues existantes dynamiques
-  const defaultCategories = useMemo(() => [
-    'Roman & Littérature',
-    'Développement Personnel',
-    'Histoire & Récits',
-    'Fantasy & Mystère',
-    'Philosophie & Poésie',
-    'Roman Graphique'
-  ], []);
+  const defaultCategories = useMemo(() => [], []);
 
   const defaultLanguages = useMemo(() => ['Français', 'Anglais', 'Arabe'], []);
 
@@ -822,14 +815,37 @@ const Home = () => {
           }}
         >
           <div className="home-card-container">
-            <TinderCardStack
-              profiles={profiles}
-              onOpenDetail={(card) => setDetailCard(card)}
-              onSwipeRight={handleSwipeRight}
-              onResetFilters={handleResetFilters}
-              onIndexChange={(idx) => setActiveCardIndex(idx)}
-              initialIndex={activeCardIndex}
-            />
+            {profiles.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '100px 20px', color: '#888' }}>
+                <div 
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'rgba(32, 159, 132, 0.1)',
+                    color: '#209f84',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '16px',
+                    fontSize: '26px'
+                  }}
+                >
+                  <i className="feather icon-book-open"></i>
+                </div>
+                <h5 style={{ fontWeight: 700, color: '#334155', marginBottom: '8px' }}>Aucun livre disponible</h5>
+                <p style={{ color: '#94a3b8', fontSize: '13px' }}>Le catalogue est actuellement vide.</p>
+              </div>
+            ) : (
+              <TinderCardStack
+                profiles={profiles}
+                onOpenDetail={(card) => setDetailCard(card)}
+                onSwipeRight={handleSwipeRight}
+                onResetFilters={handleResetFilters}
+                onIndexChange={(idx) => setActiveCardIndex(idx)}
+                initialIndex={activeCardIndex}
+              />
+            )}
           </div>
         </div>
       ) : (

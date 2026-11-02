@@ -16,20 +16,7 @@ const Filter = () => {
   const setActiveFilters = datingCtx?.setActiveFilters;
 
   // Catégories existantes
-  const defaultCategories = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('tiktok_shop_categories');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [
-      'Roman & Littérature',
-      'Développement Personnel',
-      'Histoire & Récits',
-      'Fantasy & Mystère',
-      'Philosophie & Poésie',
-      'Roman Graphique'
-    ];
-  }, []);
+  const defaultCategories = useMemo(() => [], []);
 
   const categoriesList = useMemo(() => {
     const fromProducts = allProducts.flatMap((p) => {

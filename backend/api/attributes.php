@@ -25,14 +25,7 @@ if ($db !== null) {
     } catch (Exception $e) {}
 }
 
-$defaultCategories = [
-    'Roman & Littérature',
-    'Développement Personnel',
-    'Histoire & Récits',
-    'Fantasy & Mystère',
-    'Philosophie & Poésie',
-    'Roman Graphique'
-];
+$defaultCategories = [];
 
 $defaultLanguages = [
     'Français',
@@ -145,9 +138,9 @@ function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultL
             $rows = json_decode(file_get_contents($fallbackFile), true) ?? [];
         }
         $categories = $defaultCategories;
-        if (!empty($rows['attributes_categories'])) {
+        if (isset($rows['attributes_categories'])) {
             $decoded = json_decode($rows['attributes_categories'], true);
-            if (is_array($decoded) && count($decoded) > 0) {
+            if (is_array($decoded)) {
                 $categories = array_values(array_filter(array_map('trim', $decoded)));
             }
         }
@@ -171,9 +164,9 @@ function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultL
     $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
     $categories = $defaultCategories;
-    if (!empty($rows['attributes_categories'])) {
+    if (isset($rows['attributes_categories'])) {
         $decoded = json_decode($rows['attributes_categories'], true);
-        if (is_array($decoded) && count($decoded) > 0) {
+        if (is_array($decoded)) {
             $categories = array_values(array_filter(array_map('trim', $decoded)));
         }
     }

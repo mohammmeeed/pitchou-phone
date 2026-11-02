@@ -92,14 +92,7 @@ export default function AdminProducts({ initialView }) {
   const [manualVideoUrl, setManualVideoUrl] = useState('');
 
   // Gestion des Attributs (Catégories & Langues)
-  const [categoriesList, setCategoriesList] = useState([
-    'Roman & Littérature',
-    'Développement Personnel',
-    'Histoire & Récits',
-    'Fantasy & Mystère',
-    'Philosophie & Poésie',
-    'Roman Graphique'
-  ]);
+  const [categoriesList, setCategoriesList] = useState([]);
   const [languagesList, setLanguagesList] = useState([
     'Français',
     'Anglais',
@@ -183,7 +176,7 @@ export default function AdminProducts({ initialView }) {
     try {
       const data = await adminApi.getAttributes();
       if (data) {
-        if (Array.isArray(data.categories) && data.categories.length > 0) {
+        if (Array.isArray(data.categories)) {
           setCategoriesList(data.categories);
         }
         if (data.category_images && typeof data.category_images === 'object') {

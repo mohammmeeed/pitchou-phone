@@ -3,79 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const DatingContext = createContext();
 
-export const initialProfiles = [
-  {
-    id: 5,
-    name: "The Chronicles of Autumn",
-    author: "Alexander Thorne",
-    format: "Édition Vidéo & Reliure Cuir",
-    price: 2500,
-    video: "/assets/videos/book-trailer.mp4",
-    image: "/assets/images/books/book1.jpg",
-    images: ["/assets/images/books/book1.jpg", "/assets/images/books/book2.jpg", "/assets/images/books/book3.jpg"],
-    bio: "Une épopée poétique illustrée au cœur des légendes d'automne. Ce grimoire d'exception vous plonge dans un univers médiéval mystique, entre enluminures dorées, contes oubliés et contemplation au coin du feu.",
-    location: "Éditions du Grimoire",
-    distance: "2 500 DA",
-    interests: ["Poésie", "Grimoire", "Fantasy", "Reliure Cuir"],
-    languages: ["Français", "English"],
-  },
-  {
-    id: 1,
-    name: "The Art of Whispers",
-    author: "Éléonore Vance",
-    format: "Recueil Poétique & Dorures",
-    price: 1850,
-    image: "/assets/images/books/book2.jpg",
-    images: ["/assets/images/books/book2.jpg", "/assets/images/books/book1.jpg"],
-    bio: "Un voyage poétique et contemplatif explorant les pensées secrètes et les songes de l'âme. Relié de dorures précieuses, ce chef-d'œuvre invite au calme et à la rêverie littéraire au coin du feu.",
-    location: "Éditions Poesis",
-    distance: "1 850 DA",
-    interests: ["Poésie", "Classique", "Dorures"],
-    languages: ["Français", "English"],
-  },
-  {
-    id: 2,
-    name: "Les Chroniques Oubliées",
-    author: "Julien Mercier",
-    format: "Roman Historique & Mystère",
-    price: 2300,
-    image: "/assets/images/books/book2.jpg",
-    images: ["/assets/images/books/book2.jpg", "/assets/images/books/book3.jpg"],
-    bio: "Partez à la découverte de secrets enfouis au cœur des bibliothèques sacrées de l'Antiquité. Une quête initiatique captivante qui ravira tous les passionnés d'histoire, d'énigmes et de vieux manuscrits.",
-    location: "Éditions Historia",
-    distance: "2 300 DA",
-    interests: ["Histoire", "Mystère", "Aventure"],
-    languages: ["Français"],
-  },
-  {
-    id: 3,
-    name: "The Whispering Oak",
-    author: "Arthur Pendelton",
-    format: "Roman Fantastique Broché",
-    price: 2100,
-    image: "/assets/images/books/book3.jpg",
-    images: ["/assets/images/books/book3.jpg", "/assets/images/books/book1.jpg"],
-    bio: "Plongez au cœur d'une forêt ancestrale magique, où chaque murmure raconte une légende oubliée. Guidé par la lueur d'une bougie, découvrez les secrets millénaires cachés sous le grand chêne.",
-    location: "Éditions Sylvestre",
-    distance: "2 100 DA",
-    interests: ["Fantasy", "Nature", "Légendes"],
-    languages: ["Français", "English"],
-  },
-  {
-    id: 4,
-    name: "Le Chant du Silence",
-    author: "Sarah Lindqvist",
-    format: "Méditation & Poésie",
-    price: 1950,
-    image: "/assets/images/books/book1.jpg",
-    images: ["/assets/images/books/book1.jpg", "/assets/images/books/book2.jpg"],
-    bio: "Méditation poétique sur les mots et la sérénité. Un recueil intime et apaisant qui célèbre la beauté de la solitude et le réconfort de la lecture au calme en toute harmonie.",
-    location: "Éditions Sérénité",
-    distance: "1 950 DA",
-    interests: ["Philosophie", "Méditation", "Bien-être"],
-    languages: ["Français"],
-  }
-];
+export const initialProfiles = [];
 
 // Algorithme de mélange aléatoire Fisher-Yates
 const shuffleArray = (array) => {
@@ -336,11 +264,11 @@ export const DatingProvider = ({ children }) => {
         const inStock = formatted.filter((p) => (Number(p.stock) || 0) > 0);
         setAllProfiles(shuffleArray(inStock));
       } else {
-        setAllProfiles(shuffleArray(initialProfiles));
+        setAllProfiles([]);
       }
     } catch (err) {
-      console.warn('Utilisation des données initiales locales:', err.message);
-      setAllProfiles(shuffleArray(initialProfiles));
+      console.warn('Erreur chargement produits:', err.message);
+      setAllProfiles([]);
     } finally {
       setLoadingProducts(false);
     }
