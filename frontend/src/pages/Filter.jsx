@@ -106,7 +106,7 @@ const Filter = () => {
   });
 
   const [priceRange, setPriceRange] = useState(() => {
-    return activeFilters.maxPrice ? Number(activeFilters.maxPrice) : 3500;
+    return activeFilters.maxPrice && Number(activeFilters.maxPrice) > 6000 ? Number(activeFilters.maxPrice) : 1000000;
   });
 
   // États pour les Dropdowns (accordéons déroulants)
@@ -132,13 +132,13 @@ const Filter = () => {
     setSearchQuery('');
     setSelectedCategories([]);
     setSelectedLanguages([]);
-    setPriceRange(6000);
+    setPriceRange(1000000);
     if (setActiveFilters) {
       setActiveFilters({
         search: '',
         categories: [],
         languages: [],
-        maxPrice: 6000
+        maxPrice: 1000000
       });
     }
     if (datingCtx?.resetCards) {
@@ -507,14 +507,14 @@ const Filter = () => {
                 <div className="mb-3 title font-w600 font-16 d-flex justify-content-between">
                   <span>500 DA</span>
                   <span className="text-primary font-w700">{priceRange.toLocaleString('fr-FR')} DA</span>
-                  <span>6 000+ DA</span>
+                  <span>1 000 000+ DA</span>
                 </div>
                 <input 
                   type="range" 
                   className="form-range w-100" 
                   min="500" 
-                  max="6000" 
-                  step="50"
+                  max="1000000" 
+                  step="5000"
                   value={priceRange} 
                   onChange={(e) => setPriceRange(Number(e.target.value))}
                 />

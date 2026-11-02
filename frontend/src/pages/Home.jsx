@@ -60,7 +60,7 @@ const Home = () => {
   const activeFilters = datingCtx?.activeFilters || {};
   const selectedCategories = Array.isArray(activeFilters.categories) ? activeFilters.categories : [];
   const selectedLanguages = Array.isArray(activeFilters.languages) ? activeFilters.languages : [];
-  const currentMaxPrice = activeFilters.maxPrice !== undefined ? Number(activeFilters.maxPrice) : 6000;
+  const currentMaxPrice = activeFilters.maxPrice !== undefined ? Number(activeFilters.maxPrice) : 1000000;
 
   useLayoutEffect(() => {
     if (searchOpen && searchBarRef.current) {
@@ -213,7 +213,7 @@ const Home = () => {
       search: '',
       categories: [],
       languages: [],
-      maxPrice: 6000
+      maxPrice: 1000000
     });
   };
 
@@ -711,7 +711,7 @@ const Home = () => {
               <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary, #71717a)' }}>
                 Catégories
               </span>
-              {(selectedCategories.length > 0 || selectedLanguages.length > 0 || currentMaxPrice < 6000 || searchQuery) && (
+              {(selectedCategories.length > 0 || selectedLanguages.length > 0 || currentMaxPrice < 1000000 || searchQuery) && (
                 <button
                   type="button"
                   onClick={handleResetFilters}
@@ -795,15 +795,15 @@ const Home = () => {
                 Prix maximum
               </span>
               <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>
-                {currentMaxPrice >= 6000 ? 'Tous les prix' : `${Number(currentMaxPrice).toLocaleString('fr-FR')} DA`}
+                {currentMaxPrice >= 1000000 ? 'Tous les prix' : `${Number(currentMaxPrice).toLocaleString('fr-FR')} DA`}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="range"
                 min="500"
-                max="6000"
-                step="100"
+                max="1000000"
+                step="5000"
                 value={currentMaxPrice}
                 onChange={(e) => handlePriceChange(e.target.value)}
                 className="filter-slider"

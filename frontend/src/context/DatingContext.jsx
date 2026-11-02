@@ -22,13 +22,19 @@ export const DatingProvider = ({ children }) => {
   const [activeFilters, setActiveFilters] = useState(() => {
     try {
       const saved = localStorage.getItem('tiktok_shop_active_filters');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.maxPrice === 6000 || !parsed.maxPrice)) {
+          parsed.maxPrice = 1000000;
+        }
+        return parsed;
+      }
     } catch (e) { }
     return {
       search: '',
       categories: [],
       languages: [],
-      maxPrice: 6000
+      maxPrice: 1000000
     };
   });
 
@@ -104,7 +110,7 @@ export const DatingProvider = ({ children }) => {
         if (!matchesLang) return false;
       }
       // 3. Prix maximum
-      if (activeFilters.maxPrice && Number(p.price) > Number(activeFilters.maxPrice)) {
+      if (activeFilters.maxPrice && Number(activeFilters.maxPrice) < 1000000 && Number(p.price) > Number(activeFilters.maxPrice)) {
         return false;
       }
       return true;

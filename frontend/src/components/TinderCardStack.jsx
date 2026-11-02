@@ -23,7 +23,7 @@ const TinderCardStack = ({
         search: '',
         categories: [],
         languages: [],
-        maxPrice: 6000
+        maxPrice: 1000000
       });
     }
   };
