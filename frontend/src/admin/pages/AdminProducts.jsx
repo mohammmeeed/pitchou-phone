@@ -3993,7 +3993,7 @@ export default function AdminProducts({ initialView }) {
                   <input
                     type="text"
                     className="form-control-custom"
-                    placeholder="Rechercher par titre ou auteur..."
+                    placeholder="Rechercher un produit..."
                     value={search}
                     onChange={(e) => {
                       setSearch(e.target.value);
@@ -4323,7 +4323,6 @@ export default function AdminProducts({ initialView }) {
                   <tr>
                     <th style={{ width: '80px' }}>Aperçu</th>
                     <th>Nom du Produit</th>
-                    <th>Auteur</th>
                     <th>Catégorie</th>
                     <th>Prix (DA)</th>
                     <th>Stock</th>
@@ -4333,7 +4332,7 @@ export default function AdminProducts({ initialView }) {
                 <tbody>
                   {filteredProducts.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '3rem' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '3rem' }}>
                         <i
                           className="flaticon-381-box"
                           style={{ fontSize: '2.5rem', color: '#ccc', display: 'block', marginBottom: '0.5rem' }}
@@ -4371,11 +4370,6 @@ export default function AdminProducts({ initialView }) {
                                 <div style={{ fontSize: '0.78rem', color: '#888' }}>{p.format}</div>
                               ) : null}
                             </div>
-                          </td>
-                          <td>
-                            <span style={{ fontWeight: 500, color: p.author ? '#555' : '#aaa' }}>
-                              {p.author || '—'}
-                            </span>
                           </td>
                           <td>
                             {(() => {
