@@ -4,7 +4,7 @@ import { useDating } from '../context/DatingContext';
 
 const FirstName = () => {
   const navigate = useNavigate();
-  const { userProfile, setUserProfile } = useDating();
+  const { userProfile, setUserProfile } = useDating() || {};
   const [firstName, setFirstName] = useState(userProfile?.name?.split(' ')[0] || '');
 
   const handleSubmit = (e) => {

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 
 const Sidebar = ({ isOpen, onClose }) => {
-  const { userProfile, setUserProfile, cartItems = [] } = useDating();
+  const { userProfile, setUserProfile, cartItems = [] } = useDating() || {};
   const location = useLocation();
 
   const cartCount = cartItems.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);

@@ -4,7 +4,7 @@ import { useDating } from '../context/DatingContext';
 
 const Interested = () => {
   const navigate = useNavigate();
-  const { userProfile, setUserProfile } = useDating();
+  const { userProfile, setUserProfile } = useDating() || {};
   const [interested, setInterested] = useState(userProfile?.interestedIn || 'Women');
 
   const options = ['Women', 'Men', 'Other'];

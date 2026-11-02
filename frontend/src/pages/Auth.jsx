@@ -10,7 +10,7 @@ const Auth = ({ defaultTab = 'login' }) => {
   const [activeTab, setActiveTab] = useState(tabParam === 'register' ? 'register' : defaultTab);
 
   const redirectParam = searchParams.get('redirect');
-  const { setUserProfile, clearCart } = useDating();
+  const { setUserProfile, clearCart } = useDating() || {};
 
   // Login state (telephone + mot de passe)
   const [loginPhone, setLoginPhone] = useState('');

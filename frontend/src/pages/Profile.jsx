@@ -31,7 +31,7 @@ export const cleanAddress = (addr, wilaya = '', commune = '') => {
 };
 
 const Profile = () => {
-  const { userProfile, setUserProfile } = useDating();
+  const { userProfile, setUserProfile } = useDating() || {};
 
   // Données du compte client (depuis le stockage local ou le contexte)
   const [loggedUser, setLoggedUser] = useState(() => {

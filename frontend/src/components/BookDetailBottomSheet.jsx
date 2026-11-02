@@ -6,7 +6,7 @@ const API_BASE_URL = '/api';
 
 const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { addToCart } = useDating();
+  const { addToCart } = useDating() || {};
   const [isClosing, setIsClosing] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
   const [dbProduct, setDbProduct] = useState(null);

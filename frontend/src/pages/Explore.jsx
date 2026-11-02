@@ -8,7 +8,7 @@ import { getCommunesByWilaya } from '../data/algeriaCities';
 const Explore = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { cartItems = [], updateQuantity, removeItem, clearCart, userProfile } = useDating();
+  const { cartItems = [], updateQuantity, removeItem, clearCart, userProfile } = useDating() || {};
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
   const [promoMessage, setPromoMessage] = useState('');

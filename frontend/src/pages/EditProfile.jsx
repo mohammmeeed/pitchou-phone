@@ -6,7 +6,7 @@ import { ALGERIA_CITIES, getCommunesByWilaya } from '../data/algeriaCities';
 
 const EditProfile = () => {
   const navigate = useNavigate();
-  const { userProfile, setUserProfile } = useDating();
+  const { userProfile, setUserProfile } = useDating() || {};
 
   const [loggedUser] = useState(() => {
     try {

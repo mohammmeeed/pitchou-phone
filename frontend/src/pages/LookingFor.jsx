@@ -4,7 +4,7 @@ import { useDating } from '../context/DatingContext';
 
 const LookingFor = () => {
   const navigate = useNavigate();
-  const { userProfile, setUserProfile } = useDating();
+  const { userProfile, setUserProfile } = useDating() || {};
   const [looking, setLooking] = useState(userProfile?.lookingFor || 'Long-term partner');
 
   const options = [

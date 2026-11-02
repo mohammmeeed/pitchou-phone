@@ -1,7 +1,35 @@
 // frontend/src/context/DatingContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const DatingContext = createContext();
+const defaultDatingValue = {
+  profiles: [],
+  allProfiles: [],
+  loadingProducts: false,
+  setProfiles: () => {},
+  activeFilters: { search: '', categories: [], languages: [], maxPrice: 1000000 },
+  setActiveFilters: () => {},
+  fetchProducts: () => {},
+  swipedList: [],
+  swipeCard: () => {},
+  resetCards: () => {},
+  likedList: [],
+  setLikedList: () => {},
+  addToLiked: () => {},
+  removeFromLiked: () => {},
+  isLiked: () => false,
+  matches: [],
+  setMatches: () => {},
+  userProfile: null,
+  setUserProfile: () => {},
+  cartItems: [],
+  addToCart: () => {},
+  updateQuantity: () => {},
+  removeItem: () => {},
+  clearCart: () => {},
+  logout: () => {}
+};
+
+const DatingContext = createContext(defaultDatingValue);
 
 export const initialProfiles = [];
 
@@ -20,22 +48,27 @@ export const DatingProvider = ({ children }) => {
   const [allProfiles, setAllProfiles] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [activeFilters, setActiveFilters] = useState(() => {
-    try {
-      const saved = localStorage.getItem('tiktok_shop_active_filters');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && (parsed.maxPrice === 6000 || !parsed.maxPrice)) {
-          parsed.maxPrice = 1000000;
-        }
-        return parsed;
-      }
-    } catch (e) { }
-    return {
+    const defaultFilters = {
       search: '',
       categories: [],
       languages: [],
       maxPrice: 1000000
     };
+    try {
+      const saved = localStorage.getItem('tiktok_shop_active_filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            search: typeof parsed.search === 'string' ? parsed.search : '',
+            categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+            languages: Array.isArray(parsed.languages) ? parsed.languages : [],
+            maxPrice: parsed.maxPrice && Number(parsed.maxPrice) > 6000 ? Number(parsed.maxPrice) : 1000000
+          };
+        }
+      }
+    } catch (e) { }
+    return defaultFilters;
   });
 
   useEffect(() => {
@@ -403,4 +436,7 @@ export const DatingProvider = ({ children }) => {
   );
 };
 
-export const useDating = () => useContext(DatingContext);
+export const useDating = () => {
+  const context = useContext(DatingContext);
+  return context || defaultDatingValue;
+};

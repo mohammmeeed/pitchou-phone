@@ -6,7 +6,7 @@ import { useDating } from '../context/DatingContext';
 
 const Setting = () => {
   const { darkMode, toggleDarkMode } = useTheme();
-  const { userProfile } = useDating();
+  const { userProfile } = useDating() || {};
 
   return (
     <div className="page-wrapper">
