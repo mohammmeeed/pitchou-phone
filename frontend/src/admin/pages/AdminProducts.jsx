@@ -1143,7 +1143,7 @@ export default function AdminProducts({ initialView }) {
           <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div className="page-title-wrap">
               <h1>Paramètres des Attributs</h1>
-              <p className="breadcrumb-sub">Ajouter, modifier ou supprimer les catégories et langues du catalogue</p>
+              <p className="breadcrumb-sub">Gérer les catégories de produits et les tarifs de livraison</p>
             </div>
             <div className="page-actions">
               <button
@@ -1176,7 +1176,6 @@ export default function AdminProducts({ initialView }) {
           >
             {[
               { id: 'categories', label: 'Catégories de Produits', count: categoriesList.length, icon: 'fas fa-tags', color: '#fe2c55' },
-              { id: 'languages', label: 'Langues', count: languagesList.length, icon: 'fas fa-globe', color: '#209f84' },
               { id: 'wilayas', label: 'Wilayas & Tarifs de Livraison', count: wilayasList.length, icon: 'fas fa-truck-moving', color: '#0284c7' }
             ].map((tab) => {
               const isActive = attributeTab === tab.id;
