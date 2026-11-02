@@ -129,7 +129,7 @@ export default function AdminProducts({ initialView }) {
     format: '',
     price: '',
     purchase_price: '',
-    stock: '15',
+    stock: '',
     category: '',
     categories: [],
     rating: 4.8,
@@ -817,7 +817,7 @@ export default function AdminProducts({ initialView }) {
       format: '',
       price: '',
       purchase_price: '',
-      stock: '15',
+      stock: '',
       category: '',
       categories: [],
       rating: 4.8,
@@ -1103,7 +1103,7 @@ export default function AdminProducts({ initialView }) {
           >
             {[
               { id: 'categories', label: 'Catégories de Produits', count: categoriesList.length, icon: 'fas fa-tags', color: '#fe2c55' },
-              { id: 'languages', label: 'Langues des Livres', count: languagesList.length, icon: 'fas fa-globe', color: '#209f84' },
+              { id: 'languages', label: 'Langues', count: languagesList.length, icon: 'fas fa-globe', color: '#209f84' },
               { id: 'wilayas', label: 'Wilayas & Tarifs de Livraison', count: wilayasList.length, icon: 'fas fa-truck-moving', color: '#0284c7' }
             ].map((tab) => {
               const isActive = attributeTab === tab.id;
@@ -1753,7 +1753,7 @@ export default function AdminProducts({ initialView }) {
             </div>
           )}
 
-          {/* FENÊTRE 2 : LANGUES DES LIVRES (Full Width) */}
+          {/* FENÊTRE 2 : LANGUES (Full Width) */}
           {attributeTab === 'languages' && (
             <div className="admin-card" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden' }}>
               <div
@@ -1772,10 +1772,10 @@ export default function AdminProducts({ initialView }) {
                 <div>
                   <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.15rem', fontWeight: 800, color: '#111827' }}>
                     <i className="fas fa-globe" style={{ color: '#209f84' }} />
-                    Langues des Livres
+                    Langues
                   </h4>
                   <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-                    Gérer les langues disponibles pour les livres et éditions
+                    Gérer les langues disponibles
                   </p>
                 </div>
                 <span className="badge-custom bg-soft-info" style={{ fontWeight: 800, fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}>
@@ -2643,26 +2643,13 @@ export default function AdminProducts({ initialView }) {
                       <input
                         type="text"
                         className="form-control-custom"
-                        placeholder="Ex: Les Chroniques d'Alger"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         required
                       />
                     </div>
 
-                    {/* Auteur */}
-                    <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
-                      <label className="form-label-custom">Auteur / Écrivain (Optionnel)</label>
-                      <input
-                        type="text"
-                        className="form-control-custom"
-                        placeholder="Ex: Yasmina Khadra (Optionnel)"
-                        value={formData.author}
-                        onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Catégories du Livre (Dropdown Sélecteur Recherchable) */}
+                    {/* Catégories du Produit (Dropdown Sélecteur Recherchable) */}
                     <div
                       ref={formCatDropdownRef}
                       className="form-group-custom"
@@ -2671,7 +2658,7 @@ export default function AdminProducts({ initialView }) {
                       {/* Header with Title and Manage link */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <label className="form-label-custom" style={{ margin: 0 }}>Catégorie(s) du Livre *</label>
+                          <label className="form-label-custom" style={{ margin: 0 }}>Catégorie(s) du Produit *</label>
                           {(() => {
                             const currentCats = Array.isArray(formData.categories) && formData.categories.length > 0
                               ? formData.categories
@@ -3038,7 +3025,6 @@ export default function AdminProducts({ initialView }) {
                         type="number"
                         step="50"
                         className="form-control-custom"
-                        placeholder="Ex: 2500"
                         value={formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         required
@@ -3052,7 +3038,6 @@ export default function AdminProducts({ initialView }) {
                         type="number"
                         step="50"
                         className="form-control-custom"
-                        placeholder="Ex: 1800"
                         value={formData.purchase_price}
                         onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
                       />
@@ -3069,7 +3054,6 @@ export default function AdminProducts({ initialView }) {
                       <input
                         type="number"
                         className="form-control-custom"
-                        placeholder="Ex: 20"
                         value={formData.stock}
                         onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                       />
@@ -3081,67 +3065,9 @@ export default function AdminProducts({ initialView }) {
                       <input
                         type="text"
                         className="form-control-custom"
-                        placeholder="Ex: Édition Reliée, Broché, Grand Format, Poche..."
                         value={formData.format}
                         onChange={(e) => setFormData({ ...formData, format: e.target.value })}
                       />
-                    </div>
-
-                    {/* Sélection des Langues */}
-                    <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                        <label className="form-label-custom" style={{ margin: 0 }}>Langue(s) du Livre</label>
-                        <button
-                          type="button"
-                          onClick={() => setViewMode('attributes')}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#fe2c55',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                          }}
-                        >
-                          <i className="fas fa-sliders-h" style={{ fontSize: '0.72rem' }} />
-                          Gérer
-                        </button>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
-                        {languagesList.map((lang) => {
-                          const isSelected = (formData.languages || []).includes(lang);
-                          return (
-                            <button
-                              key={lang}
-                              type="button"
-                              onClick={() => toggleLanguage(lang)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                padding: '0.6rem 1.15rem',
-                                borderRadius: '8px',
-                                border: isSelected ? '2px solid #111111' : '1px solid #d4d4d8',
-                                backgroundColor: isSelected ? '#111111' : '#ffffff',
-                                color: isSelected ? '#ffffff' : '#374151',
-                                fontWeight: isSelected ? 600 : 500,
-                                fontSize: '0.88rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <i
-                                className={isSelected ? 'fas fa-check-circle' : 'far fa-circle'}
-                                style={{ fontSize: '0.9rem', color: isSelected ? '#34d399' : '#9ca3af' }}
-                              />
-                              <span>{lang}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
                     </div>
 
                     {/* =========================================================================
@@ -3295,9 +3221,9 @@ export default function AdminProducts({ initialView }) {
                                   <img
                                     src={imgUrl}
                                     alt={`Photo ${idx + 1}`}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#ffffff' }}
                                     onError={(e) => {
-                                      e.target.src = '/assets/images/books/book1.jpg';
+                                      e.target.src = '/assets/images/categories/telephones.svg';
                                     }}
                                   />
                                   {isPrimary && (
@@ -3315,7 +3241,7 @@ export default function AdminProducts({ initialView }) {
                                         boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
                                       }}
                                     >
-                                      ★ Couverture
+                                      ★ Principale
                                     </span>
                                   )}
                                   <button
@@ -3361,7 +3287,7 @@ export default function AdminProducts({ initialView }) {
                                     onMouseEnter={(e) => (e.target.style.background = '#e4e4e7')}
                                     onMouseLeave={(e) => (e.target.style.background = '#f4f4f5')}
                                   >
-                                    ★ Mettre en couverture
+                                    ★ Mettre en photo principale
                                   </button>
                                 )}
                               </div>
@@ -3382,7 +3308,7 @@ export default function AdminProducts({ initialView }) {
                           }}
                         >
                           <i className="fas fa-info-circle" style={{ marginRight: '6px' }} />
-                          Aucune photo ajoutée pour l'instant. Ajoutez au moins une photo pour afficher la couverture du produit.
+                          Aucune photo ajoutée pour l'instant. Ajoutez au moins une photo pour afficher l'image du produit.
                         </div>
                       )}
                     </div>
@@ -3687,11 +3613,11 @@ export default function AdminProducts({ initialView }) {
                   }}
                 >
                   <img
-                    src={formData.image || '/assets/images/books/book1.jpg'}
+                    src={formData.image || '/assets/images/categories/telephones.svg'}
                     alt={formData.name || 'Aperçu'}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', padding: formData.image ? '0' : '1.5rem', backgroundColor: '#ffffff' }}
                     onError={(e) => {
-                      e.target.src = '/assets/images/books/book1.jpg';
+                      e.target.src = '/assets/images/categories/telephones.svg';
                     }}
                   />
                 </div>
@@ -3715,35 +3641,11 @@ export default function AdminProducts({ initialView }) {
                 <h3 style={{ fontSize: '1.15rem', color: '#333', margin: '0.4rem 0 0.2rem' }}>
                   {formData.name || 'Titre du Produit'}
                 </h3>
-                {(formData.author || formData.format) && (
+                {formData.format && (
                   <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '0.5rem' }}>
-                    {formData.author}
-                    {formData.author && formData.format ? ' • ' : ''}
-                    {formData.format ? <small>{formData.format}</small> : null}
+                    <small>{formData.format}</small>
                   </p>
                 )}
-
-                {/* Badges Langues Live */}
-                {Array.isArray(formData.languages) && formData.languages.length > 0 ? (
-                  <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
-                    {formData.languages.map((lang) => (
-                      <span
-                        key={lang}
-                        style={{
-                          fontSize: '0.72rem',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          background: '#f0fdf4',
-                          color: '#166534',
-                          border: '1px solid #bbf7d0',
-                          fontWeight: 600
-                        }}
-                      >
-                        {lang}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
 
                 <div
                   style={{
@@ -4392,7 +4294,7 @@ export default function AdminProducts({ initialView }) {
               }}
               totalItems={filteredProducts.length}
               itemsPerPage={itemsPerPage}
-              itemLabel="livres"
+              itemLabel="produits"
             />
           </div>
         </div>

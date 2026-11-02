@@ -23,7 +23,7 @@ export const DatingProvider = ({ children }) => {
     try {
       const saved = localStorage.getItem('tiktok_shop_active_filters');
       if (saved) return JSON.parse(saved);
-    } catch (e) {}
+    } catch (e) { }
     return {
       search: '',
       categories: [],
@@ -35,7 +35,7 @@ export const DatingProvider = ({ children }) => {
   useEffect(() => {
     try {
       localStorage.setItem('tiktok_shop_active_filters', JSON.stringify(activeFilters));
-    } catch (e) {}
+    } catch (e) { }
   }, [activeFilters]);
 
   // Profils filtrés selon les critères actifs
@@ -63,16 +63,16 @@ export const DatingProvider = ({ children }) => {
         const pCats = Array.isArray(p.categories) && p.categories.length > 0
           ? p.categories
           : (typeof p.category === 'string' && p.category.trim() !== ''
-              ? p.category.split(',').map((s) => s.trim())
-              : (Array.isArray(p.interests) ? p.interests : []));
+            ? p.category.split(',').map((s) => s.trim())
+            : (Array.isArray(p.interests) ? p.interests : []));
         const catMatch = pCats.some((c) => normalize(c).includes(q));
 
         // Langue
         const pLangs = Array.isArray(p.languages)
           ? p.languages
           : (typeof p.languages === 'string' && p.languages.trim() !== ''
-              ? p.languages.split(',').map((s) => s.trim())
-              : (typeof p.language === 'string' ? [p.language] : []));
+            ? p.languages.split(',').map((s) => s.trim())
+            : (typeof p.language === 'string' ? [p.language] : []));
         const langMatch = pLangs.some((l) => normalize(l).includes(q));
 
         if (!titleMatch && !authorMatch && !descMatch && !catMatch && !langMatch) {
@@ -85,8 +85,8 @@ export const DatingProvider = ({ children }) => {
         const pCats = Array.isArray(p.categories) && p.categories.length > 0
           ? p.categories
           : (typeof p.category === 'string' && p.category.trim() !== ''
-              ? p.category.split(',').map((s) => s.trim())
-              : []);
+            ? p.category.split(',').map((s) => s.trim())
+            : []);
         const activeNorm = activeFilters.categories.map((c) => (c || '').toLowerCase().trim());
         const matchesCategory = pCats.some((c) => activeNorm.includes((c || '').toLowerCase().trim()));
         if (!matchesCategory) {
@@ -98,8 +98,8 @@ export const DatingProvider = ({ children }) => {
         const pLangs = Array.isArray(p.languages)
           ? p.languages
           : (typeof p.languages === 'string' && p.languages.trim() !== ''
-              ? p.languages.split(',').map((s) => s.trim())
-              : []);
+            ? p.languages.split(',').map((s) => s.trim())
+            : []);
         const matchesLang = pLangs.some((l) => activeFilters.languages.includes(l));
         if (!matchesLang) return false;
       }
@@ -120,14 +120,14 @@ export const DatingProvider = ({ children }) => {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
     return [];
   });
 
   useEffect(() => {
     try {
       localStorage.setItem('tiktok_shop_favorites', JSON.stringify(likedList));
-    } catch (e) {}
+    } catch (e) { }
   }, [likedList]);
 
   const [matches, setMatches] = useState([
@@ -155,7 +155,7 @@ export const DatingProvider = ({ children }) => {
           };
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   });
 
@@ -180,7 +180,7 @@ export const DatingProvider = ({ children }) => {
         } else {
           setUserProfile(null);
         }
-      } catch (e) {}
+      } catch (e) { }
 
       try {
         const savedCart = localStorage.getItem('tiktok_cart');
@@ -192,7 +192,7 @@ export const DatingProvider = ({ children }) => {
         } else {
           setCartItems([]);
         }
-      } catch (e) {}
+      } catch (e) { }
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -203,7 +203,7 @@ export const DatingProvider = ({ children }) => {
     try {
       localStorage.removeItem('customer_user');
       localStorage.removeItem('customer_token');
-    } catch (e) {}
+    } catch (e) { }
     setUserProfile(null);
   };
 
@@ -212,14 +212,14 @@ export const DatingProvider = ({ children }) => {
     try {
       const saved = localStorage.getItem('tiktok_cart');
       if (saved) return JSON.parse(saved);
-    } catch (e) {}
+    } catch (e) { }
     return [];
   });
 
   useEffect(() => {
     try {
       localStorage.setItem('tiktok_cart', JSON.stringify(cartItems));
-    } catch (e) {}
+    } catch (e) { }
   }, [cartItems]);
 
   // Charger les produits réels depuis le backend PHP MySQL (Admin Panel)
@@ -250,15 +250,15 @@ export const DatingProvider = ({ children }) => {
           location: p.location || '',
           distance: `${Number(p.price).toLocaleString('fr-FR')} DA`,
           category: p.category || '',
-          categories: Array.isArray(p.categories) && p.categories.length > 0 
-            ? p.categories 
+          categories: Array.isArray(p.categories) && p.categories.length > 0
+            ? p.categories
             : (typeof p.category === 'string' && p.category.trim() !== '' ? p.category.split(',').map((s) => s.trim()).filter(Boolean) : []),
           stock: p.stock || 0,
           languages: Array.isArray(p.languages)
             ? p.languages
             : (typeof p.languages === 'string' && p.languages.trim() !== ''
-                ? p.languages.split(',').map((s) => s.trim()).filter(Boolean)
-                : [])
+              ? p.languages.split(',').map((s) => s.trim()).filter(Boolean)
+              : [])
         }));
 
         // Filtrer strictement les livres en stock (> 0) pour le site public
@@ -340,7 +340,7 @@ export const DatingProvider = ({ children }) => {
         id: card.id,
         name: card.name || card.title,
         author: card.author || '',
-        school: card.author 
+        school: card.author
           ? `${card.author} • ${card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : ''}`
           : (card.distance || (card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : '')),
         price: card.price || 0,
