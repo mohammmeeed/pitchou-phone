@@ -3262,9 +3262,9 @@ export default function AdminProducts({ initialView }) {
                       />
                     </div>
 
-                    {/* Format */}
+                    {/* Marque */}
                     <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
-                      <label className="form-label-custom">Format / Édition</label>
+                      <label className="form-label-custom">Marque</label>
                       <input
                         type="text"
                         className="form-control-custom"
