@@ -45,7 +45,9 @@ const Wishlist = ({ defaultCategory = null }) => {
   const isLiked = datingCtx?.isLiked || ((id) => likedList.some(item => String(item.id) === String(id)));
   const [searchQuery, setSearchQuery] = useState('');
   const [dbCategories, setDbCategories] = useState([]);
+  const [dbSubcategories, setDbSubcategories] = useState({});
   const [dbCategoryImages, setDbCategoryImages] = useState({});
+  const [selectedSubcategory, setSelectedSubcategory] = useState(null);
   const [sortBy, setSortBy] = useState('count'); // 'count' | 'az' | 'za'
   const [detailCard, setDetailCard] = useState(null);
 
@@ -75,6 +77,9 @@ const Wishlist = ({ defaultCategory = null }) => {
           if (Array.isArray(data.categories)) {
             setDbCategories(data.categories);
           }
+          if (data.subcategories && typeof data.subcategories === 'object') {
+            setDbSubcategories(data.subcategories);
+          }
           if (data.category_images && typeof data.category_images === 'object') {
             setDbCategoryImages(data.category_images);
           }
@@ -95,7 +100,7 @@ const Wishlist = ({ defaultCategory = null }) => {
       .catch(() => {});
   }, []);
 
-  // Construire la liste des catégories avec leurs images de couverture et nombre de livres
+  // Construire la liste des catégories avec leurs images de couverture et nombre de produits
   const categoriesList = useMemo(() => {
     const catMap = new Map();
 
@@ -104,39 +109,67 @@ const Wishlist = ({ defaultCategory = null }) => {
       const clean = (name || '').trim();
       if (clean) {
         const customImg = dbCategoryImages[clean] || null;
-        catMap.set(clean, { name: clean, count: 0, image: customImg, hasCustomImage: !!customImg });
+        const subs = dbSubcategories[clean] || [];
+        catMap.set(clean, { 
+          name: clean, 
+          count: 0, 
+          image: customImg, 
+          hasCustomImage: !!customImg,
+          subcategories: subs 
+        });
       }
     });
 
-    // 2. Parcourir les livres pour calculer les totaux et trouver une couverture représentative
-    allProfiles.forEach((book) => {
-      const bCats = Array.isArray(book.categories) && book.categories.length > 0
-        ? book.categories
-        : (typeof book.category === 'string' && book.category.trim() !== ''
-            ? book.category.split(',').map((s) => s.trim())
-            : (Array.isArray(book.interests) ? book.interests : []));
+    // 2. Parcourir les produits pour calculer les totaux et trouver une couverture représentative
+    allProfiles.forEach((item) => {
+      const pCats = Array.isArray(item.categories) && item.categories.length > 0
+        ? item.categories
+        : (typeof item.category === 'string' && item.category.trim() !== ''
+            ? item.category.split(',').map((s) => s.trim())
+            : (Array.isArray(item.interests) ? item.interests : []));
 
-      const coverImg = book.image || (Array.isArray(book.images) && book.images[0]) || null;
+      const coverImg = item.image || (Array.isArray(item.images) && item.images[0]) || null;
 
-      bCats.forEach((c) => {
+      pCats.forEach((c) => {
         const clean = (c || '').trim();
         if (!clean) return;
-        const customImg = dbCategoryImages[clean] || null;
-        if (!catMap.has(clean)) {
-          catMap.set(clean, { name: clean, count: 1, image: customImg || coverImg, hasCustomImage: !!customImg });
+
+        // Trouver la catégorie parente correspondante
+        let targetCat = null;
+        if (catMap.has(clean)) {
+          targetCat = clean;
         } else {
-          const item = catMap.get(clean);
-          item.count += 1;
-          if (!item.hasCustomImage && !item.image && coverImg) {
-            item.image = coverImg;
+          for (const [parentName, parentData] of catMap.entries()) {
+            if (parentData.subcategories && parentData.subcategories.includes(clean)) {
+              targetCat = parentName;
+              break;
+            }
+          }
+        }
+
+        const catKey = targetCat || clean;
+        const customImg = dbCategoryImages[catKey] || null;
+
+        if (!catMap.has(catKey)) {
+          catMap.set(catKey, { 
+            name: catKey, 
+            count: 1, 
+            image: customImg || coverImg, 
+            hasCustomImage: !!customImg,
+            subcategories: dbSubcategories[catKey] || []
+          });
+        } else {
+          const entry = catMap.get(catKey);
+          entry.count += 1;
+          if (!entry.hasCustomImage && !entry.image && coverImg) {
+            entry.image = coverImg;
           }
         }
       });
     });
 
-    return Array.from(catMap.values())
-      .filter((c) => c.count > 0 || dbCategories.length === 0);
-  }, [dbCategories, dbCategoryImages, allProfiles]);
+    return Array.from(catMap.values());
+  }, [dbCategories, dbSubcategories, dbCategoryImages, allProfiles]);
 
   // Résoudre le nom réel de la catégorie à partir du slug d'URL ou du paramètre
   const selectedCategory = useMemo(() => {
@@ -227,7 +260,12 @@ const Wishlist = ({ defaultCategory = null }) => {
     return list.filter((cat) => (cat.name || '').toLowerCase().includes(q));
   }, [categoriesList, sortBy, searchQuery]);
 
-  // Livres de la catégorie sélectionnée
+  // Réinitialiser la sous-catégorie sélectionnée lors du changement de catégorie
+  useEffect(() => {
+    setSelectedSubcategory(null);
+  }, [selectedCategory]);
+
+  // Produits de la catégorie sélectionnée (et sous-catégorie)
   const filteredBooks = useMemo(() => {
     if (!selectedCategory) return [];
 
@@ -237,23 +275,31 @@ const Wishlist = ({ defaultCategory = null }) => {
 
     const selLower = selectedCategory.toLowerCase().trim();
     const selSlug = slugifyCategory(selectedCategory);
+    const categorySubs = (dbSubcategories[selectedCategory] || []).map(s => s.toLowerCase().trim());
+    const activeSubLower = selectedSubcategory ? selectedSubcategory.toLowerCase().trim() : null;
 
-    return allProfiles.filter((book) => {
-      const bCats = Array.isArray(book.categories) && book.categories.length > 0
-        ? book.categories
-        : (typeof book.category === 'string' && book.category.trim() !== ''
-            ? book.category.split(',').map((s) => s.trim())
-            : (Array.isArray(book.interests) ? book.interests : []));
+    return allProfiles.filter((prod) => {
+      const pCats = Array.isArray(prod.categories) && prod.categories.length > 0
+        ? prod.categories
+        : (typeof prod.category === 'string' && prod.category.trim() !== ''
+            ? prod.category.split(',').map((s) => s.trim())
+            : (Array.isArray(prod.interests) ? prod.interests : []));
 
-      return bCats.some((c) => {
+      if (activeSubLower) {
+        return pCats.some((c) => (c || '').toLowerCase().trim() === activeSubLower || slugifyCategory(c || '') === slugifyCategory(selectedSubcategory));
+      }
+
+      return pCats.some((c) => {
         const cTrimmed = (c || '').trim();
         if (!cTrimmed) return false;
-        if (cTrimmed.toLowerCase() === selLower) return true;
+        const cLower = cTrimmed.toLowerCase();
+        if (cLower === selLower) return true;
         if (selSlug && slugifyCategory(cTrimmed) === selSlug) return true;
+        if (categorySubs.includes(cLower)) return true;
         return false;
       });
     });
-  }, [selectedCategory, likedList, allProfiles]);
+  }, [selectedCategory, selectedSubcategory, dbSubcategories, likedList, allProfiles]);
 
   // Pagination progressive (Infinite Scroll) pour affichage instantané des livres
   const [visibleBooksCount, setVisibleBooksCount] = useState(24);
@@ -440,12 +486,12 @@ const Wishlist = ({ defaultCategory = null }) => {
                     >
                       <div className="dz-media" style={{ height: '100%', position: 'absolute', width: '100%' }}>
                         <img 
-                          src={cat.image || '/assets/images/books/book1.jpg'} 
+                          src={cat.image || '/assets/images/categories/telephones.svg'} 
                           alt={cat.name} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={(e) => {
                             e.target.onerror = null;
-                            e.target.src = '/assets/images/books/book1.jpg';
+                            e.target.src = '/assets/images/categories/telephones.svg';
                           }}
                         />
                         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.2) 80%, transparent 100%)' }} />
@@ -458,7 +504,7 @@ const Wishlist = ({ defaultCategory = null }) => {
                           bottom: 0, 
                           left: 0, 
                           right: 0, 
-                          width: '100%',
+                          width: '100%', 
                           padding: '8px 10px', 
                           zIndex: 2,
                           textAlign: 'left',
@@ -468,7 +514,7 @@ const Wishlist = ({ defaultCategory = null }) => {
                         <h6 
                           className="title text-white mb-0" 
                           style={{ 
-                            fontSize: '18px', 
+                            fontSize: '17px', 
                             fontWeight: 800, 
                             lineHeight: 1.15,
                             letterSpacing: '-0.2px',
@@ -483,17 +529,32 @@ const Wishlist = ({ defaultCategory = null }) => {
                         >
                           {cat.name}
                         </h6>
+                        {cat.subcategories && cat.subcategories.length > 0 && (
+                          <span 
+                            className="d-block text-truncate" 
+                            style={{ 
+                              fontSize: '10.5px', 
+                              color: '#cbd5e1', 
+                              opacity: 0.95,
+                              marginTop: '2px',
+                              fontWeight: 600,
+                              textShadow: '0 1px 3px rgba(0, 0, 0, 0.9)'
+                            }}
+                          >
+                            {cat.subcategories.slice(0, 3).join(', ')}{cat.subcategories.length > 3 ? '...' : ''}
+                          </span>
+                        )}
                         <span 
                           className="about d-block text-truncate" 
                           style={{ 
                             fontSize: '11px', 
-                            color: '#e2e8f0', 
+                            color: '#94a3b8', 
                             opacity: 0.95,
-                            marginTop: '2px',
+                            marginTop: '1px',
                             textShadow: '0 1px 3px rgba(0, 0, 0, 0.9)'
                           }}
                         >
-                          {cat.count} livre{cat.count > 1 ? 's' : ''}
+                          {cat.count} article{cat.count > 1 ? 's' : ''}
                         </span>
                       </div>
                     </div>
@@ -511,7 +572,7 @@ const Wishlist = ({ defaultCategory = null }) => {
           ) : (
             
             /* =========================================================================
-               VUE 2 : GRILLE 2x2 DES LIVRES FILTRÉS PAR LA CATÉGORIE OU FAVORIS
+               VUE 2 : GRILLE 2x2 DES PRODUITS FILTRÉS PAR LA CATÉGORIE OU FAVORIS
                ========================================================================= */
             <div>
               {/* Bouton de retour vers toutes les catégories */}
@@ -525,9 +586,69 @@ const Wishlist = ({ defaultCategory = null }) => {
                   <i className="feather icon-arrow-left"></i> Toutes les catégories
                 </button>
                 <span className="text-muted font-12" style={{ fontWeight: 600 }}>
-                  {filteredBooks.length} livre{filteredBooks.length > 1 ? 's' : ''}
+                  {filteredBooks.length} article{filteredBooks.length > 1 ? 's' : ''}
                 </span>
               </div>
+
+              {/* Barre des sous-catégories (ex: Samsung, Apple iPhone, Xiaomi, Oppo...) */}
+              {selectedCategory !== '__favorites__' && (dbSubcategories[selectedCategory] || []).length > 0 && (
+                <div 
+                  className="mb-3 d-flex align-items-center gap-2"
+                  style={{
+                    overflowX: 'auto',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    paddingBottom: '6px'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSubcategory(null)}
+                    className="btn btn-sm rounded-pill font-12 d-inline-flex align-items-center gap-1 shadow-sm"
+                    style={{
+                      whiteSpace: 'nowrap',
+                      backgroundColor: selectedSubcategory === null ? '#209f84' : '#f8fafc',
+                      color: selectedSubcategory === null ? '#ffffff' : '#475569',
+                      fontWeight: selectedSubcategory === null ? 700 : 600,
+                      border: selectedSubcategory === null ? '1.5px solid #209f84' : '1px solid #e2e8f0',
+                      padding: '5px 14px'
+                    }}
+                  >
+                    Tous
+                  </button>
+                  {(dbSubcategories[selectedCategory] || []).map((sub) => {
+                    const isSubSelected = selectedSubcategory === sub;
+                    const subImg = dbCategoryImages[sub] || null;
+                    return (
+                      <button
+                        key={sub}
+                        type="button"
+                        onClick={() => setSelectedSubcategory(isSubSelected ? null : sub)}
+                        className="btn btn-sm rounded-pill font-12 d-inline-flex align-items-center gap-1 shadow-sm"
+                        style={{
+                          whiteSpace: 'nowrap',
+                          backgroundColor: isSubSelected ? '#209f84' : '#ffffff',
+                          color: isSubSelected ? '#ffffff' : '#334155',
+                          fontWeight: isSubSelected ? 700 : 600,
+                          border: isSubSelected ? '1.5px solid #209f84' : '1px solid #cbd5e1',
+                          padding: '5px 12px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {subImg && (
+                          <img 
+                            src={subImg} 
+                            alt={sub} 
+                            style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }} 
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        )}
+                        <span>{sub}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {filteredBooks.length === 0 ? (
                 <div className="text-center py-5">
@@ -537,11 +658,13 @@ const Wishlist = ({ defaultCategory = null }) => {
                   >
                     <i className="feather icon-book text-primary font-28"></i>
                   </div>
-                  <h6 className="font-w600 mb-1">Aucun livre pour le moment</h6>
+                  <h6 className="font-w600 mb-1">Aucun produit pour le moment</h6>
                   <p className="text-muted font-12 px-3 mb-3">
                     {selectedCategory === '__favorites__' 
-                      ? "Vous n'avez pas encore ajouté de livres à vos favoris."
-                      : `Aucun livre disponible dans la catégorie "${selectedCategory}".`}
+                      ? "Vous n'avez pas encore ajouté d'articles à vos favoris."
+                      : selectedSubcategory
+                        ? `Aucun produit disponible dans la sous-catégorie "${selectedSubcategory}".`
+                        : `Aucun produit disponible dans la catégorie "${selectedCategory}".`}
                   </p>
                   <button
                     type="button"

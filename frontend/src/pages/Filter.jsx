@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useDating, initialProfiles } from '../context/DatingContext';
@@ -15,21 +15,58 @@ const Filter = () => {
   const activeFilters = datingCtx?.activeFilters || {};
   const setActiveFilters = datingCtx?.setActiveFilters;
 
-  // Catégories existantes
-  const defaultCategories = useMemo(() => [], []);
+  // Catégories & Sous-catégories chargées depuis la BDD Pitchou
+  const [dbCategories, setDbCategories] = useState([]);
+  const [dbSubcategories, setDbSubcategories] = useState({});
 
-  const categoriesList = useMemo(() => {
-    const fromProducts = allProducts.flatMap((p) => {
-      if (Array.isArray(p.categories)) return p.categories;
-      if (typeof p.categories === 'string' && p.categories.trim() !== '') {
-        try { return JSON.parse(p.categories); } catch(e) { return p.categories.split(',').map((s) => s.trim()); }
+  useEffect(() => {
+    fetch('/api/attributes')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data?.categories)) {
+          setDbCategories(data.categories);
+        }
+        if (data?.subcategories && typeof data.subcategories === 'object') {
+          setDbSubcategories(data.subcategories);
+        }
+      })
+      .catch((err) => console.warn('Erreur chargement attributes dans Filter:', err));
+  }, []);
+
+  const categoriesOptions = useMemo(() => {
+    const list = [];
+    const added = new Set();
+
+    dbCategories.forEach((cat) => {
+      list.push({ name: cat, isSub: false, parent: null });
+      added.add(cat.toLowerCase().trim());
+      const subs = dbSubcategories[cat] || [];
+      subs.forEach((sub) => {
+        list.push({ name: sub, isSub: true, parent: cat });
+        added.add(sub.toLowerCase().trim());
+      });
+    });
+
+    // Également inclure les catégories trouvées sur les produits actuels
+    allProducts.forEach((p) => {
+      let pCats = [];
+      if (Array.isArray(p.categories)) pCats = p.categories;
+      else if (typeof p.categories === 'string' && p.categories.trim() !== '') {
+        try { pCats = JSON.parse(p.categories); } catch(e) { pCats = p.categories.split(',').map((s) => s.trim()); }
+      } else if (typeof p.category === 'string') {
+        pCats = p.category.split(',').map((s) => s.trim());
       }
-      if (typeof p.category === 'string') return p.category.split(',').map((s) => s.trim());
-      return [];
-    }).filter(Boolean);
-    const combined = Array.from(new Set([...defaultCategories, ...fromProducts]));
-    return combined.filter((c) => c && c.trim() !== '');
-  }, [allProducts, defaultCategories]);
+      pCats.forEach((c) => {
+        const clean = (c || '').trim();
+        if (clean && !added.has(clean.toLowerCase())) {
+          list.push({ name: clean, isSub: false, parent: null });
+          added.add(clean.toLowerCase());
+        }
+      });
+    });
+
+    return list;
+  }, [dbCategories, dbSubcategories, allProducts]);
 
   // Langues existantes
   const defaultLanguages = useMemo(() => {
@@ -285,16 +322,18 @@ const Filter = () => {
             {/* Menu déroulant (Dropdown body) avec les mêmes cases à cocher carrées */}
             {categoriesOpen && (
               <div className="card-body p-0" style={{ maxHeight: '280px', overflowY: 'auto' }}>
-                {categoriesList.map((item, idx, arr) => {
-                  const isChecked = selectedCategories.includes(item);
+                {categoriesOptions.map((opt, idx, arr) => {
+                  const catName = opt.name;
+                  const isChecked = selectedCategories.includes(catName);
                   const isLast = idx === arr.length - 1;
                   return (
                     <div
-                      key={item}
-                      onClick={() => toggleCategory(item)}
-                      className="d-flex align-items-center justify-content-between px-3 py-3"
+                      key={`${opt.parent || ''}_${catName}`}
+                      onClick={() => toggleCategory(catName)}
+                      className="d-flex align-items-center justify-content-between px-3 py-2"
                       style={{
                         cursor: 'pointer',
+                        paddingLeft: opt.isSub ? '28px' : '16px',
                         borderBottom: isLast ? 'none' : '1px solid #f1f3f6',
                         transition: 'background 0.2s ease',
                         backgroundColor: isChecked ? 'var(--rgba-primary-1, rgba(254, 44, 85, 0.03))' : 'transparent',
@@ -302,18 +341,19 @@ const Filter = () => {
                     >
                       <span 
                         style={{
-                          fontSize: '15px',
-                          fontWeight: isChecked ? 600 : 400,
-                          color: isChecked ? '#111827' : '#4b5563',
+                          fontSize: opt.isSub ? '14px' : '15px',
+                          fontWeight: isChecked || !opt.isSub ? 600 : 400,
+                          color: isChecked ? '#111827' : (opt.isSub ? '#6b7280' : '#1f2937'),
                           letterSpacing: '-0.2px',
                         }}
                       >
-                        {item}
+                        {opt.isSub && <span style={{ color: '#9ca3af', marginRight: '6px' }}>↳</span>}
+                        {catName}
                       </span>
                       <div
                         style={{
-                          width: '22px',
-                          height: '22px',
+                          width: '20px',
+                          height: '20px',
                           borderRadius: '6px',
                           border: isChecked ? '2px solid var(--primary)' : '2px solid #d1d5db',
                           background: isChecked ? 'var(--primary-gradient, linear-gradient(135deg, #f33e5b 0%, #fe2c55 100%))' : '#ffffff',
@@ -326,7 +366,7 @@ const Filter = () => {
                         }}
                       >
                         {isChecked && (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="20 6 9 17 4 12" />
                           </svg>
                         )}

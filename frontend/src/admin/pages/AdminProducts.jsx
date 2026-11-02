@@ -93,6 +93,9 @@ export default function AdminProducts({ initialView }) {
 
   // Gestion des Attributs (Catégories & Langues)
   const [categoriesList, setCategoriesList] = useState([]);
+  const [subcategoriesMap, setSubcategoriesMap] = useState({});
+  const [newSubcatInput, setNewSubcatInput] = useState({}); // { [parentCat]: string }
+  const [editingSubcategory, setEditingSubcategory] = useState(null); // { parent: string, oldName: string, value: string, image: string }
   const [languagesList, setLanguagesList] = useState([
     'Français',
     'Anglais',
@@ -102,6 +105,7 @@ export default function AdminProducts({ initialView }) {
   const [editingCategory, setEditingCategory] = useState(null); // { oldName: string, value: string, image: string }
   const [categoryImages, setCategoryImages] = useState({});
   const [uploadingCatImage, setUploadingCatImage] = useState(false);
+  const [uploadingSubcatImage, setUploadingSubcatImage] = useState(false);
   const [newLangInput, setNewLangInput] = useState('');
   const [editingLanguage, setEditingLanguage] = useState(null); // { oldName: string, value: string }
 
@@ -138,7 +142,7 @@ export default function AdminProducts({ initialView }) {
   });
 
 
-  const toggleCategory = (cat) => {
+  const toggleCategory = (cat, parentCat = null) => {
     setFormData((prev) => {
       let current = [];
       if (Array.isArray(prev.categories) && prev.categories.length > 0) {
@@ -146,9 +150,16 @@ export default function AdminProducts({ initialView }) {
       } else if (prev.category) {
         current = prev.category.split(',').map((s) => s.trim()).filter(Boolean);
       }
-      const updated = current.includes(cat)
-        ? current.filter((c) => c !== cat)
-        : [...current, cat];
+      const exists = current.includes(cat);
+      let updated;
+      if (exists) {
+        updated = current.filter((c) => c !== cat);
+      } else {
+        updated = [...current, cat];
+        if (parentCat && !current.includes(parentCat)) {
+          updated.push(parentCat);
+        }
+      }
       return {
         ...prev,
         categories: updated,
@@ -179,6 +190,9 @@ export default function AdminProducts({ initialView }) {
         if (Array.isArray(data.categories)) {
           setCategoriesList(data.categories);
         }
+        if (data.subcategories && typeof data.subcategories === 'object') {
+          setSubcategoriesMap(data.subcategories);
+        }
         if (data.category_images && typeof data.category_images === 'object') {
           setCategoryImages(data.category_images);
         }
@@ -191,6 +205,121 @@ export default function AdminProducts({ initialView }) {
       }
     } catch (e) {
       console.warn('Erreur chargement attributs:', e);
+    }
+  };
+
+  // Handlers pour Sous-catégories
+  const handleAddSubcategory = async (parentCat) => {
+    const trimmed = (newSubcatInput[parentCat] || '').trim();
+    if (!trimmed) return;
+    const currentSubs = subcategoriesMap[parentCat] || [];
+    if (currentSubs.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+      showToast('Cette sous-catégorie existe déjà.');
+      return;
+    }
+    const updatedSubs = [...currentSubs, trimmed];
+    const updatedMap = {
+      ...subcategoriesMap,
+      [parentCat]: updatedSubs
+    };
+    setSubcategoriesMap(updatedMap);
+    setNewSubcatInput((prev) => ({ ...prev, [parentCat]: '' }));
+    showToast(`Sous-catégorie "${trimmed}" ajoutée à "${parentCat}" !`);
+    await adminApi.saveAttributes({
+      action: 'add_subcategory',
+      parentCategory: parentCat,
+      name: trimmed,
+      categories: categoriesList,
+      subcategories: updatedMap,
+      category_images: categoryImages,
+      languages: languagesList
+    });
+  };
+
+  const handleSaveEditSubcategory = async (parentCat, oldName, newName, image) => {
+    const trimmed = (newName || '').trim();
+    if (!trimmed) {
+      setEditingSubcategory(null);
+      return;
+    }
+    const currentSubs = subcategoriesMap[parentCat] || [];
+    const updatedSubs = currentSubs.map((s) => (s === oldName ? trimmed : s));
+    const updatedMap = {
+      ...subcategoriesMap,
+      [parentCat]: updatedSubs
+    };
+    setSubcategoriesMap(updatedMap);
+
+    const updatedImages = { ...categoryImages };
+    if (oldName !== trimmed) {
+      delete updatedImages[oldName];
+    }
+    if (image && typeof image === 'string' && image.trim() !== '') {
+      updatedImages[trimmed] = image.trim();
+    } else {
+      delete updatedImages[trimmed];
+    }
+    setCategoryImages(updatedImages);
+    setEditingSubcategory(null);
+    showToast(`Sous-catégorie "${trimmed}" mise à jour !`);
+    await adminApi.saveAttributes({
+      action: 'edit_subcategory',
+      parentCategory: parentCat,
+      oldName,
+      newName: trimmed,
+      image: image || '',
+      categories: categoriesList,
+      subcategories: updatedMap,
+      category_images: updatedImages,
+      languages: languagesList
+    });
+  };
+
+  const handleDeleteSubcategory = async (parentCat, subName) => {
+    const currentSubs = subcategoriesMap[parentCat] || [];
+    const updatedSubs = currentSubs.filter((s) => s !== subName);
+    const updatedMap = {
+      ...subcategoriesMap,
+      [parentCat]: updatedSubs
+    };
+    setSubcategoriesMap(updatedMap);
+    const updatedImages = { ...categoryImages };
+    delete updatedImages[subName];
+    setCategoryImages(updatedImages);
+    showToast(`Sous-catégorie "${subName}" supprimée.`);
+    await adminApi.saveAttributes({
+      action: 'delete_subcategory',
+      parentCategory: parentCat,
+      name: subName,
+      categories: categoriesList,
+      subcategories: updatedMap,
+      category_images: updatedImages,
+      languages: languagesList
+    });
+  };
+
+  const handleSubcatPhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingSubcatImage(true);
+    try {
+      const res = await adminApi.uploadMedia(file);
+      if (res && res.url) {
+        setEditingSubcategory((prev) => ({
+          ...prev,
+          image: res.url
+        }));
+        showToast("Photo de sous-catégorie importée ! Cliquez sur Valider.");
+      } else {
+        alert("Erreur lors du téléversement de la photo.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors du téléversement de la photo.");
+    } finally {
+      setUploadingSubcatImage(false);
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -255,6 +384,13 @@ export default function AdminProducts({ initialView }) {
     }
     setCategoryImages(updatedImages);
 
+    const updatedMap = { ...subcategoriesMap };
+    if (oldName !== trimmed) {
+      updatedMap[trimmed] = updatedMap[oldName] || [];
+      delete updatedMap[oldName];
+      setSubcategoriesMap(updatedMap);
+    }
+
     setFormData((prev) => {
       const currentCats = (prev.categories || []).map((c) => (c === oldName ? trimmed : c));
       return {
@@ -286,6 +422,9 @@ export default function AdminProducts({ initialView }) {
     const updatedImages = { ...categoryImages };
     delete updatedImages[catName];
     setCategoryImages(updatedImages);
+    const updatedMap = { ...subcategoriesMap };
+    delete updatedMap[catName];
+    setSubcategoriesMap(updatedMap);
     setFormData((prev) => {
       const currentCats = (prev.categories || []).filter((c) => c !== catName);
       return {
@@ -821,13 +960,23 @@ export default function AdminProducts({ initialView }) {
     }
   };
 
-  const categoriesForFilter = ['Tous', ...categoriesList];
+  const categoriesForFilter = useMemo(() => {
+    const list = ['Tous', ...categoriesList];
+    Object.keys(subcategoriesMap || {}).forEach((pCat) => {
+      (subcategoriesMap[pCat] || []).forEach((sub) => {
+        if (!list.includes(sub)) {
+          list.push(sub);
+        }
+      });
+    });
+    return list;
+  }, [categoriesList, subcategoriesMap]);
 
   const categoryCounts = useMemo(() => {
     const counts = {};
     const norm = (s) => (s || '').toLowerCase().trim();
 
-    categoriesList.forEach((c) => {
+    categoriesForFilter.forEach((c) => {
       counts[c] = 0;
     });
 
@@ -837,7 +986,7 @@ export default function AdminProducts({ initialView }) {
         : (p.category ? p.category.split(',').map((s) => s.trim()) : []);
       const pCatsNorm = pCats.map(norm);
 
-      categoriesList.forEach((cat) => {
+      categoriesForFilter.forEach((cat) => {
         const catNorm = norm(cat);
         if (pCatsNorm.some((c) => c === catNorm || c.includes(catNorm))) {
           counts[cat] = (counts[cat] || 0) + 1;
@@ -846,7 +995,7 @@ export default function AdminProducts({ initialView }) {
     });
 
     return counts;
-  }, [products, categoriesList]);
+  }, [products, categoriesForFilter]);
 
   const filteredCategoriesForSelect = useMemo(() => {
     const q = catSearchQuery.toLowerCase().trim();
@@ -857,11 +1006,25 @@ export default function AdminProducts({ initialView }) {
     });
   }, [categoriesForFilter, catSearchQuery]);
 
+  const formCategoryOptions = useMemo(() => {
+    const options = [];
+    categoriesList.forEach((cat) => {
+      options.push({ name: cat, isSub: false, parent: null, image: categoryImages[cat] });
+      const subs = subcategoriesMap[cat] || [];
+      subs.forEach((sub) => {
+        options.push({ name: sub, isSub: true, parent: cat, image: categoryImages[sub] });
+      });
+    });
+    return options;
+  }, [categoriesList, subcategoriesMap, categoryImages]);
+
   const filteredFormCategories = useMemo(() => {
     const q = formCatSearchQuery.toLowerCase().trim();
-    if (!q) return categoriesList;
-    return categoriesList.filter((cat) => cat.toLowerCase().includes(q));
-  }, [categoriesList, formCatSearchQuery]);
+    if (!q) return formCategoryOptions;
+    return formCategoryOptions.filter((opt) =>
+      opt.name.toLowerCase().includes(q) || (opt.parent && opt.parent.toLowerCase().includes(q))
+    );
+  }, [formCategoryOptions, formCatSearchQuery]);
 
   const filteredProducts = products.filter((p) => {
     const pName = (p.name || '').toLowerCase();
@@ -1006,7 +1169,7 @@ export default function AdminProducts({ initialView }) {
                     Catégories de Produits
                   </h4>
                   <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-                    Gérer l'ensemble des catégories associées aux livres du catalogue
+                    Gérer l'ensemble des catégories et sous-catégories de Pitchou Phone
                   </p>
                 </div>
                 <span className="badge-custom bg-soft-primary" style={{ fontWeight: 800, fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}>
@@ -1044,7 +1207,7 @@ export default function AdminProducts({ initialView }) {
                     <input
                       type="text"
                       className="form-control-custom"
-                      placeholder="Nouvelle catégorie (ex: Sciences, Biographie, Mangas...)"
+                      placeholder="Nouvelle catégorie (ex: Téléphones, Accessoires, Batteries...)"
                       value={newCatInput}
                       onChange={(e) => setNewCatInput(e.target.value)}
                       style={{ flex: 1, minWidth: '220px' }}
@@ -1092,7 +1255,9 @@ export default function AdminProducts({ initialView }) {
                 {/* Grille responsive des catégories */}
                 {(() => {
                   const filteredCats = categoriesList.filter((cat) =>
-                    !categorySearch || cat.toLowerCase().includes(categorySearch.toLowerCase())
+                    !categorySearch ||
+                    cat.toLowerCase().includes(categorySearch.toLowerCase()) ||
+                    (subcategoriesMap[cat] || []).some((s) => s.toLowerCase().includes(categorySearch.toLowerCase()))
                   );
 
                   if (filteredCats.length === 0) {
@@ -1108,30 +1273,33 @@ export default function AdminProducts({ initialView }) {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                        gap: '0.75rem'
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+                        gap: '1.25rem'
                       }}
                     >
                       {filteredCats.map((cat) => {
                         const isEditing = editingCategory?.oldName === cat;
+                        const subs = subcategoriesMap[cat] || [];
+                        const catImg = categoryImages[cat];
 
                         return (
                           <div
                             key={cat}
                             style={{
                               display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '0.75rem 1rem',
-                              borderRadius: '8px',
+                              flexDirection: 'column',
+                              padding: '1.25rem',
+                              borderRadius: '12px',
                               backgroundColor: isEditing ? '#fef2f2' : '#ffffff',
-                              border: isEditing ? '1.5px solid #fe2c55' : '1px solid #e2e8f0',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                              transition: 'all 0.15s ease'
+                              border: isEditing ? '2px solid #fe2c55' : '1px solid #e2e8f0',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                              transition: 'all 0.15s ease',
+                              gap: '1rem'
                             }}
                           >
+                            {/* Card Header : Catégorie principale */}
                             {isEditing ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
                                 <div style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
                                   <input
                                     type="text"
@@ -1139,14 +1307,14 @@ export default function AdminProducts({ initialView }) {
                                     value={editingCategory.value}
                                     onChange={(e) => setEditingCategory({ ...editingCategory, value: e.target.value })}
                                     placeholder="Nom de la catégorie"
-                                    style={{ flex: 1, padding: '0.4rem 0.65rem', fontSize: '0.88rem' }}
+                                    style={{ flex: 1, padding: '0.5rem 0.75rem', fontSize: '0.9rem', fontWeight: 600 }}
                                     autoFocus
                                   />
                                   <button
                                     type="button"
                                     className="btn-primary-custom"
                                     onClick={() => handleSaveEditCategory(cat, editingCategory.value, editingCategory.image)}
-                                    style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                                    style={{ padding: '0.5rem 0.85rem', fontSize: '0.85rem' }}
                                     title="Enregistrer"
                                   >
                                     <i className="fas fa-check" />
@@ -1155,39 +1323,39 @@ export default function AdminProducts({ initialView }) {
                                     type="button"
                                     className="btn-light-custom"
                                     onClick={() => setEditingCategory(null)}
-                                    style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
+                                    style={{ padding: '0.5rem 0.85rem', fontSize: '0.85rem' }}
                                     title="Annuler"
                                   >
                                     <i className="fas fa-times" />
                                   </button>
                                 </div>
 
-                                {/* Sélecteur de Photo de Couverture pour la Catégorie */}
+                                {/* Sélecteur de Photo / Icône pour la Catégorie */}
                                 <div style={{ 
                                   display: 'flex', 
                                   alignItems: 'center', 
-                                  gap: '0.65rem', 
-                                  padding: '0.45rem 0.65rem', 
-                                  backgroundColor: '#f8fafc', 
-                                  borderRadius: '6px',
+                                  gap: '0.75rem', 
+                                  padding: '0.6rem 0.75rem', 
+                                  backgroundColor: '#ffffff', 
+                                  borderRadius: '8px',
                                   border: '1px dashed #cbd5e1'
                                 }}>
                                   {editingCategory.image ? (
-                                    <div style={{ position: 'relative', width: '42px', height: '42px', flexShrink: 0 }}>
+                                    <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0 }}>
                                       <img 
                                         src={editingCategory.image} 
                                         alt="Aperçu catégorie" 
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', padding: '3px' }}
                                       />
                                       <button
                                         type="button"
                                         onClick={() => setEditingCategory({ ...editingCategory, image: '' })}
                                         style={{
                                           position: 'absolute',
-                                          top: '-5px',
-                                          right: '-5px',
-                                          width: '17px',
-                                          height: '17px',
+                                          top: '-6px',
+                                          right: '-6px',
+                                          width: '18px',
+                                          height: '18px',
                                           borderRadius: '50%',
                                           backgroundColor: '#ef4444',
                                           color: '#ffffff',
@@ -1207,18 +1375,18 @@ export default function AdminProducts({ initialView }) {
                                     </div>
                                   ) : (
                                     <div style={{ 
-                                      width: '42px', 
-                                      height: '42px', 
+                                      width: '48px', 
+                                      height: '48px', 
                                       borderRadius: '6px', 
                                       backgroundColor: '#e2e8f0', 
                                       display: 'flex', 
                                       alignItems: 'center', 
                                       justifyContent: 'center', 
                                       color: '#94a3b8', 
-                                      fontSize: '0.9rem',
+                                      fontSize: '1.1rem',
                                       flexShrink: 0 
                                     }}>
-                                      <i className="fas fa-image" />
+                                      <i className="fas fa-mobile-alt" />
                                     </div>
                                   )}
 
@@ -1230,11 +1398,11 @@ export default function AdminProducts({ initialView }) {
                                         margin: 0, 
                                         display: 'inline-flex', 
                                         alignItems: 'center', 
-                                        gap: '5px', 
-                                        fontSize: '0.78rem', 
-                                        padding: '0.3rem 0.6rem',
+                                        gap: '6px', 
+                                        fontSize: '0.8rem', 
+                                        padding: '0.35rem 0.75rem',
                                         width: 'fit-content',
-                                        borderRadius: '5px',
+                                        borderRadius: '6px',
                                         backgroundColor: '#ffffff',
                                         border: '1px solid #e2e8f0'
                                       }}
@@ -1255,67 +1423,326 @@ export default function AdminProducts({ initialView }) {
                                         disabled={uploadingCatImage}
                                       />
                                     </label>
-                                    <span style={{ fontSize: '0.71rem', color: '#64748b' }}>
-                                      {editingCategory.image ? 'Image personnalisée active pour cette catégorie' : 'Aucune image (utilise la couverture d\'un livre)'}
+                                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                      {editingCategory.image ? 'Image personnalisée active' : 'Aucune image (utilise le premier produit ou l\'icône)'}
                                     </span>
                                   </div>
                                 </div>
                               </div>
                             ) : (
-                              <>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
-                                  {categoryImages[cat] ? (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                                  {catImg ? (
                                     <img
-                                      src={categoryImages[cat]}
+                                      src={catImg}
                                       alt={cat}
                                       style={{
-                                        width: '32px',
-                                        height: '32px',
-                                        borderRadius: '6px',
-                                        objectFit: 'cover',
+                                        width: '42px',
+                                        height: '42px',
+                                        borderRadius: '8px',
+                                        objectFit: 'contain',
+                                        backgroundColor: '#f8fafc',
                                         flexShrink: 0,
-                                        border: '1px solid #cbd5e1'
+                                        border: '1px solid #e2e8f0',
+                                        padding: '4px'
                                       }}
                                     />
                                   ) : (
-                                    <i className="fas fa-folder" style={{ color: '#fe2c55', fontSize: '0.92rem', flexShrink: 0 }} />
+                                    <div
+                                      style={{
+                                        width: '42px',
+                                        height: '42px',
+                                        borderRadius: '8px',
+                                        backgroundColor: '#fee2e2',
+                                        color: '#fe2c55',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '1.1rem',
+                                        flexShrink: 0
+                                      }}
+                                    >
+                                      <i className="fas fa-folder" />
+                                    </div>
                                   )}
-                                  <span
-                                    style={{
-                                      fontWeight: 700,
-                                      color: '#1e293b',
-                                      fontSize: '0.9rem',
-                                      whiteSpace: 'nowrap',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis'
-                                    }}
-                                    title={cat}
-                                  >
-                                    {cat}
-                                  </span>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div
+                                      style={{
+                                        fontWeight: 800,
+                                        color: '#0f172a',
+                                        fontSize: '1rem',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                      }}
+                                      title={cat}
+                                    >
+                                      {cat}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                      {subs.length} sous-catégorie{subs.length > 1 ? 's' : ''}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
                                   <button
                                     type="button"
                                     onClick={() => setEditingCategory({ oldName: cat, value: cat, image: categoryImages[cat] || '' })}
                                     className="btn-light-custom"
-                                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px' }}
-                                    title="Modifier cette catégorie"
+                                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', borderRadius: '6px' }}
+                                    title="Modifier la catégorie"
                                   >
-                                    <i className="fas fa-edit" style={{ color: '#3b82f6' }} /> Modifier
+                                    <i className="fas fa-edit" style={{ color: '#3b82f6' }} />
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteCategory(cat)}
                                     className="btn-light-custom"
-                                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', color: '#ef4444' }}
-                                    title="Supprimer cette catégorie"
+                                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', borderRadius: '6px', color: '#ef4444' }}
+                                    title="Supprimer la catégorie"
                                   >
                                     <i className="fas fa-trash-alt" />
                                   </button>
                                 </div>
-                              </>
+                              </div>
                             )}
+
+                            {/* Section Sous-Catégories */}
+                            <div
+                              style={{
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '10px',
+                                padding: '0.85rem',
+                                border: '1px solid #e2e8f0',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.65rem'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <i className="fas fa-sitemap" style={{ color: '#3b82f6' }} />
+                                  Sous-catégories
+                                </span>
+                                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                                  {subs.length} configurée{subs.length > 1 ? 's' : ''}
+                                </span>
+                              </div>
+
+                              {/* Liste des sous-catégories existantes */}
+                              {subs.length === 0 ? (
+                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.4rem 0' }}>
+                                  Aucune sous-catégorie pour le moment.
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '200px', overflowY: 'auto' }}>
+                                  {subs.map((sub) => {
+                                    const isSubEditing = editingSubcategory?.parent === cat && editingSubcategory?.oldName === sub;
+                                    const subImg = categoryImages[sub];
+
+                                    if (isSubEditing) {
+                                      return (
+                                        <div
+                                          key={sub}
+                                          style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '0.5rem',
+                                            padding: '0.6rem',
+                                            backgroundColor: '#ffffff',
+                                            border: '1.5px solid #3b82f6',
+                                            borderRadius: '8px'
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                            <input
+                                              type="text"
+                                              className="form-control-custom"
+                                              value={editingSubcategory.value}
+                                              onChange={(e) => setEditingSubcategory({ ...editingSubcategory, value: e.target.value })}
+                                              placeholder="Nom sous-catégorie"
+                                              style={{ flex: 1, padding: '0.35rem 0.6rem', fontSize: '0.82rem' }}
+                                              autoFocus
+                                            />
+                                            <button
+                                              type="button"
+                                              className="btn-primary-custom"
+                                              onClick={() => handleSaveEditSubcategory(cat, sub, editingSubcategory.value, editingSubcategory.image)}
+                                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                                              title="Valider"
+                                            >
+                                              <i className="fas fa-check" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="btn-light-custom"
+                                              onClick={() => setEditingSubcategory(null)}
+                                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                                              title="Annuler"
+                                            >
+                                              <i className="fas fa-times" />
+                                            </button>
+                                          </div>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            {editingSubcategory.image ? (
+                                              <div style={{ position: 'relative', width: '28px', height: '28px', flexShrink: 0 }}>
+                                                <img
+                                                  src={editingSubcategory.image}
+                                                  alt=""
+                                                  style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setEditingSubcategory({ ...editingSubcategory, image: '' })}
+                                                  style={{
+                                                    position: 'absolute',
+                                                    top: '-4px',
+                                                    right: '-4px',
+                                                    width: '14px',
+                                                    height: '14px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#ef4444',
+                                                    color: '#ffffff',
+                                                    border: 'none',
+                                                    fontSize: '9px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer'
+                                                  }}
+                                                >
+                                                  ×
+                                                </button>
+                                              </div>
+                                            ) : null}
+                                            <label
+                                              className="btn-light-custom"
+                                              style={{
+                                                cursor: uploadingSubcatImage ? 'not-allowed' : 'pointer',
+                                                margin: 0,
+                                                fontSize: '0.72rem',
+                                                padding: '0.25rem 0.5rem',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                              }}
+                                            >
+                                              <i className="fas fa-upload" style={{ color: '#3b82f6' }} />
+                                              <span>{uploadingSubcatImage ? 'Chargement...' : editingSubcategory.image ? 'Changer photo' : 'Ajouter photo'}</span>
+                                              <input
+                                                type="file"
+                                                accept="image/*"
+                                                style={{ display: 'none' }}
+                                                onChange={handleSubcatPhotoUpload}
+                                                disabled={uploadingSubcatImage}
+                                              />
+                                            </label>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <div
+                                        key={sub}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          padding: '0.4rem 0.6rem',
+                                          borderRadius: '6px',
+                                          backgroundColor: '#ffffff',
+                                          border: '1px solid #e2e8f0',
+                                          fontSize: '0.82rem'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                                          {subImg ? (
+                                            <img
+                                              src={subImg}
+                                              alt={sub}
+                                              style={{
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '4px',
+                                                objectFit: 'contain',
+                                                backgroundColor: '#f8fafc',
+                                                padding: '2px',
+                                                border: '1px solid #e2e8f0'
+                                              }}
+                                            />
+                                          ) : (
+                                            <i className="fas fa-tag" style={{ color: '#94a3b8', fontSize: '0.75rem' }} />
+                                          )}
+                                          <span
+                                            style={{
+                                              fontWeight: 600,
+                                              color: '#1e293b',
+                                              whiteSpace: 'nowrap',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis'
+                                            }}
+                                            title={sub}
+                                          >
+                                            {sub}
+                                          </span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => setEditingSubcategory({ parent: cat, oldName: sub, value: sub, image: subImg || '' })}
+                                            className="btn-light-custom"
+                                            style={{ padding: '0.25rem 0.45rem', fontSize: '0.75rem', borderRadius: '4px' }}
+                                            title="Modifier la sous-catégorie"
+                                          >
+                                            <i className="fas fa-edit" style={{ color: '#3b82f6' }} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteSubcategory(cat, sub)}
+                                            className="btn-light-custom"
+                                            style={{ padding: '0.25rem 0.45rem', fontSize: '0.75rem', borderRadius: '4px', color: '#ef4444' }}
+                                            title="Supprimer la sous-catégorie"
+                                          >
+                                            <i className="fas fa-trash-alt" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Formulaire d'ajout rapide de sous-catégorie */}
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  handleAddSubcategory(cat);
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  gap: '0.4rem',
+                                  marginTop: '0.25rem'
+                                }}
+                              >
+                                <input
+                                  type="text"
+                                  className="form-control-custom"
+                                  placeholder="Nouvelle sous-catégorie..."
+                                  value={newSubcatInput[cat] || ''}
+                                  onChange={(e) => setNewSubcatInput({ ...newSubcatInput, [cat]: e.target.value })}
+                                  style={{ flex: 1, padding: '0.35rem 0.6rem', fontSize: '0.8rem' }}
+                                />
+                                <button
+                                  type="submit"
+                                  className="btn-primary-custom"
+                                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                                  title="Ajouter à cette catégorie"
+                                >
+                                  <i className="fas fa-plus" />
+                                </button>
+                              </form>
+                            </div>
                           </div>
                         );
                       })}
@@ -2485,22 +2912,27 @@ export default function AdminProducts({ initialView }) {
                                       Aucune catégorie ne correspond à « {formCatSearchQuery} »
                                     </div>
                                   ) : (
-                                    filteredFormCategories.map((cat) => {
-                                      const isSelected = currentCats.includes(cat);
+                                    filteredFormCategories.map((opt) => {
+                                      const catName = typeof opt === 'string' ? opt : opt.name;
+                                      const isSub = typeof opt === 'object' && opt.isSub;
+                                      const parentName = typeof opt === 'object' ? opt.parent : null;
+                                      const catImg = typeof opt === 'object' ? opt.image : categoryImages[catName];
+                                      const isSelected = currentCats.includes(catName);
                                       return (
                                         <div
-                                          key={cat}
-                                          onClick={() => toggleCategory(cat)}
+                                          key={`${parentName || ''}_${catName}`}
+                                          onClick={() => toggleCategory(catName, parentName)}
                                           style={{
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'space-between',
-                                            padding: '0.55rem 0.75rem',
+                                            padding: isSub ? '0.42rem 0.75rem 0.42rem 1.75rem' : '0.55rem 0.75rem',
                                             borderRadius: '8px',
                                             cursor: 'pointer',
                                             backgroundColor: isSelected ? '#f4f4f5' : 'transparent',
                                             transition: 'background-color 0.12s ease',
-                                            marginBottom: '2px'
+                                            marginBottom: '2px',
+                                            borderLeft: isSub ? '2px solid #e2e8f0' : 'none'
                                           }}
                                           onMouseEnter={(e) => {
                                             if (!isSelected) e.currentTarget.style.backgroundColor = '#fafafa';
@@ -2527,8 +2959,26 @@ export default function AdminProducts({ initialView }) {
                                             >
                                               {isSelected && <i className="fas fa-check" />}
                                             </span>
-                                            <span style={{ fontSize: '0.86rem', fontWeight: isSelected ? 600 : 400, color: '#18181b' }}>
-                                              {cat}
+                                            {catImg ? (
+                                              <img
+                                                src={catImg}
+                                                alt=""
+                                                style={{
+                                                  width: isSub ? '18px' : '22px',
+                                                  height: isSub ? '18px' : '22px',
+                                                  borderRadius: '4px',
+                                                  objectFit: 'contain'
+                                                }}
+                                              />
+                                            ) : (
+                                              <i
+                                                className={isSub ? 'fas fa-angle-right' : 'fas fa-folder'}
+                                                style={{ fontSize: isSub ? '0.72rem' : '0.85rem', color: isSub ? '#94a3b8' : '#fe2c55' }}
+                                              />
+                                            )}
+                                            <span style={{ fontSize: isSub ? '0.82rem' : '0.88rem', fontWeight: isSelected || !isSub ? 600 : 400, color: '#18181b' }}>
+                                              {isSub && <span style={{ color: '#94a3b8', marginRight: '4px', fontSize: '0.75rem' }}>↳</span>}
+                                              {catName}
                                             </span>
                                           </div>
                                           {isSelected && (

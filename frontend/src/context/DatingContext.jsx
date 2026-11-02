@@ -87,7 +87,8 @@ export const DatingProvider = ({ children }) => {
           : (typeof p.category === 'string' && p.category.trim() !== ''
               ? p.category.split(',').map((s) => s.trim())
               : []);
-        const matchesCategory = pCats.some((c) => activeFilters.categories.includes(c));
+        const activeNorm = activeFilters.categories.map((c) => (c || '').toLowerCase().trim());
+        const matchesCategory = pCats.some((c) => activeNorm.includes((c || '').toLowerCase().trim()));
         if (!matchesCategory) {
           return false;
         }

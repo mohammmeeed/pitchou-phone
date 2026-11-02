@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="podGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" rx="32" fill="url(#bg)"/>
+  <circle cx="200" cy="180" r="105" fill="#a855f7" opacity="0.15"/>
+  <!-- Wireless Earbuds -->
+  <g transform="translate(130, 90)">
+    <!-- Left Earbud -->
+    <ellipse cx="40" cy="50" rx="22" ry="26" fill="url(#podGrad)"/>
+    <rect x="34" y="65" width="12" height="75" rx="6" fill="url(#podGrad)"/>
+    <rect x="36" y="132" width="8" height="6" rx="2" fill="#94a3b8"/>
+    <!-- Right Earbud -->
+    <ellipse cx="100" cy="50" rx="22" ry="26" fill="url(#podGrad)"/>
+    <rect x="94" y="65" width="12" height="75" rx="6" fill="url(#podGrad)"/>
+    <rect x="96" y="132" width="8" height="6" rx="2" fill="#94a3b8"/>
+  </g>
+  <text x="200" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="900" fill="#ffffff" text-anchor="middle">ÉCOUTEURS &amp; CASQUES</text>
+  <text x="200" y="364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#c084fc" text-anchor="middle">BLUETOOTH &amp; FILAIRES</text>
+</svg>

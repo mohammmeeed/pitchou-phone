@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="toolGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" rx="32" fill="url(#bg)"/>
+  <circle cx="200" cy="180" r="105" fill="#f59e0b" opacity="0.12"/>
+  <!-- Phone Screen Assembly + Screwdriver Tools -->
+  <g transform="translate(145, 80)">
+    <!-- LCD screen display module -->
+    <rect width="110" height="205" rx="16" fill="#0f172a" stroke="#f59e0b" stroke-width="3"/>
+    <rect x="6" y="6" width="98" height="193" rx="12" fill="#1e293b"/>
+    <!-- Screen flex ribbon connector -->
+    <path d="M 55 195 L 55 225" stroke="#f59e0b" stroke-width="12" stroke-linecap="round"/>
+    <rect x="42" y="222" width="26" height="8" rx="2" fill="#b45309"/>
+    <!-- Microchip and circuit lines -->
+    <rect x="35" y="70" width="40" height="40" rx="6" fill="#334155" stroke="#64748b" stroke-width="1.5"/>
+    <circle cx="55" cy="90" r="10" fill="#f59e0b"/>
+  </g>
+  <text x="200" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="19" font-weight="900" fill="#ffffff" text-anchor="middle">ÉCRANS &amp; PIÈCES</text>
+  <text x="200" y="364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#fbbf24" text-anchor="middle">AFFICHEURS, VITRES &amp; NAPPE</text>
+</svg>

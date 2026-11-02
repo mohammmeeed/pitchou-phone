@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#042f2e"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.3"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" rx="32" fill="url(#bg)"/>
+  <circle cx="200" cy="180" r="105" fill="#14b8a6" opacity="0.15"/>
+  <!-- Phone Base -->
+  <g transform="translate(140, 85)">
+    <rect width="105" height="205" rx="20" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+  </g>
+  <!-- Tempered Glass layer hovering -->
+  <g transform="translate(155, 70)">
+    <rect width="105" height="205" rx="20" fill="url(#glassGrad)" stroke="#5eead4" stroke-width="3"/>
+    <!-- Glare reflection line -->
+    <path d="M 20 15 L 85 15 L 35 190 L 15 190 Z" fill="#ffffff" opacity="0.15"/>
+    <circle cx="52" cy="14" r="3" fill="#042f2e"/>
+  </g>
+  <text x="200" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="900" fill="#ffffff" text-anchor="middle">PROTECTIONS D'ÉCRAN</text>
+  <text x="200" y="364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#2dd4bf" text-anchor="middle">VERRE TREMPÉ 9H &amp; FILM</text>
+</svg>

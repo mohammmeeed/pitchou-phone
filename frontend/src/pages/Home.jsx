@@ -72,7 +72,22 @@ const Home = () => {
   }, [searchOpen, selectedCategories, selectedLanguages, currentMaxPrice]);
 
   // Catégories et Langues existantes dynamiques
-  const defaultCategories = useMemo(() => [], []);
+  const [dbCategories, setDbCategories] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/attributes')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success) {
+          const cats = Array.isArray(data.categories) ? data.categories : [];
+          const subs = data.subcategories && typeof data.subcategories === 'object'
+            ? Object.values(data.subcategories).flat()
+            : [];
+          setDbCategories(Array.from(new Set([...cats, ...subs])));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const defaultLanguages = useMemo(() => ['Français', 'Anglais', 'Arabe'], []);
 
@@ -91,9 +106,9 @@ const Home = () => {
       if (typeof p.category === 'string') return p.category.split(',').map((s) => s.trim());
       return [];
     }).filter(Boolean);
-    const combined = Array.from(new Set([...defaultCategories, ...fromProducts]));
+    const combined = Array.from(new Set([...dbCategories, ...fromProducts]));
     return combined.filter((c) => c && c.trim() !== '');
-  }, [allProducts, defaultCategories]);
+  }, [allProducts, dbCategories]);
 
   const languagesList = useMemo(() => {
     const fromProducts = allProducts.flatMap((p) => {

@@ -144,6 +144,13 @@ function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultL
                 $categories = array_values(array_filter(array_map('trim', $decoded)));
             }
         }
+        $subcategories = [];
+        if (isset($rows['attributes_subcategories'])) {
+            $decoded = json_decode($rows['attributes_subcategories'], true);
+            if (is_array($decoded)) {
+                $subcategories = $decoded;
+            }
+        }
         $wilayas = $defaultWilayas;
         if (!empty($rows['attributes_wilayas'])) {
             $decoded = json_decode($rows['attributes_wilayas'], true);
@@ -153,13 +160,14 @@ function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultL
         }
         return [
             'categories' => $categories,
+            'subcategories' => $subcategories,
             'category_images' => json_decode($rows['attributes_category_images'] ?? '{}', true) ?? [],
             'languages' => $defaultLanguages,
             'wilayas' => $wilayas
         ];
     }
 
-    $stmt = $db->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('attributes_categories', 'attributes_category_images', 'attributes_languages', 'attributes_wilayas')");
+    $stmt = $db->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('attributes_categories', 'attributes_subcategories', 'attributes_category_images', 'attributes_languages', 'attributes_wilayas')");
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
@@ -168,6 +176,14 @@ function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultL
         $decoded = json_decode($rows['attributes_categories'], true);
         if (is_array($decoded)) {
             $categories = array_values(array_filter(array_map('trim', $decoded)));
+        }
+    }
+
+    $subcategories = [];
+    if (isset($rows['attributes_subcategories'])) {
+        $decoded = json_decode($rows['attributes_subcategories'], true);
+        if (is_array($decoded)) {
+            $subcategories = $decoded;
         }
     }
 
@@ -220,13 +236,14 @@ function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultL
 
     return [
         'categories' => $dedupedCategories,
+        'subcategories' => $subcategories,
         'category_images' => $categoryImages,
         'languages' => $dedupedLanguages,
         'wilayas' => $wilayas
     ];
 }
 
-function saveStoredAttributes(?PDO $db, array $categories, array $languages, array $wilayas, array $categoryImages = []): void {
+function saveStoredAttributes(?PDO $db, array $categories, array $languages, array $wilayas, array $categoryImages = [], array $subcategories = []): void {
     if ($db === null) {
         $fallbackFile = __DIR__ . '/../database/settings_fallback.json';
         $data = [];
@@ -234,6 +251,7 @@ function saveStoredAttributes(?PDO $db, array $categories, array $languages, arr
             $data = json_decode(file_get_contents($fallbackFile), true) ?? [];
         }
         $data['attributes_categories'] = json_encode(array_values(array_unique($categories)), JSON_UNESCAPED_UNICODE);
+        $data['attributes_subcategories'] = json_encode($subcategories, JSON_UNESCAPED_UNICODE);
         $data['attributes_languages'] = json_encode(array_values(array_unique($languages)), JSON_UNESCAPED_UNICODE);
         $data['attributes_wilayas'] = json_encode(array_values($wilayas), JSON_UNESCAPED_UNICODE);
         $data['attributes_category_images'] = json_encode($categoryImages, JSON_UNESCAPED_UNICODE);
@@ -242,6 +260,7 @@ function saveStoredAttributes(?PDO $db, array $categories, array $languages, arr
     }
     $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
     $stmt->execute(['attributes_categories', json_encode(array_values(array_unique($categories)), JSON_UNESCAPED_UNICODE)]);
+    $stmt->execute(['attributes_subcategories', json_encode($subcategories, JSON_UNESCAPED_UNICODE)]);
     $stmt->execute(['attributes_languages', json_encode(array_values(array_unique($languages)), JSON_UNESCAPED_UNICODE)]);
     $stmt->execute(['attributes_wilayas', json_encode(array_values($wilayas), JSON_UNESCAPED_UNICODE)]);
     $stmt->execute(['attributes_category_images', json_encode($categoryImages, JSON_UNESCAPED_UNICODE)]);
@@ -255,6 +274,7 @@ switch ($method) {
         echo json_encode([
             'success' => true,
             'categories' => $data['categories'],
+            'subcategories' => $data['subcategories'] ?? (object)[],
             'category_images' => $data['category_images'] ?? (object)[],
             'languages' => $data['languages'],
             'wilayas' => $data['wilayas']
@@ -269,6 +289,7 @@ switch ($method) {
 
         $current = getStoredAttributes($db, $defaultCategories, $defaultLanguages, $defaultWilayas);
         $categories = $current['categories'];
+        $subcategories = $current['subcategories'] ?? [];
         $categoryImages = $current['category_images'] ?? [];
         $languages = $current['languages'];
         $wilayas = $current['wilayas'];
@@ -276,6 +297,9 @@ switch ($method) {
         if ($action === 'save_all') {
             if (isset($input['categories']) && is_array($input['categories'])) {
                 $categories = array_values(array_filter(array_map('trim', $input['categories'])));
+            }
+            if (isset($input['subcategories']) && is_array($input['subcategories'])) {
+                $subcategories = $input['subcategories'];
             }
             if (isset($input['category_images']) && is_array($input['category_images'])) {
                 $categoryImages = $input['category_images'];
@@ -305,6 +329,9 @@ switch ($method) {
             $img = trim($input['image'] ?? '');
             if ($name !== '' && !in_array($name, $categories, true)) {
                 $categories[] = $name;
+                if (!isset($subcategories[$name])) {
+                    $subcategories[$name] = [];
+                }
                 if ($img !== '') {
                     $categoryImages[$name] = $img;
                 }
@@ -319,6 +346,11 @@ switch ($method) {
                 $index = array_search($oldName, $categories, true);
                 if ($index !== false) {
                     $categories[$index] = $newName;
+                }
+
+                if ($oldName !== $newName && isset($subcategories[$oldName])) {
+                    $subcategories[$newName] = $subcategories[$oldName];
+                    unset($subcategories[$oldName]);
                 }
 
                 // Synchroniser l'image personnalisée de la catégorie
@@ -346,6 +378,58 @@ switch ($method) {
             $name = trim($input['name'] ?? '');
             $categories = array_values(array_filter($categories, fn($c) => $c !== $name));
             unset($categoryImages[$name]);
+            if (isset($subcategories[$name])) {
+                foreach ($subcategories[$name] as $sub) {
+                    unset($categoryImages[$sub]);
+                }
+                unset($subcategories[$name]);
+            }
+        } elseif ($action === 'add_subcategory') {
+            $parent = trim($input['parentCategory'] ?? ($input['parent'] ?? ''));
+            $name = trim($input['name'] ?? '');
+            $img = trim($input['image'] ?? '');
+            if ($parent !== '' && $name !== '') {
+                if (!isset($subcategories[$parent]) || !is_array($subcategories[$parent])) {
+                    $subcategories[$parent] = [];
+                }
+                if (!in_array($name, $subcategories[$parent], true)) {
+                    $subcategories[$parent][] = $name;
+                }
+                if ($img !== '') {
+                    $categoryImages[$name] = $img;
+                }
+            }
+        } elseif ($action === 'edit_subcategory') {
+            $parent = trim($input['parentCategory'] ?? ($input['parent'] ?? ''));
+            $oldName = trim($input['oldName'] ?? '');
+            $newName = trim($input['newName'] ?? '');
+            $hasImageField = array_key_exists('image', $input);
+            $newImg = $hasImageField ? trim($input['image'] ?? '') : null;
+            if ($parent !== '' && $oldName !== '' && $newName !== '') {
+                if (isset($subcategories[$parent]) && is_array($subcategories[$parent])) {
+                    $idx = array_search($oldName, $subcategories[$parent], true);
+                    if ($idx !== false) {
+                        $subcategories[$parent][$idx] = $newName;
+                    }
+                }
+                if ($oldName !== $newName) {
+                    unset($categoryImages[$oldName]);
+                }
+                if ($hasImageField) {
+                    if ($newImg !== '') {
+                        $categoryImages[$newName] = $newImg;
+                    } else {
+                        unset($categoryImages[$newName]);
+                    }
+                }
+            }
+        } elseif ($action === 'delete_subcategory') {
+            $parent = trim($input['parentCategory'] ?? ($input['parent'] ?? ''));
+            $name = trim($input['name'] ?? '');
+            if ($parent !== '' && isset($subcategories[$parent]) && is_array($subcategories[$parent])) {
+                $subcategories[$parent] = array_values(array_filter($subcategories[$parent], fn($s) => $s !== $name));
+                unset($categoryImages[$name]);
+            }
         } elseif ($action === 'set_category_image') {
             $name = trim($input['name'] ?? '');
             $img = trim($input['image'] ?? '');
@@ -453,12 +537,13 @@ switch ($method) {
             $wilayas = normalizeWilayasList($input['wilayas'], $defaultWilayas);
         }
 
-        saveStoredAttributes($db, $categories, $languages, $wilayas, $categoryImages);
+        saveStoredAttributes($db, $categories, $languages, $wilayas, $categoryImages, $subcategories);
 
         echo json_encode([
             'success' => true,
             'message' => 'Attributs enregistrés avec succès',
             'categories' => $categories,
+            'subcategories' => $subcategories,
             'category_images' => $categoryImages,
             'languages' => $languages,
             'wilayas' => $wilayas

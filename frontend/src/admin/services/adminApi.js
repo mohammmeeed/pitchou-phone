@@ -721,6 +721,8 @@ export const adminApi = {
         }
         return {
           categories: data.categories || [],
+          subcategories: data.subcategories || {},
+          category_images: data.category_images || {},
           languages: data.languages || [],
           wilayas: Array.isArray(data.wilayas) ? data.wilayas : []
         };

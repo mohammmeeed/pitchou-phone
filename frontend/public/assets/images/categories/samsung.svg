@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a192f"/>
+      <stop offset="100%" stop-color="#112240"/>
+    </linearGradient>
+    <linearGradient id="samBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1428a0"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" rx="32" fill="url(#bg)"/>
+  <circle cx="200" cy="180" r="105" fill="#0284c7" opacity="0.15"/>
+  <!-- Samsung Ultra Style Phone -->
+  <g transform="translate(145, 75)">
+    <rect width="110" height="225" rx="10" fill="#0b1329" stroke="#1d4ed8" stroke-width="3.5"/>
+    <rect x="5" y="5" width="100" height="215" rx="8" fill="#050a18"/>
+    <!-- Punch hole camera -->
+    <circle cx="55" cy="16" r="3" fill="#1e293b"/>
+    <circle cx="55" cy="16" r="1.5" fill="#38bdf8"/>
+    <!-- Vibrant Screen artwork -->
+    <path d="M 15 150 Q 55 90 95 160 T 95 210 L 15 210 Z" fill="url(#samBlue)" opacity="0.7"/>
+    <circle cx="55" cy="110" r="32" fill="#38bdf8" opacity="0.5"/>
+  </g>
+  <!-- Stylized Branding -->
+  <text x="200" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="2">SAMSUNG</text>
+  <text x="200" y="364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#38bdf8" text-anchor="middle" letter-spacing="1">GALAXY SERIES</text>
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="accGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" rx="32" fill="url(#bg)"/>
+  <circle cx="200" cy="180" r="110" fill="#818cf8" opacity="0.15"/>
+  
+  <!-- Headphones icon illustration -->
+  <g transform="translate(110, 80)">
+    <!-- Headband -->
+    <path d="M 20 110 C 20 30, 160 30, 160 110" fill="none" stroke="url(#accGrad)" stroke-width="12" stroke-linecap="round"/>
+    <!-- Left Earcup -->
+    <rect x="8" y="95" width="26" height="55" rx="12" fill="#312e81" stroke="#818cf8" stroke-width="3"/>
+    <rect x="2" y="105" width="8" height="35" rx="4" fill="#a5b4fc"/>
+    <!-- Right Earcup -->
+    <rect x="146" y="95" width="26" height="55" rx="12" fill="#312e81" stroke="#818cf8" stroke-width="3"/>
+    <rect x="170" y="105" width="8" height="35" rx="4" fill="#a5b4fc"/>
+  </g>
+  <text x="200" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1">ACCESSOIRES</text>
+  <text x="200" y="364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#a5b4fc" text-anchor="middle" letter-spacing="1">AUDIO, COQUES &amp; SUPPORTS</text>
+</svg>

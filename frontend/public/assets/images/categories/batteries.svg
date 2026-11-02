@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#022c22"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+    <linearGradient id="batGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" rx="32" fill="url(#bg)"/>
+  <circle cx="200" cy="180" r="105" fill="#10b981" opacity="0.16"/>
+  <!-- Big Battery Icon -->
+  <g transform="translate(135, 95)">
+    <!-- Positive terminal -->
+    <rect x="42" y="0" width="46" height="14" rx="5" fill="#34d399"/>
+    <!-- Battery Body -->
+    <rect x="15" y="14" width="100" height="180" rx="20" fill="#064e3b" stroke="#10b981" stroke-width="4"/>
+    <!-- Liquid charge level -->
+    <rect x="23" y="70" width="84" height="116" rx="12" fill="url(#batGrad)"/>
+    <!-- Lightning Bolt -->
+    <polygon points="68,85 52,125 64,125 60,155 78,115 66,115" fill="#ffffff"/>
+  </g>
+  <text x="200" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="900" fill="#ffffff" text-anchor="middle">BATTERIES</text>
+  <text x="200" y="364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#6ee7b7" text-anchor="middle">INTERNES &amp; POWERBANKS</text>
+</svg>
