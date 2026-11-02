@@ -644,7 +644,7 @@ const Home = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Rechercher par titre, auteur, genre..."
+            placeholder="Rechercher un produit, une marque..."
             style={{
               border: 'none',
               background: 'transparent',
@@ -756,39 +756,7 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Ligne 2 : Langue */}
-          <div style={{ marginBottom: '8px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary, #71717a)', display: 'block', marginBottom: '4px' }}>
-              Langue
-            </span>
-            <div
-              className="filter-chips-scroll"
-              style={{
-                display: 'flex',
-                gap: '6px',
-                overflowX: 'auto',
-                paddingBottom: '2px',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none'
-              }}
-            >
-              {languagesList.map((lang) => {
-                const isSelected = selectedLanguages.includes(lang);
-                return (
-                  <button
-                    key={lang}
-                    type="button"
-                    onClick={() => toggleLanguage(lang)}
-                    className={`filter-chip ${isSelected ? 'active' : ''}`}
-                  >
-                    {lang}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Ligne 3 : Prix */}
+          {/* Ligne 2 : Prix */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary, #71717a)' }}>

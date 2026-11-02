@@ -214,7 +214,7 @@ const Filter = () => {
               <input
                 type="text"
                 className="form-control border-0 p-0 shadow-none"
-                placeholder="Titre, auteur, catégorie, description, langue..."
+                placeholder="Rechercher un produit, catégorie, marque..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
