@@ -430,8 +430,8 @@ switch ($method) {
                 $subcategories[$parent] = array_values(array_filter($subcategories[$parent], fn($s) => $s !== $name));
                 unset($categoryImages[$name]);
             }
-        } elseif ($action === 'set_category_image') {
-            $name = trim($input['name'] ?? '');
+        } elseif ($action === 'set_category_image' || $action === 'set_subcategory_image') {
+            $name = trim($input['name'] ?? ($input['subcategory'] ?? ($input['category'] ?? '')));
             $img = trim($input['image'] ?? '');
             if ($name !== '') {
                 if ($img !== '') {
@@ -535,6 +535,21 @@ switch ($method) {
         // Si la liste complète des wilayas est envoyée, synchroniser directement
         if (isset($input['wilayas']) && is_array($input['wilayas'])) {
             $wilayas = normalizeWilayasList($input['wilayas'], $defaultWilayas);
+        }
+
+        // Synchroniser également category_images et subcategories si envoyés dans la requête
+        if (isset($input['category_images']) && is_array($input['category_images'])) {
+            foreach ($input['category_images'] as $k => $v) {
+                $cleanKey = trim($k);
+                if (is_string($v) && trim($v) !== '') {
+                    $categoryImages[$cleanKey] = trim($v);
+                } elseif ($v === '' || $v === null) {
+                    unset($categoryImages[$cleanKey]);
+                }
+            }
+        }
+        if (isset($input['subcategories']) && is_array($input['subcategories'])) {
+            $subcategories = $input['subcategories'];
         }
 
         saveStoredAttributes($db, $categories, $languages, $wilayas, $categoryImages, $subcategories);

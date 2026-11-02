@@ -323,6 +323,77 @@ export default function AdminProducts({ initialView }) {
     }
   };
 
+  const handleDirectSubcatPhotoUpload = async (subName, parentCat, file) => {
+    if (!file) return;
+    setUploadingSubcatImage(true);
+    try {
+      const res = await adminApi.uploadMedia(file);
+      if (res && res.url) {
+        const updatedImages = {
+          ...categoryImages,
+          [subName]: res.url
+        };
+        setCategoryImages(updatedImages);
+        if (editingSubcategory && editingSubcategory.oldName === subName) {
+          setEditingSubcategory((prev) => ({ ...prev, image: res.url }));
+        }
+        showToast(`Photo de "${subName}" enregistrée en base de données !`);
+        await adminApi.saveAttributes({
+          action: 'set_subcategory_image',
+          parentCategory: parentCat,
+          name: subName,
+          image: res.url,
+          categories: categoriesList,
+          subcategories: subcategoriesMap,
+          category_images: updatedImages,
+          languages: languagesList
+        });
+      } else {
+        alert("Erreur lors du téléversement de la photo.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors du téléversement de la photo.");
+    } finally {
+      setUploadingSubcatImage(false);
+    }
+  };
+
+  const handleDirectCatPhotoUpload = async (catName, file) => {
+    if (!file) return;
+    setUploadingCatImage(true);
+    try {
+      const res = await adminApi.uploadMedia(file);
+      if (res && res.url) {
+        const updatedImages = {
+          ...categoryImages,
+          [catName]: res.url
+        };
+        setCategoryImages(updatedImages);
+        if (editingCategory && editingCategory.oldName === catName) {
+          setEditingCategory((prev) => ({ ...prev, image: res.url }));
+        }
+        showToast(`Photo de "${catName}" enregistrée en base de données !`);
+        await adminApi.saveAttributes({
+          action: 'set_category_image',
+          name: catName,
+          image: res.url,
+          categories: categoriesList,
+          subcategories: subcategoriesMap,
+          category_images: updatedImages,
+          languages: languagesList
+        });
+      } else {
+        alert("Erreur lors du téléversement de la photo.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors du téléversement de la photo.");
+    } finally {
+      setUploadingCatImage(false);
+    }
+  };
+
   // Handlers pour Catégories (Ajouter, Modifier avec image, Supprimer)
   const handleAddCategory = async (e) => {
     e.preventDefault();
@@ -410,6 +481,7 @@ export default function AdminProducts({ initialView }) {
       newName: trimmed, 
       image: image || '',
       categories: updated, 
+      subcategories: updatedMap,
       category_images: updatedImages,
       languages: languagesList 
     });
@@ -441,6 +513,7 @@ export default function AdminProducts({ initialView }) {
       action: 'delete_category', 
       name: catName, 
       categories: updated, 
+      subcategories: updatedMap,
       category_images: updatedImages,
       languages: languagesList 
     });
@@ -1432,39 +1505,79 @@ export default function AdminProducts({ initialView }) {
                             ) : (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
-                                  {catImg ? (
-                                    <img
-                                      src={catImg}
-                                      alt={cat}
+                                  <label
+                                    title="Cliquer pour changer la photo de la catégorie"
+                                    style={{
+                                      cursor: 'pointer',
+                                      position: 'relative',
+                                      display: 'inline-block',
+                                      margin: 0
+                                    }}
+                                  >
+                                    {catImg ? (
+                                      <img
+                                        src={catImg}
+                                        alt={cat}
+                                        style={{
+                                          width: '42px',
+                                          height: '42px',
+                                          borderRadius: '8px',
+                                          objectFit: 'contain',
+                                          backgroundColor: '#f8fafc',
+                                          flexShrink: 0,
+                                          border: '1px solid #e2e8f0',
+                                          padding: '4px'
+                                        }}
+                                      />
+                                    ) : (
+                                      <div
+                                        style={{
+                                          width: '42px',
+                                          height: '42px',
+                                          borderRadius: '8px',
+                                          backgroundColor: '#fee2e2',
+                                          color: '#fe2c55',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: '1.1rem',
+                                          flexShrink: 0
+                                        }}
+                                      >
+                                        <i className="fas fa-folder" />
+                                      </div>
+                                    )}
+                                    <span
                                       style={{
-                                        width: '42px',
-                                        height: '42px',
-                                        borderRadius: '8px',
-                                        objectFit: 'contain',
-                                        backgroundColor: '#f8fafc',
-                                        flexShrink: 0,
-                                        border: '1px solid #e2e8f0',
-                                        padding: '4px'
-                                      }}
-                                    />
-                                  ) : (
-                                    <div
-                                      style={{
-                                        width: '42px',
-                                        height: '42px',
-                                        borderRadius: '8px',
-                                        backgroundColor: '#fee2e2',
-                                        color: '#fe2c55',
+                                        position: 'absolute',
+                                        bottom: '-3px',
+                                        right: '-3px',
+                                        backgroundColor: '#0f172a',
+                                        color: '#ffffff',
+                                        borderRadius: '50%',
+                                        width: '18px',
+                                        height: '18px',
+                                        fontSize: '9px',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        fontSize: '1.1rem',
-                                        flexShrink: 0
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                                       }}
                                     >
-                                      <i className="fas fa-folder" />
-                                    </div>
-                                  )}
+                                      <i className="fas fa-camera" />
+                                    </span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      style={{ display: 'none' }}
+                                      onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                          handleDirectCatPhotoUpload(cat, e.target.files[0]);
+                                        }
+                                        e.target.value = '';
+                                      }}
+                                    />
+                                  </label>
                                   <div style={{ minWidth: 0 }}>
                                     <div
                                       style={{
@@ -1484,7 +1597,34 @@ export default function AdminProducts({ initialView }) {
                                     </div>
                                   </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+                                <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0, alignItems: 'center' }}>
+                                  <label
+                                    className="btn-light-custom"
+                                    style={{
+                                      padding: '0.35rem 0.65rem',
+                                      fontSize: '0.8rem',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      margin: 0
+                                    }}
+                                    title="Changer la photo de la catégorie"
+                                  >
+                                    <i className="fas fa-camera" style={{ color: '#0ea5e9' }} />
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      style={{ display: 'none' }}
+                                      onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                          handleDirectCatPhotoUpload(cat, e.target.files[0]);
+                                        }
+                                        e.target.value = '';
+                                      }}
+                                    />
+                                  </label>
                                   <button
                                     type="button"
                                     onClick={() => setEditingCategory({ oldName: cat, value: cat, image: categoryImages[cat] || '' })}
@@ -1585,7 +1725,7 @@ export default function AdminProducts({ initialView }) {
                                           </div>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                             {editingSubcategory.image ? (
-                                              <div style={{ position: 'relative', width: '28px', height: '28px', flexShrink: 0 }}>
+                                              <div style={{ position: 'relative', width: '30px', height: '30px', flexShrink: 0 }}>
                                                 <img
                                                   src={editingSubcategory.image}
                                                   alt=""
@@ -1610,6 +1750,7 @@ export default function AdminProducts({ initialView }) {
                                                     justifyContent: 'center',
                                                     cursor: 'pointer'
                                                   }}
+                                                  title="Supprimer la photo"
                                                 >
                                                   ×
                                                 </button>
@@ -1627,8 +1768,8 @@ export default function AdminProducts({ initialView }) {
                                                 gap: '4px'
                                               }}
                                             >
-                                              <i className="fas fa-upload" style={{ color: '#3b82f6' }} />
-                                              <span>{uploadingSubcatImage ? 'Chargement...' : editingSubcategory.image ? 'Changer photo' : 'Ajouter photo'}</span>
+                                              <i className="fas fa-camera" style={{ color: '#3b82f6' }} />
+                                              <span>{uploadingSubcatImage ? 'Chargement...' : editingSubcategory.image ? 'Changer la photo' : 'Ajouter une photo'}</span>
                                               <input
                                                 type="file"
                                                 accept="image/*"
@@ -1657,23 +1798,59 @@ export default function AdminProducts({ initialView }) {
                                         }}
                                       >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
-                                          {subImg ? (
-                                            <img
-                                              src={subImg}
-                                              alt={sub}
-                                              style={{
-                                                width: '24px',
-                                                height: '24px',
-                                                borderRadius: '4px',
-                                                objectFit: 'contain',
-                                                backgroundColor: '#f8fafc',
-                                                padding: '2px',
-                                                border: '1px solid #e2e8f0'
+                                          <label
+                                            title="Cliquer pour changer la photo de la sous-catégorie"
+                                            style={{
+                                              cursor: 'pointer',
+                                              position: 'relative',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              margin: 0
+                                            }}
+                                          >
+                                            {subImg ? (
+                                              <img
+                                                src={subImg}
+                                                alt={sub}
+                                                style={{
+                                                  width: '24px',
+                                                  height: '24px',
+                                                  borderRadius: '4px',
+                                                  objectFit: 'contain',
+                                                  backgroundColor: '#f8fafc',
+                                                  padding: '2px',
+                                                  border: '1px solid #cbd5e1'
+                                                }}
+                                              />
+                                            ) : (
+                                              <div
+                                                style={{
+                                                  width: '24px',
+                                                  height: '24px',
+                                                  borderRadius: '4px',
+                                                  backgroundColor: '#f1f5f9',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  border: '1px dashed #cbd5e1',
+                                                  color: '#94a3b8'
+                                                }}
+                                              >
+                                                <i className="fas fa-camera" style={{ fontSize: '0.7rem' }} />
+                                              </div>
+                                            )}
+                                            <input
+                                              type="file"
+                                              accept="image/*"
+                                              style={{ display: 'none' }}
+                                              onChange={(e) => {
+                                                if (e.target.files?.[0]) {
+                                                  handleDirectSubcatPhotoUpload(sub, cat, e.target.files[0]);
+                                                }
+                                                e.target.value = '';
                                               }}
                                             />
-                                          ) : (
-                                            <i className="fas fa-tag" style={{ color: '#94a3b8', fontSize: '0.75rem' }} />
-                                          )}
+                                          </label>
                                           <span
                                             style={{
                                               fontWeight: 600,
@@ -1687,7 +1864,34 @@ export default function AdminProducts({ initialView }) {
                                             {sub}
                                           </span>
                                         </div>
-                                        <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                                        <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0, alignItems: 'center' }}>
+                                          <label
+                                            className="btn-light-custom"
+                                            style={{
+                                              padding: '0.25rem 0.45rem',
+                                              fontSize: '0.75rem',
+                                              borderRadius: '4px',
+                                              cursor: 'pointer',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '3px',
+                                              margin: 0
+                                            }}
+                                            title="Changer la photo de cette sous-catégorie"
+                                          >
+                                            <i className="fas fa-camera" style={{ color: '#0ea5e9' }} />
+                                            <input
+                                              type="file"
+                                              accept="image/*"
+                                              style={{ display: 'none' }}
+                                              onChange={(e) => {
+                                                if (e.target.files?.[0]) {
+                                                  handleDirectSubcatPhotoUpload(sub, cat, e.target.files[0]);
+                                                }
+                                                e.target.value = '';
+                                              }}
+                                            />
+                                          </label>
                                           <button
                                             type="button"
                                             onClick={() => setEditingSubcategory({ parent: cat, oldName: sub, value: sub, image: subImg || '' })}
