@@ -120,7 +120,7 @@ const Wishlist = ({ defaultCategory = null }) => {
       }
     });
 
-    // 2. Parcourir les produits pour calculer les totaux et trouver une couverture représentative
+    // 2. Parcourir les produits pour calculer les totaux exacts (1 produit = 1 compte par catégorie)
     allProfiles.forEach((item) => {
       const pCats = Array.isArray(item.categories) && item.categories.length > 0
         ? item.categories
@@ -129,6 +129,9 @@ const Wishlist = ({ defaultCategory = null }) => {
             : (Array.isArray(item.interests) ? item.interests : []));
 
       const coverImg = item.image || (Array.isArray(item.images) && item.images[0]) || null;
+
+      // Dédupliquer les catégories parentes pour ce produit
+      const seenParentsForThisProduct = new Set();
 
       pCats.forEach((c) => {
         const clean = (c || '').trim();
@@ -148,8 +151,12 @@ const Wishlist = ({ defaultCategory = null }) => {
         }
 
         const catKey = targetCat || clean;
-        const customImg = dbCategoryImages[catKey] || null;
+        seenParentsForThisProduct.add(catKey);
+      });
 
+      // Incrémenter chaque catégorie parente trouvée exactement UNE FOIS par produit
+      seenParentsForThisProduct.forEach((catKey) => {
+        const customImg = dbCategoryImages[catKey] || null;
         if (!catMap.has(catKey)) {
           catMap.set(catKey, { 
             name: catKey, 
@@ -466,7 +473,7 @@ const Wishlist = ({ defaultCategory = null }) => {
               </div>
 
               {/* Grille 2x4 défilable des catégories (Exactement 8 cartes : 4 lignes x 2 colonnes par écran) */}
-              <div className="row g-2 categories-grid-2x4 categories-grid-2x2">
+              <div className="row g-2 categories-grid-2x2">
                 
                 {/* CATÉGORIES EN GRILLE 2x4 */}
                 {filteredCategories.map((cat) => (
@@ -529,21 +536,7 @@ const Wishlist = ({ defaultCategory = null }) => {
                         >
                           {cat.name}
                         </h6>
-                        {cat.subcategories && cat.subcategories.length > 0 && (
-                          <span 
-                            className="d-block text-truncate" 
-                            style={{ 
-                              fontSize: '10.5px', 
-                              color: '#cbd5e1', 
-                              opacity: 0.95,
-                              marginTop: '2px',
-                              fontWeight: 600,
-                              textShadow: '0 1px 3px rgba(0, 0, 0, 0.9)'
-                            }}
-                          >
-                            {cat.subcategories.slice(0, 3).join(', ')}{cat.subcategories.length > 3 ? '...' : ''}
-                          </span>
-                        )}
+
                         <span 
                           className="about d-block text-truncate" 
                           style={{ 
@@ -689,24 +682,94 @@ const Wishlist = ({ defaultCategory = null }) => {
                       >
                         {/* Image Couverture */}
                         <div style={{ position: 'relative', width: '100%', paddingTop: '130%', background: '#1c1c1e', overflow: 'hidden' }}>
-                          <img
-                            src={card.image || (card.images && card.images[0]) || '/assets/images/books/book1.jpg'}
-                            alt={card.name}
-                            loading="lazy"
-                            decoding="async"
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = '/assets/images/books/book1.jpg';
-                            }}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover'
-                            }}
-                          />
+                          {(() => {
+                            const rawVid = card.video || (card.videos && card.videos[0]);
+                            const cardVid = rawVid && typeof rawVid === 'string' && rawVid.trim() !== '' ? rawVid.trim() : null;
+                            const rawImg = card.image || (card.images && card.images[0]);
+                            const cardImg = rawImg && rawImg !== '/assets/images/books/book1.jpg' && String(rawImg).trim() !== '' ? rawImg : null;
+
+                            if (cardVid) {
+                              return (
+                                <>
+                                  <video
+                                    src={`${cardVid}#t=0.1`}
+                                    muted
+                                    playsInline
+                                    preload="metadata"
+                                    style={{
+                                      position: 'absolute',
+                                      top: 0,
+                                      left: 0,
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover'
+                                    }}
+                                  />
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      top: '8px',
+                                      right: '8px',
+                                      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                                      backdropFilter: 'blur(4px)',
+                                      color: '#ffffff',
+                                      borderRadius: '9999px',
+                                      padding: '3px 8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      fontSize: '10px',
+                                      fontWeight: 700,
+                                      pointerEvents: 'none',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                                      zIndex: 2
+                                    }}
+                                  >
+                                    <i className="feather icon-video" style={{ fontSize: '10px' }}></i>
+                                    <span>Vidéo</span>
+                                  </div>
+                                </>
+                              );
+                            }
+                            if (cardImg) {
+                              return (
+                                <img
+                                  src={cardImg}
+                                  alt={card.name}
+                                  loading="lazy"
+                                  decoding="async"
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = '/assets/images/categories/telephones.svg';
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover'
+                                  }}
+                                />
+                              );
+                            }
+                            return (
+                              <img
+                                src="/assets/images/categories/telephones.svg"
+                                alt={card.name}
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'contain',
+                                  padding: '1.5rem',
+                                  backgroundColor: '#f8fafc'
+                                }}
+                              />
+                            );
+                          })()}
 
                           {/* Badge Format */}
                           {(card.format || card.badge) && (

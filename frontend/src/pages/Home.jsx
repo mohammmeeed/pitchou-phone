@@ -6,6 +6,8 @@ import BottomNav from '../components/BottomNav';
 import TinderCardStack from '../components/TinderCardStack';
 import BookDetailBottomSheet from '../components/BookDetailBottomSheet';
 import { useDating } from '../context/DatingContext';
+import { useTheme } from '../context/ThemeContext';
+import Loader from '../components/Loader';
 
 const Home = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -14,6 +16,7 @@ const Home = () => {
   const [cartToast, setCartToast] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const datingCtx = useDating();
+  const { accentColor } = useTheme();
 
   const isSearchParamActive = Boolean(
     searchParams.get('search') === 'true' ||
@@ -530,7 +533,7 @@ const Home = () => {
             position: 'fixed',
             inset: 0,
             zIndex: 99999,
-            backgroundColor: '#ffffff',
+            backgroundColor: '#212121',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -540,16 +543,7 @@ const Home = () => {
             pointerEvents: firstImageReady ? 'none' : 'auto'
           }}
         >
-          <img
-            src="/animated-logo.gif"
-            alt="Chargement..."
-            style={{
-              width: '180px',
-              maxWidth: '65vw',
-              height: 'auto',
-              objectFit: 'contain'
-            }}
-          />
+          <Loader />
         </div>
       )}
 
@@ -802,21 +796,22 @@ const Home = () => {
               <div style={{ textAlign: 'center', padding: '100px 20px', color: '#888' }}>
                 <div 
                   style={{
-                    width: '64px',
-                    height: '64px',
+                    width: '68px',
+                    height: '68px',
                     borderRadius: '50%',
-                    background: 'rgba(32, 159, 132, 0.1)',
-                    color: '#209f84',
+                    background: accentColor ? `${accentColor}1a` : 'var(--primary-light, rgba(37, 99, 235, 0.12))',
+                    color: accentColor || 'var(--primary, #2563eb)',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginBottom: '16px',
-                    fontSize: '26px'
+                    fontSize: '28px',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.04)'
                   }}
                 >
-                  <i className="feather icon-book-open"></i>
+                  <i className="feather icon-smartphone"></i>
                 </div>
-                <h5 style={{ fontWeight: 700, color: '#334155', marginBottom: '8px' }}>Aucun livre disponible</h5>
+                <h5 style={{ fontWeight: 700, color: '#111827', marginBottom: '8px' }}>Aucun produit disponible</h5>
                 <p style={{ color: '#94a3b8', fontSize: '13px' }}>Le catalogue est actuellement vide.</p>
               </div>
             ) : (
@@ -848,26 +843,33 @@ const Home = () => {
                   width: '64px',
                   height: '64px',
                   borderRadius: '50%',
-                  background: 'rgba(0,0,0,0.05)',
+                  background: accentColor ? `${accentColor}1a` : 'var(--primary-light, rgba(37, 99, 235, 0.1))',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginBottom: '16px',
                   fontSize: '26px',
-                  color: '#9ca3af'
+                  color: accentColor || 'var(--primary, #2563eb)'
                 }}
               >
                 <i className="feather icon-search"></i>
               </div>
-              <p style={{ fontWeight: 600, color: '#111827', fontSize: '15px', marginBottom: '4px' }}>Aucun livre trouvé</p>
+              <p style={{ fontWeight: 600, color: '#111827', fontSize: '15px', marginBottom: '4px' }}>Aucun produit trouvé</p>
               <p style={{ fontSize: '13px', maxWidth: '260px', margin: '0 auto 18px', color: '#6b7280' }}>
-                Aucun livre ne correspond à votre recherche ou à vos filtres.
+                Aucun produit ne correspond à votre recherche ou à vos filtres.
               </p>
               <button
                 type="button"
                 onClick={handleResetFilters}
                 className="btn btn-primary btn-sm rounded-pill"
-                style={{ padding: '9px 24px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                style={{
+                  padding: '9px 24px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: accentColor || 'var(--primary, #2563eb)'
+                }}
               >
                 Réinitialiser la recherche
               </button>
@@ -887,24 +889,94 @@ const Home = () => {
                   >
                     {/* Image Couverture */}
                     <div style={{ position: 'relative', width: '100%', paddingTop: '130%', background: '#1c1c1e', overflow: 'hidden' }}>
-                      <img
-                        src={card.image || (card.images && card.images[0]) || '/assets/images/books/book1.jpg'}
-                        alt={card.name}
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = '/assets/images/books/book1.jpg';
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                      />
+                      {(() => {
+                        const rawVid = card.video || (card.videos && card.videos[0]);
+                        const cardVid = rawVid && typeof rawVid === 'string' && rawVid.trim() !== '' ? rawVid.trim() : null;
+                        const rawImg = card.image || (card.images && card.images[0]);
+                        const cardImg = rawImg && rawImg !== '/assets/images/books/book1.jpg' && String(rawImg).trim() !== '' ? rawImg : null;
+
+                        if (cardVid) {
+                          return (
+                            <>
+                              <video
+                                src={`${cardVid}#t=0.1`}
+                                muted
+                                playsInline
+                                preload="metadata"
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover'
+                                }}
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  right: '8px',
+                                  backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                                  backdropFilter: 'blur(4px)',
+                                  color: '#ffffff',
+                                  borderRadius: '9999px',
+                                  padding: '3px 8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  pointerEvents: 'none',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                                  zIndex: 2
+                                }}
+                              >
+                                <i className="feather icon-video" style={{ fontSize: '10px' }}></i>
+                                <span>Vidéo</span>
+                              </div>
+                            </>
+                          );
+                        }
+                        if (cardImg) {
+                          return (
+                            <img
+                              src={cardImg}
+                              alt={card.name}
+                              loading="lazy"
+                              decoding="async"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = '/assets/images/categories/telephones.svg';
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                            />
+                          );
+                        }
+                        return (
+                          <img
+                            src="/assets/images/categories/telephones.svg"
+                            alt={card.name}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              padding: '1.5rem',
+                              backgroundColor: '#f8fafc'
+                            }}
+                          />
+                        );
+                      })()}
 
                       {/* Badge Format */}
                       {card.format && (

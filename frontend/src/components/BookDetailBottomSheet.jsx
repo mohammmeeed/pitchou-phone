@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 
@@ -14,6 +14,23 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
   const [touchStartX, setTouchStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const galleryTrackRef = useRef(null);
+
+  useEffect(() => {
+    if (!galleryTrackRef.current) return;
+    const mediaNodes = galleryTrackRef.current.children;
+    Array.from(mediaNodes).forEach((node, idx) => {
+      const vid = node.querySelector('video');
+      if (vid) {
+        if (idx === activeMediaIndex) {
+          vid.currentTime = 0;
+          vid.play().catch(() => {});
+        } else {
+          vid.pause();
+        }
+      }
+    });
+  }, [activeMediaIndex]);
 
   // Reset de l'index de média à chaque changement de produit ou ouverture
   useEffect(() => {
@@ -154,23 +171,23 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
       parsedVideos = [activeBook.video];
     }
 
-    // Ajouter les photos
-    parsedImages.forEach((img) => {
-      if (img && typeof img === 'string' && img.trim() !== '') {
-        items.push({ type: 'image', url: img.trim() });
-      }
-    });
-
-    // Ajouter les vidéos
+    // Prioriser les vidéos en premier (pour correspondre au feed plein écran)
     parsedVideos.forEach((vid) => {
       if (vid && typeof vid === 'string' && vid.trim() !== '') {
         items.push({ type: 'video', url: vid.trim() });
       }
     });
 
+    // Ajouter les photos ensuite
+    parsedImages.forEach((img) => {
+      if (img && typeof img === 'string' && img.trim() !== '') {
+        items.push({ type: 'image', url: img.trim() });
+      }
+    });
+
     return items.length > 0 
       ? items 
-      : [{ type: 'image', url: activeBook.image || '/assets/images/books/book1.jpg' }];
+      : [{ type: 'image', url: (activeBook.image && activeBook.image !== '/assets/images/books/book1.jpg') ? activeBook.image : '/assets/images/categories/telephones.svg' }];
   }, [dbProduct, card, activeBook.image, activeBook.video]);
 
   const totalItems = galleryItems.length;
@@ -311,6 +328,7 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
           >
             {/* Slider Track */}
             <div 
+              ref={galleryTrackRef}
               className="book-sheet-gallery-track"
               style={{
                 display: 'flex',
@@ -334,7 +352,7 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
                   {item.type === 'video' ? (
                     <video 
                       src={item.url} 
-                      poster={activeBook.image} 
+                      preload="metadata"
                       autoPlay={idx === activeMediaIndex} 
                       loop 
                       muted 
@@ -348,7 +366,7 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
                       alt={`${activeName} - photo ${idx + 1}`} 
                       className="book-sheet-media"
                       onError={(e) => {
-                        e.target.src = '/assets/images/books/book1.jpg';
+                        e.target.src = '/assets/images/categories/telephones.svg';
                       }}
                       draggable={false}
                     />
@@ -413,15 +431,55 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
                     aria-label={`Afficher média ${thumbIdx + 1}`}
                   >
                     {item.type === 'video' ? (
-                      <div className="book-sheet-thumb-video-icon">
-                        <i className="feather icon-play"></i>
+                      <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#000000', overflow: 'hidden' }}>
+                        <video
+                          src={`${item.url}#t=0.1`}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            display: 'block',
+                            pointerEvents: 'none'
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                            pointerEvents: 'none'
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ffffff',
+                              fontSize: '9px',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                            }}
+                          >
+                            <i className="feather icon-play" style={{ marginLeft: '1px' }}></i>
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <img 
                         src={item.url} 
                         alt={`Miniature ${thumbIdx + 1}`} 
                         className="book-sheet-thumb-img" 
-                        onError={(e) => { e.target.src = '/assets/images/books/book1.jpg'; }}
+                        onError={(e) => { e.target.src = '/assets/images/categories/telephones.svg'; }}
                       />
                     )}
                   </button>

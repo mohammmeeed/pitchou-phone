@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
+import { useTheme } from '../context/ThemeContext';
 
 const TinderCardStack = ({ 
   profiles = [], 
@@ -11,6 +12,7 @@ const TinderCardStack = ({
   initialIndex = 0
 }) => {
   const datingCtx = useDating();
+  const { accentColor } = useTheme();
   const addToLiked = datingCtx?.addToLiked;
   const isLiked = datingCtx?.isLiked;
   const removeFromLiked = datingCtx?.removeFromLiked;
@@ -100,26 +102,33 @@ const TinderCardStack = ({
             width: '64px',
             height: '64px',
             borderRadius: '50%',
-            background: 'rgba(0,0,0,0.05)',
+            background: accentColor ? `${accentColor}1a` : 'var(--primary-light, rgba(37, 99, 235, 0.1))',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '16px',
             fontSize: '26px',
-            color: '#9ca3af'
+            color: accentColor || 'var(--primary, #2563eb)'
           }}
         >
           <i className="icon feather icon-search"></i>
         </div>
-        <h5 style={{ fontWeight: 600, color: '#111827', marginBottom: '8px' }}>Aucun livre trouvé</h5>
+        <h5 style={{ fontWeight: 600, color: '#111827', marginBottom: '8px' }}>Aucun produit trouvé</h5>
         <p style={{ fontSize: '13px', maxWidth: '260px', margin: '0 auto 18px', color: '#6b7280' }}>
-          Aucun livre ne correspond à votre recherche ou à vos filtres.
+          Aucun produit ne correspond à votre recherche ou à vos filtres.
         </p>
         <button 
           type="button"
           onClick={handleResetFilters}
           className="btn btn-primary btn-sm rounded-pill"
-          style={{ padding: '9px 24px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+          style={{
+            padding: '9px 24px',
+            fontSize: '13px',
+            fontWeight: 600,
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: accentColor || 'var(--primary, #2563eb)'
+          }}
         >
           Réinitialiser la recherche
         </button>
@@ -326,7 +335,7 @@ const TinderCardStack = ({
             <video 
               key={`vid-${card.id}`}
               src={card.video} 
-              poster={card.image}
+              preload="metadata"
               autoPlay 
               loop 
               muted 
