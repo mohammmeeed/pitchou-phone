@@ -34,7 +34,7 @@ const Header = ({
     return localStorage.getItem('shop_logo_image') || '';
   });
   const [shopLogoText, setShopLogoText] = React.useState(() => {
-    return localStorage.getItem('shop_logo_text') || 'LeerBook';
+    return localStorage.getItem('shop_logo_text') || 'Pitchou';
   });
 
   React.useEffect(() => {

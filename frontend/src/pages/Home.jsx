@@ -63,6 +63,7 @@ const Home = () => {
   const activeFilters = datingCtx?.activeFilters || {};
   const selectedCategories = Array.isArray(activeFilters.categories) ? activeFilters.categories : [];
   const selectedLanguages = Array.isArray(activeFilters.languages) ? activeFilters.languages : [];
+  const selectedEtats = Array.isArray(activeFilters.etats) ? activeFilters.etats : [];
   const currentMaxPrice = activeFilters.maxPrice !== undefined ? Number(activeFilters.maxPrice) : 1000000;
 
   useLayoutEffect(() => {
@@ -72,7 +73,7 @@ const Home = () => {
         setSearchBarHeight(h);
       }
     }
-  }, [searchOpen, selectedCategories, selectedLanguages, currentMaxPrice]);
+  }, [searchOpen, selectedCategories, selectedEtats, selectedLanguages, currentMaxPrice]);
 
   // Catégories et Langues existantes dynamiques
   const [dbCategories, setDbCategories] = useState([]);
@@ -187,6 +188,17 @@ const Home = () => {
         ? current.filter((c) => c !== cat)
         : [...current, cat];
       return { ...prev, categories: updated };
+    });
+  };
+
+  const toggleEtat = (etat) => {
+    if (!datingCtx?.setActiveFilters) return;
+    datingCtx.setActiveFilters((prev) => {
+      const current = Array.isArray(prev?.etats) ? prev.etats : [];
+      const updated = current.includes(etat)
+        ? current.filter((e) => e !== etat)
+        : [...current, etat];
+      return { ...prev, etats: updated };
     });
   };
 
@@ -705,7 +717,7 @@ const Home = () => {
               <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary, #71717a)' }}>
                 Catégories
               </span>
-              {(selectedCategories.length > 0 || selectedLanguages.length > 0 || currentMaxPrice < 1000000 || searchQuery) && (
+              {(selectedCategories.length > 0 || selectedEtats.length > 0 || selectedLanguages.length > 0 || currentMaxPrice < 1000000 || searchQuery) && (
                 <button
                   type="button"
                   onClick={handleResetFilters}
@@ -750,7 +762,52 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Ligne 2 : Prix */}
+          {/* Ligne 2 : État du Produit */}
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary, #71717a)' }}>
+                État du produit
+              </span>
+              {selectedEtats.length > 0 && (
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)' }}>
+                  {selectedEtats.length} sélectionné{selectedEtats.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <div
+              className="filter-chips-scroll"
+              style={{
+                display: 'flex',
+                gap: '6px',
+                overflowX: 'auto',
+                paddingBottom: '2px',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
+            >
+              {[
+                { label: 'Sous blister', icon: '📦' },
+                { label: 'Très bon état', icon: '⭐' },
+                { label: 'Bon état', icon: '👍' },
+                { label: 'Occasion', icon: '🔄' }
+              ].map((item) => {
+                const isSelected = selectedEtats.includes(item.label);
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => toggleEtat(item.label)}
+                    className={`filter-chip ${isSelected ? 'active' : ''}`}
+                  >
+                    <span style={{ marginRight: '4px' }}>{item.icon}</span>
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Ligne 3 : Prix */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary, #71717a)' }}>
@@ -897,45 +954,20 @@ const Home = () => {
 
                         if (cardVid) {
                           return (
-                            <>
-                              <video
-                                src={`${cardVid}#t=0.1`}
-                                muted
-                                playsInline
-                                preload="metadata"
-                                style={{
-                                  position: 'absolute',
-                                  top: 0,
-                                  left: 0,
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover'
-                                }}
-                              />
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: '8px',
-                                  right: '8px',
-                                  backgroundColor: 'rgba(0, 0, 0, 0.65)',
-                                  backdropFilter: 'blur(4px)',
-                                  color: '#ffffff',
-                                  borderRadius: '9999px',
-                                  padding: '3px 8px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontSize: '10px',
-                                  fontWeight: 700,
-                                  pointerEvents: 'none',
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                                  zIndex: 2
-                                }}
-                              >
-                                <i className="feather icon-video" style={{ fontSize: '10px' }}></i>
-                                <span>Vidéo</span>
-                              </div>
-                            </>
+                            <video
+                              src={`${cardVid}#t=0.1`}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                            />
                           );
                         }
                         if (cardImg) {
@@ -978,28 +1010,34 @@ const Home = () => {
                         );
                       })()}
 
-                      {/* Badge Format */}
-                      {card.format && (
-                        <span
-                          style={{
-                            position: 'absolute',
-                            bottom: '8px',
-                            left: '8px',
-                            background: 'rgba(0, 0, 0, 0.55)',
-                            backdropFilter: 'blur(6px)',
-                            color: '#fff',
-                            fontSize: '10px',
-                            padding: '3px 7px',
-                            borderRadius: '6px',
-                            maxWidth: '85%',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}
-                        >
-                          {card.format}
-                        </span>
-                      )}
+                      {/* Badge État du Produit */}
+                      {(() => {
+                        const rawEtat = card.format || card.etat;
+                        const cardEtat = rawEtat && typeof rawEtat === 'string' && rawEtat.trim() !== '' && rawEtat.trim().toLowerCase() !== 'format' ? rawEtat.trim() : null;
+                        if (!cardEtat) return null;
+                        return (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              bottom: '8px',
+                              left: '8px',
+                              background: 'rgba(0, 0, 0, 0.6)',
+                              backdropFilter: 'blur(6px)',
+                              color: '#fff',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              maxWidth: '85%',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}
+                          >
+                            {cardEtat}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Infos Produit */}

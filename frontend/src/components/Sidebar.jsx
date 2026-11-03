@@ -120,7 +120,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
           <div className="sidebar-bottom">
             <div className="app-info">
-              <h6 className="name">LeerBook</h6>
+              <h6 className="name">Pitchou</h6>
               <span className="ver-info">App Version 1.2</span>
             </div>
           </div>

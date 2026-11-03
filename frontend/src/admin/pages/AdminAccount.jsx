@@ -318,7 +318,7 @@ export default function AdminAccount() {
                 <input
                   type="email"
                   className="form-control-custom"
-                  placeholder="admin@leerbook.com"
+                  placeholder="admin@pitchou.dz"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required

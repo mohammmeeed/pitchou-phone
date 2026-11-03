@@ -97,7 +97,7 @@ export default function AdminLogin() {
             Espace Administration
           </h2>
           <p style={{ margin: 0, fontSize: '0.86rem', color: '#71717a' }}>
-            Connectez-vous pour gérer votre boutique LeerBook
+            Connectez-vous pour gérer votre boutique Pitchou
           </p>
         </div>
 
@@ -239,7 +239,7 @@ export default function AdminLogin() {
             }}
           >
             <i className="fas fa-arrow-left" style={{ fontSize: '0.75rem' }} />
-            Retour à la boutique LeerBook
+            Retour à la boutique Pitchou
           </Link>
         </div>
       </div>

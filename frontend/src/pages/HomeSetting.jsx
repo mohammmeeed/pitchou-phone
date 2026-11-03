@@ -15,7 +15,7 @@ const HomeSetting = () => {
           <div className="main-banner mb-3 position-relative text-center py-4">
             <div className="banner-content-2">
               <img className="dz-logo mx-auto mb-2" src="/assets/images/logo.png" alt="logo" style={{ maxHeight: '45px' }} />
-              <h2 className="title">Explore LeerBook</h2>
+              <h2 className="title">Explore Pitchou</h2>
               <p className="text-muted">Votre librairie en ligne préférée</p>
             </div>
             <div className="bg-shape">

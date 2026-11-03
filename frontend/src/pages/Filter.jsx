@@ -98,6 +98,21 @@ const Filter = () => {
     return [];
   });
 
+  const [selectedEtats, setSelectedEtats] = useState(() => {
+    if (Array.isArray(activeFilters.etats) && activeFilters.etats.length > 0) {
+      return activeFilters.etats;
+    }
+    return [];
+  });
+
+  const toggleEtat = (etat) => {
+    setSelectedEtats((prev) =>
+      prev.includes(etat) ? prev.filter((e) => e !== etat) : [...prev, etat]
+    );
+  };
+
+  const [etatsOpen, setEtatsOpen] = useState(true);
+
   const [selectedLanguages, setSelectedLanguages] = useState(() => {
     if (Array.isArray(activeFilters.languages) && activeFilters.languages.length > 0) {
       return activeFilters.languages;
@@ -367,6 +382,131 @@ const Filter = () => {
                       >
                         {isChecked && (
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* CARTE : ÉTAT DU PRODUIT (Neuf, 10/10, Bon état, Occasion) */}
+          <div className="card style-1" style={{ overflow: 'hidden', marginBottom: '16px' }}>
+            <div 
+              className="card-header d-flex align-items-center justify-content-between"
+              onClick={() => setEtatsOpen((prev) => !prev)}
+              style={{
+                cursor: 'pointer',
+                userSelect: 'none',
+                borderBottom: etatsOpen ? '1px solid #f1f3f6' : 'none',
+                padding: '14px 16px',
+                transition: 'background-color 0.15s ease'
+              }}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <h6 className="title font-w400 font-14 mb-0">État du Produit</h6>
+                {selectedEtats.length > 0 && (
+                  <span 
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      backgroundColor: 'var(--rgba-primary-1, rgba(254, 44, 85, 0.12))',
+                      color: 'var(--primary)',
+                      padding: '2px 8px',
+                      borderRadius: '12px'
+                    }}
+                  >
+                    {selectedEtats.length}
+                  </span>
+                )}
+              </div>
+
+              <div className="d-flex align-items-center gap-2">
+                <span 
+                  style={{ 
+                    fontSize: '13px', 
+                    color: selectedEtats.length > 0 ? 'var(--primary)' : '#9ca3af', 
+                    fontWeight: 500 
+                  }}
+                >
+                  {selectedEtats.length === 0 
+                    ? 'Tous les états' 
+                    : (selectedEtats.length === 1 ? selectedEtats[0] : `${selectedEtats.length} sélect.`)}
+                </span>
+                <svg 
+                  width="18" 
+                  height="18" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="#6b7280" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  style={{
+                    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transform: etatsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    flexShrink: 0
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
+            </div>
+
+            {etatsOpen && (
+              <div className="card-body p-0">
+                {[
+                  { name: 'Sous blister', icon: '📦' },
+                  { name: 'Très bon état', icon: '⭐' },
+                  { name: 'Bon état', icon: '👍' },
+                  { name: 'Occasion', icon: '🔄' }
+                ].map((item, idx, arr) => {
+                  const isChecked = selectedEtats.includes(item.name);
+                  const isLast = idx === arr.length - 1;
+                  return (
+                    <div
+                      key={item.name}
+                      onClick={() => toggleEtat(item.name)}
+                      className="d-flex align-items-center justify-content-between px-3 py-2"
+                      style={{
+                        cursor: 'pointer',
+                        borderBottom: isLast ? 'none' : '1px solid #f1f3f6',
+                        transition: 'background 0.2s ease',
+                        backgroundColor: isChecked ? 'var(--rgba-primary-1, rgba(254, 44, 85, 0.03))' : 'transparent',
+                      }}
+                    >
+                      <span 
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: isChecked ? 600 : 400,
+                          color: isChecked ? '#111827' : '#374151',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <span>{item.icon}</span>
+                        <span>{item.name}</span>
+                      </span>
+
+                      <div 
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '4px',
+                          border: isChecked ? '2px solid var(--primary)' : '2px solid #d1d5db',
+                          backgroundColor: isChecked ? 'var(--primary)' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {isChecked && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="20 6 9 17 4 12" />
                           </svg>
                         )}

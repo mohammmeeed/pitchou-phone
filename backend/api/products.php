@@ -31,12 +31,12 @@ function formatProduct(array $product): array {
     if (!empty($product['images'])) {
         $decoded = json_decode($product['images'], true);
         if (is_array($decoded)) {
-            $images = $decoded;
+            $images = array_values(array_filter($decoded, fn($x) => is_string($x) && trim($x) !== ''));
         } else {
-            $images = array_filter(array_map('trim', explode(',', $product['images'])));
+            $images = array_values(array_filter(array_map('trim', explode(',', $product['images']))));
         }
     }
-    if (empty($images) && !empty($product['image'])) {
+    if (empty($images) && !empty($product['image']) && trim($product['image']) !== '') {
         $images = [$product['image']];
     }
     $product['images'] = array_values($images);
@@ -49,12 +49,12 @@ function formatProduct(array $product): array {
     if (!empty($product['videos'])) {
         $decoded = json_decode($product['videos'], true);
         if (is_array($decoded)) {
-            $videos = $decoded;
+            $videos = array_values(array_filter($decoded, fn($x) => is_string($x) && trim($x) !== ''));
         } else {
-            $videos = array_filter(array_map('trim', explode(',', $product['videos'])));
+            $videos = array_values(array_filter(array_map('trim', explode(',', $product['videos']))));
         }
     }
-    if (empty($videos) && !empty($product['video'])) {
+    if (empty($videos) && !empty($product['video']) && trim($product['video']) !== '') {
         $videos = [$product['video']];
     }
     $product['videos'] = array_values($videos);
@@ -76,6 +76,7 @@ function formatProduct(array $product): array {
     }
     $product['categories'] = array_values($categories);
     $product['category'] = !empty($product['categories']) ? implode(', ', $product['categories']) : ($product['category'] ?? '');
+    $product['etat'] = $product['format'] ?? '';
     $product['purchase_price'] = isset($product['purchase_price']) ? (float)$product['purchase_price'] : 0.0;
 
     return $product;
@@ -259,9 +260,9 @@ function handlePost(?PDO $pdo): void {
         } elseif (!empty($input['image'])) {
             $images = [$input['image']];
         }
-        $images = array_values(array_filter($images));
-        $mainImage = !empty($images) ? $images[0] : ($input['image'] ?? '/assets/images/books/book1.jpg');
-        $imagesJson = !empty($images) ? json_encode($images) : json_encode([$mainImage]);
+        $images = array_values(array_filter($images, fn($x) => is_string($x) && trim($x) !== ''));
+        $mainImage = !empty($images) ? $images[0] : (!empty($input['image']) && trim($input['image']) !== '' ? $input['image'] : '');
+        $imagesJson = !empty($images) ? json_encode($images) : (!empty($mainImage) ? json_encode([$mainImage]) : json_encode([]));
 
         // Multi-videos
         $videos = [];
@@ -286,7 +287,7 @@ function handlePost(?PDO $pdo): void {
         }
         if (isset($existingCols['format'])) {
             $cols[] = 'format';
-            $vals[] = trim($input['format'] ?? '');
+            $vals[] = trim($input['format'] ?? ($input['etat'] ?? ''));
         }
         if (isset($existingCols['purchase_price'])) {
             $cols[] = 'purchase_price';
@@ -400,9 +401,9 @@ function handlePut(?PDO $pdo): void {
         } elseif (!empty($input['image'])) {
             $images = [$input['image']];
         }
-        $images = array_values(array_filter($images));
-        $mainImage = !empty($images) ? $images[0] : ($input['image'] ?? '/assets/images/books/book1.jpg');
-        $imagesJson = !empty($images) ? json_encode($images) : json_encode([$mainImage]);
+        $images = array_values(array_filter($images, fn($x) => is_string($x) && trim($x) !== ''));
+        $mainImage = !empty($images) ? $images[0] : (!empty($input['image']) && trim($input['image']) !== '' ? $input['image'] : '');
+        $imagesJson = !empty($images) ? json_encode($images) : (!empty($mainImage) ? json_encode([$mainImage]) : json_encode([]));
 
         // Multi-videos
         $videos = [];
@@ -431,7 +432,7 @@ function handlePut(?PDO $pdo): void {
         }
         if (isset($existingCols['format'])) {
             $fields[] = "format = ?";
-            $params[] = trim($input['format'] ?? '');
+            $params[] = trim($input['format'] ?? ($input['etat'] ?? ''));
         }
         if (isset($input['price'])) {
             $fields[] = "price = ?";
@@ -503,6 +504,7 @@ function handlePut(?PDO $pdo): void {
                     if (isset($input['author'])) $prod['author'] = trim($input['author']);
                     if (isset($input['price'])) $prod['price'] = (float)$input['price'];
                     if (isset($input['stock'])) $prod['stock'] = (int)$input['stock'];
+                    if (isset($input['format']) || isset($input['etat'])) $prod['format'] = trim($input['format'] ?? ($input['etat'] ?? ''));
                     if (!empty($categories)) {
                         $prod['categories'] = $categories;
                         $prod['category'] = $categoriesStr;

@@ -7,7 +7,7 @@ class Database {
 
     // Paramètres MySQL configurables
     private static string $host = '127.0.0.1';
-    private static int $port = 3306;
+    private static int $port = 3307;
     private static string $dbName = 'pitchou-db';
     private static string $username = 'root';
     private static string $password = '';

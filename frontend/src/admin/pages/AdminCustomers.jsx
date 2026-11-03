@@ -608,7 +608,7 @@ export default function AdminCustomers() {
                         </div>
                         <div>
                           <div style={{ fontWeight: 600, color: '#333' }}>{c.name}</div>
-                          <small style={{ color: '#888' }}>Client LeerBook</small>
+                          <small style={{ color: '#888' }}>Client Pitchou</small>
                         </div>
                       </div>
                     </td>

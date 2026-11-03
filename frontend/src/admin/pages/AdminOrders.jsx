@@ -24,7 +24,7 @@ export default function AdminOrders() {
   // Logo et informations de la boutique (sélectionnés dans le panneau d'administration)
   const [shopLogo, setShopLogo] = useState(() => localStorage.getItem('shop_logo_image') || '');
   const [storeInfo, setStoreInfo] = useState({
-    name: localStorage.getItem('shop_logo_text') || 'LeerBook',
+    name: localStorage.getItem('shop_logo_text') || 'Pitchou',
     phone: '',
     email: ''
   });
@@ -46,7 +46,7 @@ export default function AdminOrders() {
             localStorage.setItem('shop_logo_image', s.logo_image || '');
           }
           if (s.logo_text || s.store_name) {
-            const name = s.store_name || s.logo_text || 'LeerBook';
+            const name = s.store_name || s.logo_text || 'Pitchou';
             setStoreInfo((prev) => ({
               ...prev,
               name,
@@ -432,7 +432,7 @@ export default function AdminOrders() {
     <div class="slip-header">
       <div class="store-info">
         ${shopLogo ? `<img src="${shopLogo}" style="max-height: 44px; max-width: 150px; object-fit: contain; margin-bottom: 4px; display: block;" onerror="this.style.display='none'" />` : ''}
-        <h2>${storeInfo.name || 'LeerBook'}</h2>
+        <h2>${storeInfo.name || 'Pitchou'}</h2>
         <p>Boutique en ligne &bull; Vente & Livraison</p>
         ${storeInfo.phone ? `<p>Tél : ${storeInfo.phone}</p>` : ''}
       </div>
@@ -533,7 +533,7 @@ export default function AdminOrders() {
     </div>
 
     <div class="slip-footer">
-      Merci pour votre commande ! &bull; ${storeInfo.name || 'LeerBook'} &bull; Document officiel tenant lieu de bon de livraison
+      Merci pour votre commande ! &bull; ${storeInfo.name || 'Pitchou'} &bull; Document officiel tenant lieu de bon de livraison
     </div>
   </div>
 </body>
@@ -859,7 +859,7 @@ export default function AdminOrders() {
                     />
                   ) : null}
                   <div style={{ fontSize: '22px', fontWeight: 800, color: '#111827', textTransform: 'uppercase' }}>
-                    {storeInfo.name || 'LeerBook'}
+                    {storeInfo.name || 'Pitchou'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '2px' }}>Boutique en ligne &bull; Vente & Livraison</div>
                   {storeInfo.phone && <div style={{ fontSize: '12px', color: '#4b5563' }}>Tél : {storeInfo.phone}</div>}
@@ -988,7 +988,7 @@ export default function AdminOrders() {
 
               {/* Pied de page du bon de livraison */}
               <div style={{ textAlign: 'center', marginTop: '18px', fontSize: '11px', color: '#6b7280' }}>
-                Merci pour votre commande ! &bull; {storeInfo.name || 'LeerBook'} &bull; Document officiel tenant lieu de bon de livraison
+                Merci pour votre commande ! &bull; {storeInfo.name || 'Pitchou'} &bull; Document officiel tenant lieu de bon de livraison
               </div>
             </div>
           </div>

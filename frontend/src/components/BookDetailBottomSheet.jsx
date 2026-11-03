@@ -537,7 +537,7 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
                       border: '1px solid #e5e7eb'
                     }}
                   >
-                    <i className="feather icon-book-open" style={{ fontSize: '12px' }}></i>
+                    <i className="feather icon-check-circle" style={{ fontSize: '12px' }}></i>
                     {rawFormat}
                   </span>
                 ) : null}
@@ -547,7 +547,7 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
             {/* Synopsis / Description (uniquement si renseigné dans la BDD) */}
             {activeBook.bio && activeBook.bio.trim() !== '' ? (
               <div className="book-sheet-section mb-3">
-                <h6 className="book-sheet-section-title">À propos de ce livre</h6>
+                <h6 className="book-sheet-section-title">Description du produit</h6>
                 <p className="book-sheet-desc">
                   {activeBook.bio}
                 </p>

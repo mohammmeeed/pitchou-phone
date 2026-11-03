@@ -78,7 +78,7 @@ const ProfileDetail = () => {
               stock: rawStock,
               category: raw.category || '',
               rating: raw.rating || 4.8,
-              image: parsedImages[0] || raw.image || '/assets/images/books/book1.jpg',
+              image: (parsedImages[0] && parsedImages[0] !== '/assets/images/books/book1.jpg') || (raw.image && raw.image !== '/assets/images/books/book1.jpg') || '',
               images: parsedImages,
               video: parsedVideos[0] || raw.video || null,
               videos: parsedVideos,
@@ -128,7 +128,7 @@ const ProfileDetail = () => {
       : (profile.video ? [profile.video] : []);
     const imgs = Array.isArray(profile.images) && profile.images.length > 0 
       ? profile.images 
-      : (profile.image ? [profile.image] : ['/assets/images/books/book1.jpg']);
+      : (profile.image && profile.image !== '/assets/images/books/book1.jpg' ? [profile.image] : []);
 
     vids.forEach((v) => {
       if (v) list.push({ type: 'video', url: v });
@@ -137,7 +137,7 @@ const ProfileDetail = () => {
       if (img) list.push({ type: 'image', url: img });
     });
 
-    return list.length > 0 ? list : [{ type: 'image', url: profile.image || '/assets/images/books/book1.jpg' }];
+    return list.length > 0 ? list : [{ type: 'image', url: (profile.image && profile.image !== '/assets/images/books/book1.jpg') ? profile.image : '/assets/images/categories/telephones.svg' }];
   }, [profile]);
 
   const activeMedia = mediaList[activeMediaIndex] || mediaList[0];

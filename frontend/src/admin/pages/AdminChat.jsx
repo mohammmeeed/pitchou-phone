@@ -36,7 +36,7 @@ export default function AdminChat() {
     "Bonjour ! Votre commande est bien confirmée.",
     "Votre colis a été expédié avec Yalidine Express.",
     "Ce livre est actuellement en stock avec livraison rapide.",
-    "Merci beaucoup pour votre confiance sur LeerBook !"
+    "Merci beaucoup pour votre confiance sur Pitchou !"
   ];
 
   useEffect(() => {
@@ -267,7 +267,7 @@ export default function AdminChat() {
         <div className="page-title-wrap">
           <h1>Messagerie & Chat Clients</h1>
           <p className="breadcrumb-sub">
-            Échangez en temps réel avec vos clients et acheteurs LeerBook
+            Échangez en temps réel avec vos clients et acheteurs Pitchou
           </p>
         </div>
         <div className="page-actions">

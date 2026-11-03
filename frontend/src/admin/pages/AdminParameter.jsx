@@ -529,7 +529,7 @@ export default function AdminParameter() {
                       className="form-control-custom"
                       value={settings.logo_text}
                       onChange={(e) => setSettings({ ...settings, logo_text: e.target.value })}
-                      placeholder="Ex: LeerBook"
+                      placeholder="Ex: Pitchou"
                     />
                   </div>
                 </div>

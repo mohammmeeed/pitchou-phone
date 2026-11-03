@@ -5,6 +5,11 @@ import AdminLayout from '../AdminLayout';
 import { adminApi } from '../services/adminApi';
 import AdminPagination from '../components/AdminPagination';
 
+const isVideoUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  return /\.(mp4|webm|mov|ogg|m4v)(\?.*)?$/i.test(url) || url.includes('/video');
+};
+
 export default function AdminProducts({ initialView }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +90,11 @@ export default function AdminProducts({ initialView }) {
   // Upload Photo State & Ref
   const imageFilesInputRef = useRef(null);
   const videoFilesInputRef = useRef(null);
+  const mediaFilesInputRef = useRef(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [manualMediaUrl, setManualMediaUrl] = useState('');
+  const [draggedMediaIndex, setDraggedMediaIndex] = useState(null);
+  const [dragOverMediaIndex, setDragOverMediaIndex] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState('');
@@ -137,6 +147,7 @@ export default function AdminProducts({ initialView }) {
     images: [],
     video: '',
     videos: [],
+    media: [],
     bio: '',
     languages: []
   });
@@ -670,213 +681,165 @@ export default function AdminProducts({ initialView }) {
     setTimeout(() => setToastMessage(''), 3000);
   };
 
-  // Multi-Images Upload Handlers
-  const handleImageFilesChange = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    setUploadingImage(true);
-    setUploadSuccess('');
-    setFormError('');
-    try {
-      const results = await adminApi.uploadMultipleMedia(files);
-      const newUrls = results.filter((r) => r && r.success && r.url).map((r) => r.url);
-      if (newUrls.length > 0) {
-        setFormData((prev) => {
-          const currentImages = Array.isArray(prev.images) ? prev.images : [];
-          const updated = [...currentImages, ...newUrls];
-          return {
-            ...prev,
-            images: updated,
-            image: updated[0] || prev.image
-          };
-        });
-        setUploadSuccess(`${newUrls.length} photo(s) chargée(s) avec succès !`);
-      } else {
-        setFormError('Erreur lors du chargement des photos');
-      }
-    } catch (err) {
-      setFormError('Erreur lors du téléversement des photos');
-    } finally {
-      setUploadingImage(false);
-      if (e.target) e.target.value = '';
+    // =========================================================================
+  // GESTION UNIFIÉE DES MÉDIAS (PHOTOS & VIDÉOS AVEC DRAG & DROP)
+  // =========================================================================
+  const getMediaList = () => {
+    if (Array.isArray(formData.media) && formData.media.length > 0) {
+      return formData.media.filter((item) => item && typeof item.url === 'string' && item.url.trim() !== '');
     }
+    const imgs = (Array.isArray(formData.images) ? formData.images : (formData.image ? [formData.image] : []))
+      .filter((u) => typeof u === 'string' && u.trim() !== '')
+      .map((url) => ({ type: isVideoUrl(url) ? 'video' : 'image', url }));
+    const vids = (Array.isArray(formData.videos) ? formData.videos : (formData.video ? [formData.video] : []))
+      .filter((u) => typeof u === 'string' && u.trim() !== '')
+      .map((url) => ({ type: 'video', url }));
+    const seen = new Set();
+    const result = [];
+    [...imgs, ...vids].forEach((item) => {
+      if (item.url && !seen.has(item.url)) {
+        seen.add(item.url);
+        result.push(item);
+      }
+    });
+    return result;
   };
 
-  const handleDropImages = async (e) => {
-    e.preventDefault();
-    const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith('image/'));
-    if (files.length === 0) return;
+  const updateMediaList = (newMedia) => {
+    const cleaned = (newMedia || []).filter((m) => m && typeof m.url === 'string' && m.url.trim() !== '');
+    const images = cleaned.filter((m) => m.type === 'image').map((m) => m.url);
+    const videos = cleaned.filter((m) => m.type === 'video').map((m) => m.url);
+    setFormData((prev) => ({
+      ...prev,
+      media: cleaned,
+      images,
+      image: images[0] || '',
+      videos,
+      video: videos[0] || null
+    }));
+  };
 
-    setUploadingImage(true);
+  const uploadAndAddMedia = async (files) => {
+    setUploadingMedia(true);
     setUploadSuccess('');
     setFormError('');
     try {
       const results = await adminApi.uploadMultipleMedia(files);
-      const newUrls = results.filter((r) => r && r.success && r.url).map((r) => r.url);
-      if (newUrls.length > 0) {
-        setFormData((prev) => {
-          const currentImages = Array.isArray(prev.images) ? prev.images : [];
-          const updated = [...currentImages, ...newUrls];
-          return {
-            ...prev,
-            images: updated,
-            image: updated[0] || prev.image
-          };
-        });
-        setUploadSuccess(`${newUrls.length} photo(s) importée(s) avec succès !`);
+      const newItems = [];
+      results.forEach((r, idx) => {
+        if (r && r.success && r.url) {
+          const file = files[idx];
+          const isVid = file ? file.type.startsWith('video/') : isVideoUrl(r.url);
+          newItems.push({
+            type: isVid ? 'video' : 'image',
+            url: r.url
+          });
+        }
+      });
+
+      if (newItems.length > 0) {
+        const current = getMediaList();
+        updateMediaList([...current, ...newItems]);
+        setUploadSuccess(`${newItems.length} média(s) (photo/vidéo) chargé(s) avec succès !`);
+      } else {
+        setFormError('Erreur lors du chargement des médias');
       }
     } catch (err) {
       setFormError('Erreur lors du téléversement');
     } finally {
-      setUploadingImage(false);
+      setUploadingMedia(false);
     }
   };
 
-  const handleRemoveImage = (indexToRemove) => {
-    setFormData((prev) => {
-      const updated = (prev.images || []).filter((_, i) => i !== indexToRemove);
-      return {
-        ...prev,
-        images: updated,
-        image: updated[0] || ''
-      };
-    });
-  };
-
-  const handleSetPrimaryImage = (indexToPrimary) => {
-    setFormData((prev) => {
-      const list = [...(prev.images || [])];
-      const [item] = list.splice(indexToPrimary, 1);
-      const updated = [item, ...list];
-      return {
-        ...prev,
-        images: updated,
-        image: updated[0] || ''
-      };
-    });
-  };
-
-  const handleAddManualImage = (e) => {
-    if (e) e.preventDefault();
-    const url = manualImageUrl.trim();
-    if (!url) return;
-    setFormData((prev) => {
-      const currentImages = Array.isArray(prev.images) ? prev.images : [];
-      const updated = [...currentImages, url];
-      return {
-        ...prev,
-        images: updated,
-        image: updated[0] || prev.image
-      };
-    });
-    setManualImageUrl('');
-    setUploadSuccess('Photo ajoutée depuis le lien !');
-  };
-
-  // Multi-Videos Upload Handlers
-  const handleVideoFilesChange = async (e) => {
+  const handleMediaFilesChange = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-
-    setUploadingVideo(true);
-    setUploadSuccess('');
-    setFormError('');
-    try {
-      const results = await adminApi.uploadMultipleMedia(files);
-      const newUrls = results.filter((r) => r && r.success && r.url).map((r) => r.url);
-      if (newUrls.length > 0) {
-        setFormData((prev) => {
-          const currentVideos = Array.isArray(prev.videos) ? prev.videos : [];
-          const updated = [...currentVideos, ...newUrls];
-          return {
-            ...prev,
-            videos: updated,
-            video: updated[0] || prev.video
-          };
-        });
-        setUploadSuccess(`${newUrls.length} vidéo(s) chargée(s) avec succès !`);
-      } else {
-        setFormError('Erreur lors du chargement des vidéos');
-      }
-    } catch (err) {
-      setFormError('Erreur lors du téléversement des vidéos');
-    } finally {
-      setUploadingVideo(false);
-      if (e.target) e.target.value = '';
-    }
+    await uploadAndAddMedia(files);
+    if (e.target) e.target.value = '';
   };
 
-  const handleDropVideos = async (e) => {
+  const handleDropMedia = async (e) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith('video/'));
+    const files = Array.from(e.dataTransfer.files || []).filter(
+      (f) => f.type.startsWith('image/') || f.type.startsWith('video/')
+    );
     if (files.length === 0) return;
+    await uploadAndAddMedia(files);
+  };
 
-    setUploadingVideo(true);
-    setUploadSuccess('');
-    setFormError('');
+  const handleAddManualMedia = (e) => {
+    if (e) e.preventDefault();
+    const url = manualMediaUrl.trim();
+    if (!url) return;
+    const isVid = isVideoUrl(url);
+    const current = getMediaList();
+    updateMediaList([...current, { type: isVid ? 'video' : 'image', url }]);
+    setManualMediaUrl('');
+    setUploadSuccess(`${isVid ? 'Vidéo' : 'Photo'} ajoutée depuis le lien !`);
+  };
+
+  const handleRemoveMedia = (indexToRemove) => {
+    const current = getMediaList();
+    const updated = current.filter((_, i) => i !== indexToRemove);
+    updateMediaList(updated);
+  };
+
+  const handleSetPrimaryMedia = (indexToPrimary) => {
+    const current = getMediaList();
+    const list = [...current];
+    const [item] = list.splice(indexToPrimary, 1);
+    updateMediaList([item, ...list]);
+  };
+
+  // Drag and Drop Handlers pour réordonner les médias
+  const handleMediaDragStart = (e, index) => {
+    setDraggedMediaIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
     try {
-      const results = await adminApi.uploadMultipleMedia(files);
-      const newUrls = results.filter((r) => r && r.success && r.url).map((r) => r.url);
-      if (newUrls.length > 0) {
-        setFormData((prev) => {
-          const currentVideos = Array.isArray(prev.videos) ? prev.videos : [];
-          const updated = [...currentVideos, ...newUrls];
-          return {
-            ...prev,
-            videos: updated,
-            video: updated[0] || prev.video
-          };
-        });
-        setUploadSuccess(`${newUrls.length} vidéo(s) importée(s) avec succès !`);
-      }
-    } catch (err) {
-      setFormError('Erreur lors du téléversement');
-    } finally {
-      setUploadingVideo(false);
+      e.dataTransfer.setData('text/plain', String(index));
+    } catch (err) {}
+  };
+
+  const handleMediaDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverMediaIndex !== index) {
+      setDragOverMediaIndex(index);
     }
   };
 
-  const handleRemoveVideo = (indexToRemove) => {
-    setFormData((prev) => {
-      const updated = (prev.videos || []).filter((_, i) => i !== indexToRemove);
-      return {
-        ...prev,
-        videos: updated,
-        video: updated[0] || ''
-      };
-    });
+  const handleMediaDragEnd = () => {
+    setDraggedMediaIndex(null);
+    setDragOverMediaIndex(null);
   };
 
-  const handleSetPrimaryVideo = (indexToPrimary) => {
-    setFormData((prev) => {
-      const list = [...(prev.videos || [])];
-      const [item] = list.splice(indexToPrimary, 1);
-      const updated = [item, ...list];
-      return {
-        ...prev,
-        videos: updated,
-        video: updated[0] || ''
-      };
-    });
+  const handleMediaDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedMediaIndex === null || draggedMediaIndex === targetIndex) {
+      setDraggedMediaIndex(null);
+      setDragOverMediaIndex(null);
+      return;
+    }
+    const current = getMediaList();
+    const list = [...current];
+    const [moved] = list.splice(draggedMediaIndex, 1);
+    list.splice(targetIndex, 0, moved);
+    updateMediaList(list);
+    setDraggedMediaIndex(null);
+    setDragOverMediaIndex(null);
   };
 
-  const handleAddManualVideo = (e) => {
-    if (e) e.preventDefault();
-    const url = manualVideoUrl.trim();
-    if (!url) return;
-    setFormData((prev) => {
-      const currentVideos = Array.isArray(prev.videos) ? prev.videos : [];
-      const updated = [...currentVideos, url];
-      return {
-        ...prev,
-        videos: updated,
-        video: updated[0] || prev.video
-      };
-    });
-    setManualVideoUrl('');
-    setUploadSuccess('Vidéo ajoutée depuis le lien !');
-  };
+  // Aliases rétrocompatibles
+  const handleImageFilesChange = handleMediaFilesChange;
+  const handleDropImages = handleDropMedia;
+  const handleRemoveImage = handleRemoveMedia;
+  const handleSetPrimaryImage = handleSetPrimaryMedia;
+  const handleAddManualImage = handleAddManualMedia;
+  const handleVideoFilesChange = handleMediaFilesChange;
+  const handleDropVideos = handleDropMedia;
+  const handleRemoveVideo = handleRemoveMedia;
+  const handleSetPrimaryVideo = handleSetPrimaryMedia;
+  const handleAddManualVideo = handleAddManualMedia;
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
@@ -898,6 +861,7 @@ export default function AdminProducts({ initialView }) {
       images: [],
       video: '',
       videos: [],
+    media: [],
       bio: '',
       languages: []
     });
@@ -948,6 +912,7 @@ export default function AdminProducts({ initialView }) {
     } else if (prod.image) {
       parsedImages = [prod.image];
     }
+    parsedImages = (parsedImages || []).filter((u) => typeof u === 'string' && u.trim() !== '');
 
     // Parse videos array
     let parsedVideos = [];
@@ -963,6 +928,7 @@ export default function AdminProducts({ initialView }) {
     } else if (prod.video) {
       parsedVideos = [prod.video];
     }
+    parsedVideos = (parsedVideos || []).filter((u) => typeof u === 'string' && u.trim() !== '');
 
     setFormData({
       name: prod.name || '',
@@ -978,6 +944,10 @@ export default function AdminProducts({ initialView }) {
       images: parsedImages,
       video: parsedVideos[0] || prod.video || '',
       videos: parsedVideos,
+      media: [
+        ...parsedImages.map((u) => ({ type: isVideoUrl(u) ? 'video' : 'image', url: u })),
+        ...parsedVideos.map((u) => ({ type: 'video', url: u }))
+      ].filter((m) => m && typeof m.url === 'string' && m.url.trim() !== ''),
       bio: prod.bio || '',
       languages: parsedLangs
     });
@@ -992,14 +962,21 @@ export default function AdminProducts({ initialView }) {
       return;
     }
 
+    const validImages = (formData.images || []).filter((u) => typeof u === 'string' && u.trim() !== '');
+    const validVideos = (formData.videos || []).filter((u) => typeof u === 'string' && u.trim() !== '');
+    const mainImg = validImages[0] || (typeof formData.image === 'string' && formData.image.trim() !== '' ? formData.image : '');
+    const mainVid = validVideos[0] || (typeof formData.video === 'string' && formData.video.trim() !== '' ? formData.video : null);
+
     const payload = {
+      format: formData.format || '',
+      etat: formData.format || '',
       ...formData,
       category: (formData.categories || []).join(', ') || formData.category || '',
       categories: formData.categories || [],
-      image: formData.images?.[0] || formData.image || '',
-      images: formData.images || [],
-      video: formData.videos?.[0] || formData.video || null,
-      videos: formData.videos || [],
+      image: mainImg,
+      images: validImages,
+      video: mainVid,
+      videos: validVideos,
       price: parseFloat(formData.price),
       purchase_price: formData.purchase_price !== '' ? parseFloat(formData.purchase_price) : 0,
       stock: parseInt(formData.stock, 10) || 0
@@ -3262,499 +3239,420 @@ export default function AdminProducts({ initialView }) {
                       />
                     </div>
 
-                    {/* Marque */}
+                    {/* État du Produit */}
                     <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
-                      <label className="form-label-custom">Marque</label>
-                      <input
-                        type="text"
-                        className="form-control-custom"
-                        value={formData.format}
-                        onChange={(e) => setFormData({ ...formData, format: e.target.value })}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <label className="form-label-custom" style={{ margin: 0, fontWeight: 700, color: '#18181b' }}>
+                          État du Produit
+                        </label>
+                        {formData.format && (
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              background: '#f1f5f9',
+                              color: '#334155',
+                              padding: '0.15rem 0.6rem',
+                              borderRadius: '9999px',
+                              border: '1px solid #cbd5e1'
+                            }}
+                          >
+                            Sélectionné : {formData.format}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Menu déroulant quand on clique */}
+                      <div style={{ position: 'relative' }}>
+                        <select
+                          className="form-control-custom"
+                          value={formData.format || ''}
+                          onChange={(e) => setFormData({ ...formData, format: e.target.value })}
+                          style={{
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            color: formData.format ? '#0f172a' : '#94a3b8',
+                            backgroundColor: '#ffffff'
+                          }}
+                        >
+                          <option value="">-- Choisir l'état du produit --</option>
+                          <option value="Sous blister">📦 Sous blister</option>
+                          <option value="Très bon état">⭐ Très bon état</option>
+                          <option value="Bon état">👍 Bon état</option>
+                          <option value="Occasion">🔄 Occasion</option>
+                          {formData.format && !['Sous blister', 'Très bon état', 'Bon état', 'Occasion'].includes(formData.format) && (
+                            <option value={formData.format}>{formData.format}</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* Raccourcis en un clic (Pills interactives) */}
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+                        {[
+                          { label: 'Sous blister', icon: '📦', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
+                          { label: 'Très bon état', icon: '⭐', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                          { label: 'Bon état', icon: '👍', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+                          { label: 'Occasion', icon: '🔄', color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' }
+                        ].map((opt) => {
+                          const isSelected = formData.format === opt.label;
+                          return (
+                            <button
+                              key={opt.label}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, format: opt.label })}
+                              style={{
+                                padding: '0.42rem 0.9rem',
+                                fontSize: '0.82rem',
+                                fontWeight: isSelected ? 700 : 500,
+                                borderRadius: '9999px',
+                                border: `1.5px solid ${isSelected ? opt.color : opt.border}`,
+                                backgroundColor: isSelected ? opt.bg : '#ffffff',
+                                color: isSelected ? opt.color : '#475569',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                boxShadow: isSelected ? `0 2px 6px ${opt.border}` : '0 1px 2px rgba(0,0,0,0.03)',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <span>{opt.icon}</span>
+                              <span>{opt.label}</span>
+                              {isSelected && <i className="fas fa-check" style={{ fontSize: '0.75rem', marginLeft: '2px' }}></i>}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* =========================================================================
-                        SECTION 1 : MULTI-PHOTOS DU PRODUIT
+                        SECTION : MULTI-MÉDIAS DU PRODUIT (PHOTOS & VIDÉOS AVEC DRAG & DROP)
                         ========================================================================= */}
-                    <div className="form-group-custom" style={{ gridColumn: '1 / -1', borderTop: '1px solid #f0f0f0', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                          <span style={{ fontSize: '1rem', fontWeight: 700, color: '#18181b' }}>
-                            📸 Galerie Photos du Produit
-                          </span>
-                          <span className="badge-custom bg-soft-primary" style={{ fontWeight: 700 }}>
-                            {formData.images?.length || 0} photo(s)
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: '#71717a' }}>
-                          La première photo sert de <strong>Couverture principale</strong>
-                        </span>
-                      </div>
+                    {(() => {
+                      const mediaList = getMediaList();
+                      const photoCount = mediaList.filter((m) => m.type === 'image').length;
+                      const videoCount = mediaList.filter((m) => m.type === 'video').length;
 
-                      {/* Zone de Téléversement Multi-Photos */}
-                      <div
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={handleDropImages}
-                        onClick={() => imageFilesInputRef.current?.click()}
-                        style={{
-                          border: '2px dashed #d4d4d8',
-                          borderRadius: '10px',
-                          padding: '1.25rem',
-                          textAlign: 'center',
-                          backgroundColor: '#fafafa',
-                          cursor: 'pointer',
-                          marginBottom: '0.85rem',
-                          transition: 'all 0.2s ease',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem'
-                        }}
-                      >
-                        <input
-                          type="file"
-                          ref={imageFilesInputRef}
-                          accept="image/*"
-                          multiple
-                          onChange={handleImageFilesChange}
-                          style={{ display: 'none' }}
-                        />
+                      return (
+                        <div className="form-group-custom" style={{ gridColumn: '1 / -1', borderTop: '1px solid #f0f0f0', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <span style={{ fontSize: '1rem', fontWeight: 700, color: '#18181b' }}>
+                                📸 / 🎬 Galerie Médias du Produit (Photos & Vidéos)
+                              </span>
+                              <span className="badge-custom bg-soft-primary" style={{ fontWeight: 700 }}>
+                                {photoCount} photo(s)
+                              </span>
+                              <span className="badge-custom bg-soft-info" style={{ fontWeight: 700 }}>
+                                {videoCount} vidéo(s)
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.8rem', color: '#71717a' }}>
+                              La première photo sert de <strong>Couverture principale</strong> • Glissez-déposez pour réorganiser l'ordre
+                            </span>
+                          </div>
 
-                        <div
-                          style={{
-                            width: '46px',
-                            height: '46px',
-                            borderRadius: '50%',
-                            backgroundColor: '#111111',
-                            color: '#ffffff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1.2rem',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                          }}
-                        >
-                          {uploadingImage ? (
-                            <i className="flaticon-381-refresh" style={{ animation: 'spin 1s linear infinite' }} />
+                          {/* Zone de Téléversement Multi-Médias (Photos & Vidéos) */}
+                          <div
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={handleDropMedia}
+                            onClick={() => mediaFilesInputRef.current?.click()}
+                            style={{
+                              border: '2px dashed #93c5fd',
+                              borderRadius: '10px',
+                              padding: '1.35rem',
+                              textAlign: 'center',
+                              backgroundColor: '#f8fafc',
+                              cursor: 'pointer',
+                              marginBottom: '0.85rem',
+                              transition: 'all 0.2s ease',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.5rem'
+                            }}
+                          >
+                            <input
+                              type="file"
+                              ref={mediaFilesInputRef}
+                              accept="image/*,video/*"
+                              multiple
+                              onChange={handleMediaFilesChange}
+                              style={{ display: 'none' }}
+                            />
+
+                            <div
+                              style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '50%',
+                                backgroundColor: '#111111',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.25rem',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                              }}
+                            >
+                              {uploadingMedia ? (
+                                <i className="flaticon-381-refresh" style={{ animation: 'spin 1s linear infinite' }} />
+                              ) : (
+                                <i className="flaticon-381-photo" />
+                              )}
+                            </div>
+
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111111' }}>
+                                {uploadingMedia
+                                  ? 'Téléversement des médias en cours...'
+                                  : 'Ajouter une ou plusieurs photos et vidéos depuis votre appareil'}
+                              </div>
+                              <div style={{ fontSize: '0.78rem', color: '#71717a', marginTop: '0.2rem' }}>
+                                Cliquez ou glissez-déposez ici (Sélection multiple possible • JPG, PNG, WEBP, GIF, MP4, WebM, MOV)
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Champ textuel pour ajouter un média par URL */}
+                          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                            <div style={{ position: 'relative', flex: 1 }}>
+                              <input
+                                type="text"
+                                className="form-control-custom"
+                                placeholder="Ou coller un lien d'image ou vidéo (/uploads/... ou https://...)"
+                                value={manualMediaUrl}
+                                onChange={(e) => setManualMediaUrl(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddManualMedia();
+                                  }
+                                }}
+                                style={{ paddingLeft: '2.4rem', fontSize: '0.85rem' }}
+                              />
+                              <i
+                                className="fas fa-link"
+                                style={{
+                                  position: 'absolute',
+                                  left: '12px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  color: '#a1a1aa',
+                                  fontSize: '0.85rem'
+                                }}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-light-custom"
+                              onClick={handleAddManualMedia}
+                              style={{ whiteSpace: 'nowrap', padding: '0.55rem 1rem', fontSize: '0.82rem' }}
+                            >
+                              <i className="fas fa-plus" /> Ajouter média
+                            </button>
+                          </div>
+
+                          {/* Grille d'aperçu des médias avec Drag & Drop */}
+                          {mediaList.length > 0 ? (
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                gap: '0.85rem',
+                                marginBottom: '1rem'
+                              }}
+                            >
+                              {mediaList.map((item, idx) => {
+                                const isPrimary = idx === 0;
+                                const isDragged = draggedMediaIndex === idx;
+                                const isDragOver = dragOverMediaIndex === idx;
+                                const isVid = item.type === 'video';
+
+                                return (
+                                  <div
+                                    key={`${item.url}-${idx}`}
+                                    draggable
+                                    onDragStart={(e) => handleMediaDragStart(e, idx)}
+                                    onDragOver={(e) => handleMediaDragOver(e, idx)}
+                                    onDragEnd={handleMediaDragEnd}
+                                    onDrop={(e) => handleMediaDrop(e, idx)}
+                                    style={{
+                                      position: 'relative',
+                                      borderRadius: '8px',
+                                      overflow: 'hidden',
+                                      border: isDragOver
+                                        ? '2.5px dashed #2563eb'
+                                        : isPrimary
+                                        ? '2.5px solid #111111'
+                                        : '1px solid #e4e4e7',
+                                      backgroundColor: isVid ? '#000000' : '#f8fafc',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      boxShadow: isPrimary ? '0 4px 12px rgba(0,0,0,0.15)' : '0 2px 6px rgba(0,0,0,0.05)',
+                                      opacity: isDragged ? 0.35 : 1,
+                                      cursor: 'grab',
+                                      transform: isDragOver ? 'scale(1.03)' : 'none',
+                                      transition: 'transform 0.15s ease, border-color 0.15s ease'
+                                    }}
+                                  >
+                                    <div style={{ height: '140px', width: '100%', overflow: 'hidden', position: 'relative' }}>
+                                      {isVid ? (
+                                        <video
+                                          src={item.url}
+                                          muted
+                                          playsInline
+                                          style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+                                        />
+                                      ) : (
+                                        <img
+                                          src={item.url}
+                                          alt={`Média ${idx + 1}`}
+                                          style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#ffffff', pointerEvents: 'none' }}
+                                          onError={(e) => {
+                                            e.target.src = '/assets/images/categories/telephones.svg';
+                                          }}
+                                        />
+                                      )}
+
+                                      {/* Badge Principal */}
+                                      {isPrimary && (
+                                        <span
+                                          style={{
+                                            position: 'absolute',
+                                            top: '6px',
+                                            left: '6px',
+                                            backgroundColor: '#111111',
+                                            color: '#ffffff',
+                                            fontSize: '0.65rem',
+                                            fontWeight: 700,
+                                            padding: '2px 7px',
+                                            borderRadius: '4px',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                            zIndex: 3
+                                          }}
+                                        >
+                                          ★ Principale
+                                        </span>
+                                      )}
+
+                                      {/* Badge Type (Photo / Vidéo) */}
+                                      <span
+                                        style={{
+                                          position: 'absolute',
+                                          top: isPrimary ? '28px' : '6px',
+                                          left: '6px',
+                                          backgroundColor: isVid ? '#2563eb' : 'rgba(17, 17, 17, 0.75)',
+                                          color: '#ffffff',
+                                          fontSize: '0.62rem',
+                                          fontWeight: 700,
+                                          padding: '2px 6px',
+                                          borderRadius: '4px',
+                                          boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                          zIndex: 3
+                                        }}
+                                      >
+                                        {isVid ? '🎬 Vidéo' : '🖼️ Photo'}
+                                      </span>
+
+                                      {/* Poignée Drag & Drop indicator */}
+                                      <div
+                                        title="Glisser-déposer pour changer l'ordre"
+                                        style={{
+                                          position: 'absolute',
+                                          top: '6px',
+                                          left: '50%',
+                                          transform: 'translateX(-50%)',
+                                          backgroundColor: 'rgba(0,0,0,0.5)',
+                                          color: '#ffffff',
+                                          borderRadius: '4px',
+                                          padding: '2px 6px',
+                                          fontSize: '0.65rem',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '3px',
+                                          zIndex: 3
+                                        }}
+                                      >
+                                        <i className="fas fa-grip-vertical" />
+                                      </div>
+
+                                      {/* Bouton Supprimer */}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemoveMedia(idx);
+                                        }}
+                                        title="Supprimer ce média"
+                                        style={{
+                                          position: 'absolute',
+                                          top: '6px',
+                                          right: '6px',
+                                          width: '24px',
+                                          height: '24px',
+                                          borderRadius: '50%',
+                                          backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                                          color: '#ffffff',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: '0.7rem',
+                                          zIndex: 4
+                                        }}
+                                      >
+                                        <i className="fas fa-trash-alt" />
+                                      </button>
+                                    </div>
+
+                                    {!isPrimary && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetPrimaryMedia(idx)}
+                                        style={{
+                                          border: 'none',
+                                          background: '#f4f4f5',
+                                          color: '#18181b',
+                                          fontSize: '0.72rem',
+                                          fontWeight: 600,
+                                          padding: '6px 5px',
+                                          cursor: 'pointer',
+                                          borderTop: '1px solid #e4e4e7',
+                                          transition: 'background 0.15s ease'
+                                        }}
+                                        onMouseEnter={(e) => (e.target.style.background = '#e4e4e7')}
+                                        onMouseLeave={(e) => (e.target.style.background = '#f4f4f5')}
+                                      >
+                                        ★ Mettre en principal
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           ) : (
-                            <i className="flaticon-381-photo" />
+                            <div
+                              style={{
+                                padding: '0.85rem',
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0',
+                                fontSize: '0.82rem',
+                                color: '#64748b',
+                                textAlign: 'center',
+                                marginBottom: '1rem'
+                              }}
+                            >
+                              <i className="fas fa-info-circle" style={{ marginRight: '6px' }} />
+                              Aucun média ajouté pour l'instant. Ajoutez des photos ou des vidéos pour afficher le produit.
+                            </div>
                           )}
                         </div>
-
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111111' }}>
-                            {uploadingImage
-                              ? 'Téléversement des photos en cours...'
-                              : 'Ajouter une ou plusieurs photos depuis votre appareil'}
-                          </div>
-                          <div style={{ fontSize: '0.78rem', color: '#71717a', marginTop: '0.2rem' }}>
-                            Cliquez ou glissez-déposez ici (Sélection multiple possible • JPG, PNG, WEBP, GIF)
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Champ textuel pour ajouter une photo par URL */}
-                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                        <div style={{ position: 'relative', flex: 1 }}>
-                          <input
-                            type="text"
-                            className="form-control-custom"
-                            placeholder="Ou coller un lien d'image externe (/uploads/... ou https://...)"
-                            value={manualImageUrl}
-                            onChange={(e) => setManualImageUrl(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddManualImage();
-                              }
-                            }}
-                            style={{ paddingLeft: '2.4rem', fontSize: '0.85rem' }}
-                          />
-                          <i
-                            className="fas fa-link"
-                            style={{
-                              position: 'absolute',
-                              left: '12px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              color: '#a1a1aa',
-                              fontSize: '0.85rem'
-                            }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          className="btn-light-custom"
-                          onClick={handleAddManualImage}
-                          style={{ whiteSpace: 'nowrap', padding: '0.55rem 1rem', fontSize: '0.82rem' }}
-                        >
-                          <i className="fas fa-plus" /> Ajouter photo
-                        </button>
-                      </div>
-
-                      {/* Grille d'aperçu des photos ajoutées */}
-                      {Array.isArray(formData.images) && formData.images.length > 0 ? (
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-                            gap: '0.85rem',
-                            marginBottom: '1rem'
-                          }}
-                        >
-                          {formData.images.map((imgUrl, idx) => {
-                            const isPrimary = idx === 0;
-                            return (
-                              <div
-                                key={idx}
-                                style={{
-                                  position: 'relative',
-                                  borderRadius: '8px',
-                                  overflow: 'hidden',
-                                  border: isPrimary ? '2.5px solid #111111' : '1px solid #e4e4e7',
-                                  backgroundColor: '#f8fafc',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  boxShadow: isPrimary ? '0 4px 12px rgba(0,0,0,0.15)' : '0 2px 6px rgba(0,0,0,0.05)',
-                                  transition: 'all 0.2s ease'
-                                }}
-                              >
-                                <div style={{ height: '140px', width: '100%', overflow: 'hidden', position: 'relative' }}>
-                                  <img
-                                    src={imgUrl}
-                                    alt={`Photo ${idx + 1}`}
-                                    style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#ffffff' }}
-                                    onError={(e) => {
-                                      e.target.src = '/assets/images/categories/telephones.svg';
-                                    }}
-                                  />
-                                  {isPrimary && (
-                                    <span
-                                      style={{
-                                        position: 'absolute',
-                                        top: '6px',
-                                        left: '6px',
-                                        backgroundColor: '#111111',
-                                        color: '#ffffff',
-                                        fontSize: '0.65rem',
-                                        fontWeight: 700,
-                                        padding: '2px 7px',
-                                        borderRadius: '4px',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                                      }}
-                                    >
-                                      ★ Principale
-                                    </span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveImage(idx)}
-                                    title="Supprimer cette photo"
-                                    style={{
-                                      position: 'absolute',
-                                      top: '6px',
-                                      right: '6px',
-                                      width: '24px',
-                                      height: '24px',
-                                      borderRadius: '50%',
-                                      backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                                      color: '#ffffff',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '0.7rem'
-                                    }}
-                                  >
-                                    <i className="fas fa-trash-alt" />
-                                  </button>
-                                </div>
-
-                                {!isPrimary && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSetPrimaryImage(idx)}
-                                    style={{
-                                      border: 'none',
-                                      background: '#f4f4f5',
-                                      color: '#18181b',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 600,
-                                      padding: '5px',
-                                      cursor: 'pointer',
-                                      borderTop: '1px solid #e4e4e7',
-                                      transition: 'background 0.15s ease'
-                                    }}
-                                    onMouseEnter={(e) => (e.target.style.background = '#e4e4e7')}
-                                    onMouseLeave={(e) => (e.target.style.background = '#f4f4f5')}
-                                  >
-                                    ★ Mettre en photo principale
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            padding: '0.85rem',
-                            backgroundColor: '#f8fafc',
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
-                            fontSize: '0.82rem',
-                            color: '#64748b',
-                            textAlign: 'center',
-                            marginBottom: '1rem'
-                          }}
-                        >
-                          <i className="fas fa-info-circle" style={{ marginRight: '6px' }} />
-                          Aucune photo ajoutée pour l'instant. Ajoutez au moins une photo pour afficher l'image du produit.
-                        </div>
-                      )}
-                    </div>
-
-                    {/* =========================================================================
-                        SECTION 2 : MULTI-VIDÉOS DU PRODUIT (FORMAT TIKTOK / REELS / MP4)
-                        ========================================================================= */}
-                    <div className="form-group-custom" style={{ gridColumn: '1 / -1', borderTop: '1px solid #f0f0f0', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                          <span style={{ fontSize: '1rem', fontWeight: 700, color: '#18181b' }}>
-                            🎬 Vidéos du Produit (TikTok / Reels / MP4)
-                          </span>
-                          <span className="badge-custom bg-soft-info" style={{ fontWeight: 700 }}>
-                            {formData.videos?.length || 0} vidéo(s)
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.8rem', color: '#71717a' }}>
-                          Affichées en boucle vidéo dans le flux TikTok et la fiche détaillée
-                        </span>
-                      </div>
-
-                      {/* Zone de Téléversement Multi-Vidéos */}
-                      <div
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={handleDropVideos}
-                        onClick={() => videoFilesInputRef.current?.click()}
-                        style={{
-                          border: '2px dashed #93c5fd',
-                          borderRadius: '10px',
-                          padding: '1.25rem',
-                          textAlign: 'center',
-                          backgroundColor: '#f8fafc',
-                          cursor: 'pointer',
-                          marginBottom: '0.85rem',
-                          transition: 'all 0.2s ease',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem'
-                        }}
-                      >
-                        <input
-                          type="file"
-                          ref={videoFilesInputRef}
-                          accept="video/*"
-                          multiple
-                          onChange={handleVideoFilesChange}
-                          style={{ display: 'none' }}
-                        />
-
-                        <div
-                          style={{
-                            width: '46px',
-                            height: '46px',
-                            borderRadius: '50%',
-                            backgroundColor: '#2563eb',
-                            color: '#ffffff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1.2rem',
-                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
-                          }}
-                        >
-                          {uploadingVideo ? (
-                            <i className="flaticon-381-refresh" style={{ animation: 'spin 1s linear infinite' }} />
-                          ) : (
-                            <i className="flaticon-381-video-clip" />
-                          )}
-                        </div>
-
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#111111' }}>
-                            {uploadingVideo
-                              ? 'Téléversement des vidéos en cours...'
-                              : 'Ajouter une ou plusieurs vidéos depuis votre appareil'}
-                          </div>
-                          <div style={{ fontSize: '0.78rem', color: '#71717a', marginTop: '0.2rem' }}>
-                            Cliquez ou glissez-déposez ici (MP4, WebM, MOV • Jusqu'à 100 Mo par fichier)
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Champ textuel pour ajouter une vidéo par URL */}
-                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                        <div style={{ position: 'relative', flex: 1 }}>
-                          <input
-                            type="text"
-                            className="form-control-custom"
-                            placeholder="Ou coller un lien vidéo (/uploads/... ou https://...)"
-                            value={manualVideoUrl}
-                            onChange={(e) => setManualVideoUrl(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddManualVideo();
-                              }
-                            }}
-                            style={{ paddingLeft: '2.4rem', fontSize: '0.85rem' }}
-                          />
-                          <i
-                            className="fas fa-video"
-                            style={{
-                              position: 'absolute',
-                              left: '12px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              color: '#a1a1aa',
-                              fontSize: '0.85rem'
-                            }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          className="btn-light-custom"
-                          onClick={handleAddManualVideo}
-                          style={{ whiteSpace: 'nowrap', padding: '0.55rem 1rem', fontSize: '0.82rem' }}
-                        >
-                          <i className="fas fa-plus" /> Ajouter vidéo
-                        </button>
-                      </div>
-
-                      {/* Grille d'aperçu des vidéos ajoutées */}
-                      {Array.isArray(formData.videos) && formData.videos.length > 0 ? (
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                            gap: '0.85rem',
-                            marginBottom: '1rem'
-                          }}
-                        >
-                          {formData.videos.map((vidUrl, idx) => {
-                            const isPrimary = idx === 0;
-                            return (
-                              <div
-                                key={idx}
-                                style={{
-                                  position: 'relative',
-                                  borderRadius: '8px',
-                                  overflow: 'hidden',
-                                  border: isPrimary ? '2.5px solid #2563eb' : '1px solid #e4e4e7',
-                                  backgroundColor: '#000000',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  boxShadow: isPrimary ? '0 4px 12px rgba(37, 99, 235, 0.2)' : '0 2px 6px rgba(0,0,0,0.1)'
-                                }}
-                              >
-                                <div style={{ height: '180px', width: '100%', position: 'relative' }}>
-                                  <video
-                                    src={vidUrl}
-                                    controls
-                                    muted
-                                    playsInline
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                  />
-                                  {isPrimary && (
-                                    <span
-                                      style={{
-                                        position: 'absolute',
-                                        top: '6px',
-                                        left: '6px',
-                                        backgroundColor: '#2563eb',
-                                        color: '#ffffff',
-                                        fontSize: '0.65rem',
-                                        fontWeight: 700,
-                                        padding: '2px 7px',
-                                        borderRadius: '4px',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
-                                        zIndex: 2
-                                      }}
-                                    >
-                                      ★ Vidéo Principale
-                                    </span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveVideo(idx)}
-                                    title="Supprimer cette vidéo"
-                                    style={{
-                                      position: 'absolute',
-                                      top: '6px',
-                                      right: '6px',
-                                      width: '26px',
-                                      height: '26px',
-                                      borderRadius: '50%',
-                                      backgroundColor: 'rgba(239, 68, 68, 0.95)',
-                                      color: '#ffffff',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '0.75rem',
-                                      zIndex: 2
-                                    }}
-                                  >
-                                    <i className="fas fa-trash-alt" />
-                                  </button>
-                                </div>
-
-                                {!isPrimary && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSetPrimaryVideo(idx)}
-                                    style={{
-                                      border: 'none',
-                                      background: '#f4f4f5',
-                                      color: '#18181b',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 600,
-                                      padding: '6px',
-                                      cursor: 'pointer',
-                                      borderTop: '1px solid #e4e4e7'
-                                    }}
-                                  >
-                                    ★ Définir en vidéo principale
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            padding: '0.85rem',
-                            backgroundColor: '#f8fafc',
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
-                            fontSize: '0.82rem',
-                            color: '#64748b',
-                            textAlign: 'center',
-                            marginBottom: '1rem'
-                          }}
-                        >
-                          <i className="fas fa-video" style={{ marginRight: '6px', color: '#2563eb' }} />
-                          Optionnel : Ajoutez des vidéos de présentation pour captiver vos acheteurs au format TikTok.
-                        </div>
-                      )}
-                    </div>
+                      );
+                    })()}
 
                     {/* Description */}
                     <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
@@ -3815,14 +3713,43 @@ export default function AdminProducts({ initialView }) {
                     backgroundColor: '#f8f8f8'
                   }}
                 >
-                  <img
-                    src={formData.image || '/assets/images/categories/telephones.svg'}
-                    alt={formData.name || 'Aperçu'}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', padding: formData.image ? '0' : '1.5rem', backgroundColor: '#ffffff' }}
-                    onError={(e) => {
-                      e.target.src = '/assets/images/categories/telephones.svg';
-                    }}
-                  />
+                  {(() => {
+                    const hasImg = formData.image && typeof formData.image === 'string' && formData.image.trim() !== '';
+                    const vidUrl = formData.video || (Array.isArray(formData.videos) && formData.videos[0] ? formData.videos[0] : null);
+
+                    if (hasImg) {
+                      return (
+                        <img
+                          src={formData.image}
+                          alt={formData.name || 'Aperçu'}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#ffffff' }}
+                          onError={(e) => {
+                            e.target.src = '/assets/images/categories/telephones.svg';
+                          }}
+                        />
+                      );
+                    }
+
+                    if (vidUrl) {
+                      return (
+                        <video
+                          src={`${vidUrl}#t=0.1`}
+                          controls
+                          muted
+                          playsInline
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000000' }}
+                        />
+                      );
+                    }
+
+                    return (
+                      <img
+                        src="/assets/images/categories/telephones.svg"
+                        alt={formData.name || 'Aperçu'}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '1.5rem', backgroundColor: '#ffffff' }}
+                      />
+                    );
+                  })()}
                 </div>
 
                 {(() => {
@@ -3845,9 +3772,24 @@ export default function AdminProducts({ initialView }) {
                   {formData.name || 'Titre du Produit'}
                 </h3>
                 {formData.format && (
-                  <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '0.5rem' }}>
-                    <small>{formData.format}</small>
-                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
+                    <span 
+                      style={{ 
+                        fontSize: '0.78rem', 
+                        fontWeight: 700, 
+                        color: formData.format === 'Sous blister' ? '#16a34a' : formData.format === 'Très bon état' ? '#2563eb' : formData.format === 'Bon état' ? '#d97706' : '#64748b',
+                        background: formData.format === 'Sous blister' ? '#f0fdf4' : formData.format === 'Très bon état' ? '#eff6ff' : formData.format === 'Bon état' ? '#fffbeb' : '#f8fafc',
+                        border: `1px solid ${formData.format === 'Sous blister' ? '#bbf7d0' : formData.format === 'Très bon état' ? '#bfdbfe' : formData.format === 'Bon état' ? '#fde68a' : '#e2e8f0'}`,
+                        padding: '0.2rem 0.65rem',
+                        borderRadius: '9999px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      {formData.format === 'Sous blister' ? '📦' : formData.format === 'Très bon état' ? '⭐' : formData.format === 'Bon état' ? '👍' : '🔄'} {formData.format}
+                    </span>
+                  </div>
                 )}
 
                 <div
@@ -4347,20 +4289,103 @@ export default function AdminProducts({ initialView }) {
                       return (
                         <tr key={p.id}>
                           <td>
-                            <img
-                              src={p.image || '/assets/images/books/book1.jpg'}
-                              alt={p.name}
-                              style={{
-                                width: '46px',
-                                height: '60px',
-                                objectFit: 'cover',
-                                borderRadius: '6px',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                              }}
-                              onError={(e) => {
-                                e.target.src = '/assets/images/books/book1.jpg';
-                              }}
-                            />
+                            {(() => {
+                              const hasImg = p.image && typeof p.image === 'string' && p.image.trim() !== '';
+                              const vidUrl = p.video || (Array.isArray(p.videos) && p.videos[0] ? p.videos[0] : null);
+
+                              if (hasImg) {
+                                return (
+                                  <img
+                                    src={p.image}
+                                    alt={p.name}
+                                    style={{
+                                      width: '46px',
+                                      height: '60px',
+                                      objectFit: 'cover',
+                                      borderRadius: '6px',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                                    }}
+                                    onError={(e) => {
+                                      e.target.src = '/assets/images/categories/telephones.svg';
+                                    }}
+                                  />
+                                );
+                              }
+
+                              if (vidUrl) {
+                                return (
+                                  <div
+                                    title="Aperçu vidéo (survolez pour lecture)"
+                                    style={{
+                                      position: 'relative',
+                                      width: '46px',
+                                      height: '60px',
+                                      borderRadius: '6px',
+                                      overflow: 'hidden',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                                      backgroundColor: '#000000',
+                                      cursor: 'pointer'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      const v = e.currentTarget.querySelector('video');
+                                      if (v) v.play().catch(() => {});
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      const v = e.currentTarget.querySelector('video');
+                                      if (v) {
+                                        v.pause();
+                                        v.currentTime = 0.1;
+                                      }
+                                    }}
+                                  >
+                                    <video
+                                      src={`${vidUrl}#t=0.1`}
+                                      muted
+                                      playsInline
+                                      preload="metadata"
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        display: 'block'
+                                      }}
+                                    />
+                                    <span
+                                      style={{
+                                        position: 'absolute',
+                                        bottom: '2px',
+                                        right: '2px',
+                                        fontSize: '0.58rem',
+                                        backgroundColor: 'rgba(0,0,0,0.7)',
+                                        color: '#ffffff',
+                                        borderRadius: '3px',
+                                        padding: '1px 3px',
+                                        lineHeight: 1,
+                                        pointerEvents: 'none'
+                                      }}
+                                    >
+                                      🎬
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <img
+                                  src="/assets/images/categories/telephones.svg"
+                                  alt={p.name}
+                                  style={{
+                                    width: '46px',
+                                    height: '60px',
+                                    objectFit: 'contain',
+                                    padding: '6px',
+                                    borderRadius: '6px',
+                                    backgroundColor: '#f8fafc',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                                  }}
+                                />
+                              );
+                            })()}
                           </td>
                           <td>
                             <div>

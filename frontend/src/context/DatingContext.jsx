@@ -142,7 +142,16 @@ export const DatingProvider = ({ children }) => {
         const matchesLang = pLangs.some((l) => activeFilters.languages.includes(l));
         if (!matchesLang) return false;
       }
-      // 3. Prix maximum
+            // 3. État du produit (Sous blister, Très bon état, Bon état, Occasion)
+      if (activeFilters.etats && activeFilters.etats.length > 0) {
+        const pEtat = (p.format || p.etat || '').trim().toLowerCase();
+        const matchesEtat = activeFilters.etats.some(
+          (e) => (e || '').trim().toLowerCase() === pEtat
+        );
+        if (!matchesEtat) return false;
+      }
+
+      // 4. Prix maximum
       if (activeFilters.maxPrice && Number(activeFilters.maxPrice) < 1000000 && Number(p.price) > Number(activeFilters.maxPrice)) {
         return false;
       }
@@ -281,8 +290,10 @@ export const DatingProvider = ({ children }) => {
           price: Number(p.price) || 0,
           purchase_price: Number(p.purchase_price) || 0,
           priceFormatted: `${Number(p.price).toLocaleString('fr-FR')} DA`,
-          image: p.image || '/assets/images/books/book1.jpg',
-          images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []),
+          image: (p.image && p.image !== '/assets/images/books/book1.jpg') ? p.image : '',
+          images: Array.isArray(p.images)
+            ? p.images.filter((x) => x && x !== '/assets/images/books/book1.jpg' && String(x).trim() !== '')
+            : (p.image && p.image !== '/assets/images/books/book1.jpg' ? [p.image] : []),
           video: p.video || null,
           videos: Array.isArray(p.videos) && p.videos.length > 0 ? p.videos : (p.video ? [p.video] : []),
           bio: p.bio || '',
@@ -334,7 +345,7 @@ export const DatingProvider = ({ children }) => {
           price: Number(product.price) || 0,
           purchase_price: Number(product.purchase_price) || 0,
           quantity: 1,
-          image: product.image || '/assets/images/books/book1.jpg'
+          image: product.image || (product.video ? product.video : '/assets/images/categories/telephones.svg')
         }
       ];
     });
@@ -384,7 +395,7 @@ export const DatingProvider = ({ children }) => {
           : (card.distance || (card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : '')),
         price: card.price || 0,
         priceFormatted: card.priceFormatted || (card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : ''),
-        image: card.image || '/assets/images/books/book1.jpg',
+        image: card.image || (card.video ? card.video : '/assets/images/categories/telephones.svg'),
         video: card.video || null,
         format: card.format || '',
         bio: card.bio || '',

@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
 import BookDetailBottomSheet from '../components/BookDetailBottomSheet';
 import { useDating } from '../context/DatingContext';
+import { useTheme } from '../context/ThemeContext';
 
 // Helper pour créer un slug URL propre et lisible (gère le français, l'arabe, les accents et les émojis)
 export const slugifyCategory = (name) => {
@@ -38,6 +39,8 @@ const Wishlist = ({ defaultCategory = null }) => {
   const rawParam = routeParams.category || searchParams.get('cat') || defaultCategory || null;
 
   const datingCtx = useDating();
+  const { accentColor } = useTheme();
+  const primaryColor = accentColor || 'var(--primary, #2563eb)';
   const allProfiles = Array.isArray(datingCtx?.allProfiles) ? datingCtx.allProfiles : [];
   const likedList = Array.isArray(datingCtx?.likedList) ? datingCtx.likedList : [];
   const removeFromLiked = datingCtx?.removeFromLiked || (() => {});
@@ -455,15 +458,15 @@ const Wishlist = ({ defaultCategory = null }) => {
                     gap: '3px',
                     padding: '4px 8px',
                     borderRadius: '8px',
-                    border: sortBy !== 'count' ? '1.5px solid #209f84' : '1px solid #e2e8f0',
-                    backgroundColor: sortBy !== 'count' ? '#ecfdf5' : '#f8fafc',
-                    color: sortBy !== 'count' ? '#209f84' : '#64748b',
+                    border: sortBy !== 'count' ? `1.5px solid ${primaryColor}` : '1px solid #e2e8f0',
+                    backgroundColor: sortBy !== 'count' ? (accentColor ? `${accentColor}15` : 'rgba(37, 99, 235, 0.08)') : '#f8fafc',
+                    color: sortBy !== 'count' ? primaryColor : '#64748b',
                     fontWeight: 700,
                     fontSize: '11px',
                     lineHeight: 1,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
-                    boxShadow: sortBy !== 'count' ? '0 2px 6px rgba(32, 159, 132, 0.2)' : 'none'
+                    boxShadow: sortBy !== 'count' ? `0 2px 6px ${accentColor ? `${accentColor}33` : 'rgba(37, 99, 235, 0.2)'}` : 'none'
                   }}
                 >
                   <span>{sortBy === 'za' ? 'Z-A' : 'A-Z'}</span>
@@ -600,10 +603,10 @@ const Wishlist = ({ defaultCategory = null }) => {
                     className="btn btn-sm rounded-pill font-12 d-inline-flex align-items-center gap-1 shadow-sm"
                     style={{
                       whiteSpace: 'nowrap',
-                      backgroundColor: selectedSubcategory === null ? '#209f84' : '#f8fafc',
+                      backgroundColor: selectedSubcategory === null ? primaryColor : '#f8fafc',
                       color: selectedSubcategory === null ? '#ffffff' : '#475569',
                       fontWeight: selectedSubcategory === null ? 700 : 600,
-                      border: selectedSubcategory === null ? '1.5px solid #209f84' : '1px solid #e2e8f0',
+                      border: selectedSubcategory === null ? `1.5px solid ${primaryColor}` : '1px solid #e2e8f0',
                       padding: '5px 14px'
                     }}
                   >
@@ -620,10 +623,10 @@ const Wishlist = ({ defaultCategory = null }) => {
                         className="btn btn-sm rounded-pill font-12 d-inline-flex align-items-center gap-1 shadow-sm"
                         style={{
                           whiteSpace: 'nowrap',
-                          backgroundColor: isSubSelected ? '#209f84' : '#ffffff',
+                          backgroundColor: isSubSelected ? primaryColor : '#ffffff',
                           color: isSubSelected ? '#ffffff' : '#334155',
                           fontWeight: isSubSelected ? 700 : 600,
-                          border: isSubSelected ? '1.5px solid #209f84' : '1px solid #cbd5e1',
+                          border: isSubSelected ? `1.5px solid ${primaryColor}` : '1px solid #cbd5e1',
                           padding: '5px 12px',
                           transition: 'all 0.15s ease'
                         }}
@@ -647,7 +650,7 @@ const Wishlist = ({ defaultCategory = null }) => {
                 <div className="text-center py-5">
                   <div 
                     className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3"
-                    style={{ width: '64px', height: '64px', background: 'rgba(32, 159, 132, 0.1)' }}
+                    style={{ width: '64px', height: '64px', background: accentColor ? `${accentColor}1a` : 'var(--primary-light, rgba(37, 99, 235, 0.1))' }}
                   >
                     <i className="feather icon-book text-primary font-28"></i>
                   </div>
@@ -690,45 +693,20 @@ const Wishlist = ({ defaultCategory = null }) => {
 
                             if (cardVid) {
                               return (
-                                <>
-                                  <video
-                                    src={`${cardVid}#t=0.1`}
-                                    muted
-                                    playsInline
-                                    preload="metadata"
-                                    style={{
-                                      position: 'absolute',
-                                      top: 0,
-                                      left: 0,
-                                      width: '100%',
-                                      height: '100%',
-                                      objectFit: 'cover'
-                                    }}
-                                  />
-                                  <div
-                                    style={{
-                                      position: 'absolute',
-                                      top: '8px',
-                                      right: '8px',
-                                      backgroundColor: 'rgba(0, 0, 0, 0.65)',
-                                      backdropFilter: 'blur(4px)',
-                                      color: '#ffffff',
-                                      borderRadius: '9999px',
-                                      padding: '3px 8px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      fontSize: '10px',
-                                      fontWeight: 700,
-                                      pointerEvents: 'none',
-                                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                                      zIndex: 2
-                                    }}
-                                  >
-                                    <i className="feather icon-video" style={{ fontSize: '10px' }}></i>
-                                    <span>Vidéo</span>
-                                  </div>
-                                </>
+                                <video
+                                  src={`${cardVid}#t=0.1`}
+                                  muted
+                                  playsInline
+                                  preload="metadata"
+                                  style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover'
+                                  }}
+                                />
                               );
                             }
                             if (cardImg) {
@@ -830,7 +808,7 @@ const Wishlist = ({ defaultCategory = null }) => {
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', paddingTop: '4px', borderTop: '1px solid rgba(0,0,0,0.04)' }}>
-                            <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary, #209f84)' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: primaryColor }}>
                               {displayPrice}
                             </span>
                             <span

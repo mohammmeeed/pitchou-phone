@@ -204,7 +204,7 @@ const Chat = () => {
               <div className="chat-content">
                 <div className="message-item">
                   <div className="bubble">
-                    Bonjour ! 👋 Bienvenue sur le support client LeerBook. Posez-nous vos questions sur vos commandes, livres et livraisons ici.
+                    Bonjour ! 👋 Bienvenue sur le support client Pitchou. Posez-nous vos questions sur vos commandes, produits et livraisons ici.
                   </div>
                   <div className="message-time">Support</div>
                 </div>

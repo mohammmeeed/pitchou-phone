@@ -3,6 +3,40 @@ import { Link } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 import { useTheme } from '../context/ThemeContext';
 
+const CardVideo = ({ src, poster, isCurrent }) => {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isCurrent) {
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {});
+      }
+    } else {
+      video.pause();
+      try {
+        video.currentTime = 0;
+      } catch (e) {}
+    }
+  }, [isCurrent]);
+
+  return (
+    <video 
+      ref={videoRef}
+      src={src} 
+      poster={poster}
+      preload="metadata"
+      autoPlay={isCurrent} 
+      loop 
+      muted 
+      playsInline 
+    />
+  );
+};
+
 const TinderCardStack = ({ 
   profiles = [], 
   onOpenDetail, 
@@ -332,14 +366,11 @@ const TinderCardStack = ({
       <>
         <div className="dz-media">
           {card.video ? (
-            <video 
+            <CardVideo 
               key={`vid-${card.id}`}
-              src={card.video} 
-              preload="metadata"
-              autoPlay 
-              loop 
-              muted 
-              playsInline 
+              src={card.video}
+              poster={card.image && card.image !== card.video ? card.image : undefined}
+              isCurrent={isCurrent}
             />
           ) : (
             <img 
@@ -353,6 +384,26 @@ const TinderCardStack = ({
         </div>
         <div className="dz-content">
           <div className="left-content">
+            {(() => {
+              const rawEtat = card.format || card.etat;
+              const cardEtat = rawEtat && typeof rawEtat === 'string' && rawEtat.trim() !== '' && rawEtat.trim().toLowerCase() !== 'format' ? rawEtat.trim() : null;
+              if (!cardEtat) return null;
+              return (
+                <div
+                  style={{
+                    color: '#ffffff',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    opacity: 0.9,
+                    marginBottom: '2px',
+                    textShadow: '0 1px 3px rgba(0, 0, 0, 0.6)',
+                    letterSpacing: '0.2px'
+                  }}
+                >
+                  {cardEtat}
+                </div>
+              );
+            })()}
             <h4 className="title">
               <span 
                 className="book-title-clickable"
@@ -482,7 +533,7 @@ const TinderCardStack = ({
             className="dz-swipe-border-green" 
             style={{ 
               opacity: greenBorderOpacity,
-              borderColor: '#209f84',
+              borderColor: accentColor || '#2563eb',
               boxShadow: 'inset 0 0 20px rgba(32, 159, 132, 0.45), 0 0 15px rgba(32, 159, 132, 0.3)'
             }}
           />
@@ -494,7 +545,7 @@ const TinderCardStack = ({
               top: '40px',
               left: '25px',
               opacity: cartBadgeOpacity,
-              background: '#209f84',
+              background: accentColor || '#2563eb',
               color: '#ffffff',
               border: '2px solid rgba(255, 255, 255, 0.95)',
               borderRadius: '16px',

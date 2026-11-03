@@ -400,7 +400,7 @@ export default function AdminLayout({ children }) {
               </div>
               {!isCollapsed && (
                 <div className="brand-text">
-                  <h2 style={{ textTransform: 'capitalize' }}>{shopLogoText || 'LeerBook'}</h2>
+                  <h2 style={{ textTransform: 'capitalize' }}>{shopLogoText || 'Pitchou'}</h2>
                   <span>Admin E-Commerce</span>
                 </div>
               )}
@@ -630,7 +630,7 @@ export default function AdminLayout({ children }) {
                         {currentAdmin?.name || 'Administrateur'}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
-                        {currentAdmin?.email || 'admin@leerbook.com'}
+                        {currentAdmin?.email || 'admin@pitchou.dz'}
                       </div>
                     </div>
 

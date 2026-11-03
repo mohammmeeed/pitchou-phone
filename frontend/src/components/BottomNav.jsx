@@ -26,7 +26,7 @@ const BottomNav = ({ onSearchClick, isSearchOpen = false }) => {
 
   const tabs = [
     { path: '/', icon: 'flaticon flaticon-dog-house', label: 'Accueil' },
-    { path: '/categories', icon: 'icon feather icon-book-open', label: 'Catégories' },
+    { path: '/categories', icon: 'icon feather icon-layers', label: 'Catégories' },
     { path: '/?search=true', icon: 'icon feather icon-search', isSearch: true, label: 'Recherche' },
     { path: '/panier', icon: 'icon feather icon-shopping-cart', label: 'Panier', isCart: true },
   ];

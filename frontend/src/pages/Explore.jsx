@@ -244,7 +244,7 @@ const Explore = () => {
               </div>
               <h4 className="fw-bold mb-2">Commande confirmée !</h4>
               <p className="text-muted mb-4">
-                Merci pour votre achat sur LeerBook. Vos livres sont en cours de préparation.
+                Merci pour votre achat sur Pitchou. Vos produits sont en cours de préparation.
               </p>
               <Link to="/" className="btn btn-primary rounded-xl px-4 py-2">
                 Retour à l'accueil
