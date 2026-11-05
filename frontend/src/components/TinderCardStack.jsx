@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useDating } from '../context/DatingContext';
 import { useTheme } from '../context/ThemeContext';
+import { getProductSubcategory } from '../utils/productUtils';
 
 const CardVideo = ({ src, poster, isCurrent }) => {
   const videoRef = useRef(null);
@@ -361,10 +362,37 @@ const TinderCardStack = ({
   // Render card helper
   const renderCardContent = (card, isCurrent = false) => {
     const isCardFavorited = isLiked ? isLiked(card.id) : false;
+    const isCardOutOfStock = card.stock !== undefined && Number(card.stock) <= 0;
 
     return (
       <>
-        <div className="dz-media">
+        {isCardOutOfStock && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '18px',
+              left: '18px',
+              zIndex: 15,
+              backgroundColor: 'rgba(15, 23, 42, 0.88)',
+              color: '#f87171',
+              border: '1px solid rgba(239, 68, 68, 0.85)',
+              padding: '5px 12px',
+              borderRadius: '20px',
+              fontSize: '11px',
+              fontWeight: 800,
+              letterSpacing: '0.6px',
+              textTransform: 'uppercase',
+              backdropFilter: 'blur(6px)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)'
+            }}
+          >
+            Out of stock
+          </div>
+        )}
+        <div 
+          className="dz-media"
+          style={isCardOutOfStock ? { filter: 'grayscale(60%)', opacity: 0.8 } : undefined}
+        >
           {card.video ? (
             <CardVideo 
               key={`vid-${card.id}`}
@@ -384,10 +412,10 @@ const TinderCardStack = ({
         </div>
         <div className="dz-content">
           <div className="left-content">
+            {/* Badge Sous-Catégorie */}
             {(() => {
-              const rawEtat = card.format || card.etat;
-              const cardEtat = rawEtat && typeof rawEtat === 'string' && rawEtat.trim() !== '' && rawEtat.trim().toLowerCase() !== 'format' ? rawEtat.trim() : null;
-              if (!cardEtat) return null;
+              const badgeText = getProductSubcategory(card);
+              if (!badgeText) return null;
               return (
                 <div
                   style={{
@@ -400,7 +428,7 @@ const TinderCardStack = ({
                     letterSpacing: '0.2px'
                   }}
                 >
-                  {cardEtat}
+                  {badgeText}
                 </div>
               );
             })()}
@@ -446,8 +474,8 @@ const TinderCardStack = ({
                 fontSize: '13px',
                 fontWeight: 700,
                 borderRadius: '9999px',
-                backgroundColor: '#ffffff',
-                color: '#000000',
+                backgroundColor: isCardOutOfStock ? '#4b5563' : '#ffffff',
+                color: isCardOutOfStock ? '#ffffff' : '#000000',
                 border: 'none',
                 boxShadow: '0 4px 14px rgba(0, 0, 0, 0.35)',
                 cursor: 'pointer',
@@ -462,13 +490,13 @@ const TinderCardStack = ({
                 }
               }}
             >
-              <span>Voir plus</span>
+              <span>{isCardOutOfStock ? 'Out of stock' : 'Voir plus'}</span>
               <svg 
                 width="14" 
                 height="14" 
                 viewBox="0 0 24 24" 
                 fill="none" 
-                stroke="#000000" 
+                stroke={isCardOutOfStock ? '#ffffff' : '#000000'} 
                 strokeWidth="2.5" 
                 strokeLinecap="round" 
                 strokeLinejoin="round"

@@ -8,7 +8,7 @@ import { getCommunesByWilaya } from '../data/algeriaCities';
 const Explore = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { cartItems = [], updateQuantity, removeItem, clearCart, userProfile } = useDating() || {};
+  const { cartItems = [], updateQuantity, removeItem, clearCart, userProfile, profiles = [] } = useDating() || {};
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
   const [promoMessage, setPromoMessage] = useState('');
@@ -270,7 +270,54 @@ const Explore = () => {
               <div className="cart-items-list mb-3">
                 {cartItems.map((item) => (
                   <div key={item.id} className="cart-item-card">
-                    <img src={item.image} alt={item.title} className="cart-thumb" />
+                    {(() => {
+                      const isVideoUrl = (url) => {
+                        if (!url || typeof url !== 'string') return false;
+                        return /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(url) || url.includes('/uploads/prod_vid_');
+                      };
+
+                      const productInDb = (profiles || []).find((p) => String(p.id) === String(item.id));
+                      const rawVideo = isVideoUrl(item.video)
+                        ? item.video
+                        : (isVideoUrl(item.image)
+                          ? item.image
+                          : (productInDb?.video || (Array.isArray(productInDb?.videos) && productInDb.videos[0]) || null));
+
+                      const rawImage = !isVideoUrl(item.image) && item.image && item.image !== '/assets/images/categories/telephones.svg'
+                        ? item.image
+                        : (productInDb?.image && !isVideoUrl(productInDb.image) && productInDb.image !== '/assets/images/categories/telephones.svg'
+                          ? productInDb.image
+                          : (Array.isArray(productInDb?.images) && productInDb.images[0] && !isVideoUrl(productInDb.images[0])
+                            ? productInDb.images[0]
+                            : null));
+
+                      if (!rawImage && rawVideo) {
+                        const vidSrc = rawVideo.includes('#t=') ? rawVideo : `${rawVideo}#t=0.1`;
+                        return (
+                          <video
+                            src={vidSrc}
+                            className="cart-thumb"
+                            muted
+                            playsInline
+                            preload="metadata"
+                            onLoadedData={(e) => {
+                              try {
+                                if (e.target.currentTime === 0) e.target.currentTime = 0.1;
+                              } catch (_) {}
+                            }}
+                            style={{ objectFit: 'cover', pointerEvents: 'none' }}
+                          />
+                        );
+                      }
+
+                      return (
+                        <img
+                          src={rawImage || item.image || '/assets/images/categories/telephones.svg'}
+                          alt={item.title}
+                          className="cart-thumb"
+                        />
+                      );
+                    })()}
                     
                     <div className="cart-details">
                       <div className="d-flex justify-content-between align-items-start">

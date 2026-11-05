@@ -30,6 +30,13 @@ export default function AdminProducts({ initialView }) {
   const formCatDropdownRef = useRef(null);
   const formCatSearchInputRef = useRef(null);
 
+
+  // Form Brand Dropdown State & Refs (Add/Edit Form)
+  const [isFormBrandDropdownOpen, setIsFormBrandDropdownOpen] = useState(false);
+  const [formBrandSearchQuery, setFormBrandSearchQuery] = useState('');
+  const formBrandDropdownRef = useRef(null);
+  const formBrandSearchInputRef = useRef(null);
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (catDropdownRef.current && !catDropdownRef.current.contains(event.target)) {
@@ -38,11 +45,15 @@ export default function AdminProducts({ initialView }) {
       if (formCatDropdownRef.current && !formCatDropdownRef.current.contains(event.target)) {
         setIsFormCatDropdownOpen(false);
       }
+      if (formBrandDropdownRef.current && !formBrandDropdownRef.current.contains(event.target)) {
+        setIsFormBrandDropdownOpen(false);
+      }
     }
     function handleKeyDown(event) {
       if (event.key === 'Escape') {
         setIsCatDropdownOpen(false);
         setIsFormCatDropdownOpen(false);
+        setIsFormBrandDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -65,6 +76,12 @@ export default function AdminProducts({ initialView }) {
       setTimeout(() => formCatSearchInputRef.current?.focus(), 50);
     }
   }, [isFormCatDropdownOpen]);
+
+  useEffect(() => {
+    if (isFormBrandDropdownOpen && formBrandSearchInputRef.current) {
+      setTimeout(() => formBrandSearchInputRef.current?.focus(), 50);
+    }
+  }, [isFormBrandDropdownOpen]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -124,6 +141,12 @@ export default function AdminProducts({ initialView }) {
   const [categorySearch, setCategorySearch] = useState('');
   const [languageSearch, setLanguageSearch] = useState('');
 
+  // Brands / Marques State
+  const [brandsList, setBrandsList] = useState([]);
+  const [newBrandInput, setNewBrandInput] = useState('');
+  const [editingBrand, setEditingBrand] = useState(null); // { oldName: string, value: string }
+  const [brandSearch, setBrandSearch] = useState('');
+
   // Wilayas State (Ajout, Modification, Suppression et Tarifs de Livraison Bureau & Domicile)
   const [wilayasList, setWilayasList] = useState([]);
   const [newWilayaNameInput, setNewWilayaNameInput] = useState('');
@@ -135,6 +158,7 @@ export default function AdminProducts({ initialView }) {
   // Form State
   const [formData, setFormData] = useState({
     name: '',
+    brand: '',
     author: '',
     format: '',
     price: '',
@@ -149,8 +173,75 @@ export default function AdminProducts({ initialView }) {
     videos: [],
     media: [],
     bio: '',
-    languages: []
+    languages: [],
+    model_glb: '',
+    model_usdz: '',
+    barcode: ''
   });
+
+  const generateBarcode = () => {
+    // Standard EAN-13 interne : préfixe 200 + 9 chiffres aléatoires + 1 chiffre de contrôle
+    let code = '200' + Array.from({ length: 9 }, () => Math.floor(Math.random() * 10)).join('');
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      sum += parseInt(code[i], 10) * (i % 2 === 0 ? 1 : 3);
+    }
+    const checksum = (10 - (sum % 10)) % 10;
+    const fullBarcode = code + checksum;
+    setFormData((prev) => ({ ...prev, barcode: fullBarcode }));
+    showToast('Code-barres généré avec succès !');
+  };
+
+  const glbFileInputRef = useRef(null);
+  const usdzFileInputRef = useRef(null);
+  const [uploadingGlb, setUploadingGlb] = useState(false);
+  const [uploadingUsdz, setUploadingUsdz] = useState(false);
+
+  const handleUploadGlb = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingGlb(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (json && json.success && json.url) {
+        setFormData((prev) => ({ ...prev, model_glb: json.url }));
+        showToast('Modèle 3D (.GLB) téléversé avec succès !');
+      } else {
+        throw new Error(json?.error || 'Erreur lors du téléversement');
+      }
+    } catch (err) {
+      showToast(err.message || 'Erreur téléversement GLB', 'error');
+    } finally {
+      setUploadingGlb(false);
+      if (glbFileInputRef.current) glbFileInputRef.current.value = '';
+    }
+  };
+
+  const handleUploadUsdz = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingUsdz(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const json = await res.json();
+      if (json && json.success && json.url) {
+        setFormData((prev) => ({ ...prev, model_usdz: json.url }));
+        showToast('Fichier Apple AR (.USDZ) téléversé avec succès !');
+      } else {
+        throw new Error(json?.error || 'Erreur lors du téléversement');
+      }
+    } catch (err) {
+      showToast(err.message || 'Erreur téléversement USDZ', 'error');
+    } finally {
+      setUploadingUsdz(false);
+      if (usdzFileInputRef.current) usdzFileInputRef.current.value = '';
+    }
+  };
 
 
   const toggleCategory = (cat, parentCat = null) => {
@@ -212,6 +303,9 @@ export default function AdminProducts({ initialView }) {
         }
         if (Array.isArray(data.wilayas)) {
           setWilayasList(data.wilayas);
+        }
+        if (Array.isArray(data.brands)) {
+          setBrandsList(data.brands);
         }
       }
     } catch (e) {
@@ -578,6 +672,55 @@ export default function AdminProducts({ initialView }) {
     await adminApi.saveAttributes({ action: 'delete_language', name: langName, categories: categoriesList, languages: updated });
   };
 
+  // Handlers pour Marques (Ajouter, Modifier, Supprimer)
+  const handleAddBrand = async (e) => {
+    if (e) e.preventDefault();
+    const trimmed = newBrandInput.trim();
+    if (!trimmed) return;
+    if (brandsList.some((b) => b.toLowerCase() === trimmed.toLowerCase())) {
+      showToast('Cette marque existe déjà.');
+      return;
+    }
+    const updated = [...brandsList, trimmed];
+    setBrandsList(updated);
+    setNewBrandInput('');
+    showToast(`Marque "${trimmed}" ajoutée avec succès !`);
+    await adminApi.saveAttributes({ action: 'add_brand', name: trimmed, brands: updated });
+  };
+
+  const handleSaveEditBrand = async (oldName, newName) => {
+    const trimmed = (newName || '').trim();
+    if (!trimmed || trimmed === oldName) {
+      setEditingBrand(null);
+      return;
+    }
+    const updated = brandsList.map((b) => (b === oldName ? trimmed : b));
+    setBrandsList(updated);
+    if (formData.brand === oldName || formData.author === oldName) {
+      setFormData((prev) => ({ ...prev, brand: trimmed, author: trimmed }));
+    }
+    setProducts((prev) =>
+      prev.map((p) =>
+        ((p.brand || p.author || '') === oldName)
+          ? { ...p, brand: trimmed, author: trimmed }
+          : p
+      )
+    );
+    setEditingBrand(null);
+    showToast(`Marque renommée en "${trimmed}" !`);
+    await adminApi.saveAttributes({ action: 'edit_brand', oldName, newName: trimmed, brands: updated });
+  };
+
+  const handleDeleteBrand = async (brandName) => {
+    const updated = brandsList.filter((b) => b !== brandName);
+    setBrandsList(updated);
+    if (formData.brand === brandName || formData.author === brandName) {
+      setFormData((prev) => ({ ...prev, brand: '', author: '' }));
+    }
+    showToast(`Marque "${brandName}" supprimée.`);
+    await adminApi.saveAttributes({ action: 'delete_brand', name: brandName, brands: updated });
+  };
+
   // Handlers pour Wilayas & Frais de Livraison (Ajouter, Modifier, Supprimer)
   const handleAddWilaya = async (e) => {
     e.preventDefault();
@@ -849,6 +992,7 @@ export default function AdminProducts({ initialView }) {
     setManualVideoUrl('');
     setFormData({
       name: '',
+      brand: '',
       author: '',
       format: '',
       price: '',
@@ -863,7 +1007,10 @@ export default function AdminProducts({ initialView }) {
       videos: [],
     media: [],
       bio: '',
-      languages: []
+      languages: [],
+      model_glb: '',
+      model_usdz: '',
+      barcode: ''
     });
     setViewMode('form');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -932,7 +1079,8 @@ export default function AdminProducts({ initialView }) {
 
     setFormData({
       name: prod.name || '',
-      author: prod.author || '',
+      brand: prod.brand || prod.marque || prod.author || '',
+      author: prod.brand || prod.marque || prod.author || '',
       format: prod.format || '',
       price: prod.price || '',
       purchase_price: prod.purchase_price !== undefined && prod.purchase_price !== null && Number(prod.purchase_price) > 0 ? String(prod.purchase_price) : '',
@@ -949,7 +1097,10 @@ export default function AdminProducts({ initialView }) {
         ...parsedVideos.map((u) => ({ type: 'video', url: u }))
       ].filter((m) => m && typeof m.url === 'string' && m.url.trim() !== ''),
       bio: prod.bio || '',
-      languages: parsedLangs
+      languages: parsedLangs,
+      model_glb: prod.model_glb || prod.model_3d_glb || '',
+      model_usdz: prod.model_usdz || prod.model_3d_usdz || '',
+      barcode: prod.barcode || ''
     });
     setViewMode('form');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -979,7 +1130,10 @@ export default function AdminProducts({ initialView }) {
       videos: validVideos,
       price: parseFloat(formData.price),
       purchase_price: formData.purchase_price !== '' ? parseFloat(formData.purchase_price) : 0,
-      stock: parseInt(formData.stock, 10) || 0
+      stock: parseInt(formData.stock, 10) || 0,
+      model_glb: formData.model_glb || '',
+      model_usdz: formData.model_usdz || '',
+      barcode: formData.barcode ? String(formData.barcode).trim() : ''
     };
 
     try {
@@ -1153,6 +1307,7 @@ export default function AdminProducts({ initialView }) {
           >
             {[
               { id: 'categories', label: 'Catégories de Produits', count: categoriesList.length, icon: 'fas fa-tags', color: '#fe2c55' },
+              { id: 'brands', label: 'Marques', count: brandsList.length, icon: 'fas fa-tag', color: '#18181b' },
               { id: 'wilayas', label: 'Wilayas & Tarifs de Livraison', count: wilayasList.length, icon: 'fas fa-truck-moving', color: '#0284c7' }
             ].map((tab) => {
               const isActive = attributeTab === tab.id;
@@ -2142,6 +2297,258 @@ export default function AdminProducts({ initialView }) {
                                     className="btn-light-custom"
                                     style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', borderRadius: '6px', color: '#ef4444' }}
                                     title="Supprimer cette langue"
+                                  >
+                                    <i className="fas fa-trash-alt" />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+
+          {/* FENÊTRE 2 : MARQUES DE PRODUITS (Full Width) */}
+          {attributeTab === 'brands' && (
+            <div className="admin-card" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+              <div
+                className="card-header-custom"
+                style={{
+                  borderBottom: '1px solid #f0f0f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                  padding: '1.25rem 1.5rem',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                <div>
+                  <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.15rem', fontWeight: 800, color: '#111827' }}>
+                    <i className="fas fa-award" style={{ color: '#8b5cf6' }} />
+                    Marques de Produits
+                  </h4>
+                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                    Ajouter, modifier ou supprimer les marques du catalogue (Apple, Samsung, OnePlus, Xiaomi, Hoco...)
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span className="badge-custom" style={{ fontWeight: 800, fontSize: '0.85rem', padding: '0.4rem 0.85rem', backgroundColor: '#f1f5f9', color: '#18181b', border: '1px solid #cbd5e1' }}>
+                    <i className="fas fa-tag" style={{ marginRight: '0.35rem' }} />
+                    {brandsList.length} marques enregistrées
+                  </span>
+                </div>
+              </div>
+
+              <div className="card-body-custom" style={{ padding: '1.5rem' }}>
+                {/* Barre d'action : Formulaire d'ajout rapide + Barre de recherche */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#f8fafc',
+                    padding: '1.25rem',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0'
+                  }}
+                >
+                  <form
+                    onSubmit={handleAddBrand}
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      flex: 1,
+                      minWidth: '300px'
+                    }}
+                  >
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      placeholder="Nouvelle marque (ex: Apple, Samsung, OnePlus, Xiaomi, Hoco...)"
+                      value={newBrandInput}
+                      onChange={(e) => setNewBrandInput(e.target.value)}
+                      style={{ flex: '1 1 240px', minWidth: '200px' }}
+                    />
+                    <button
+                      type="submit"
+                      className="btn-primary-custom"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        whiteSpace: 'nowrap',
+                        padding: '0.65rem 1.25rem',
+                        fontWeight: 700
+                      }}
+                    >
+                      <i className="fas fa-plus" /> Ajouter la Marque
+                    </button>
+                  </form>
+
+                  {/* Recherche rapide */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
+                    <i
+                      className="fas fa-search"
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#94a3b8',
+                        fontSize: '0.85rem'
+                      }}
+                    />
+                    <input
+                      type="text"
+                      className="form-control-custom"
+                      placeholder="Rechercher une marque..."
+                      value={brandSearch}
+                      onChange={(e) => setBrandSearch(e.target.value)}
+                      style={{ paddingLeft: '2.2rem', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Grille des Marques */}
+                {(() => {
+                  const filtered = brandsList.filter((b) =>
+                    !brandSearch || b.toLowerCase().includes(brandSearch.toLowerCase())
+                  );
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+                        <i className="fas fa-award" style={{ fontSize: '2.5rem', marginBottom: '0.75rem', display: 'block', opacity: 0.4 }} />
+                        <p style={{ margin: 0, fontWeight: 600 }}>
+                          {brandSearch ? `Aucune marque ne correspond à "${brandSearch}".` : 'Aucune marque pour l’instant.'}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: '0.85rem'
+                      }}
+                    >
+                      {filtered.map((brandName) => {
+                        const isEditing = editingBrand && editingBrand.oldName === brandName;
+                        const productCount = products.filter(
+                          (p) => (p.brand || p.author || '').toLowerCase() === brandName.toLowerCase()
+                        ).length;
+
+                        return (
+                          <div
+                            key={brandName}
+                            style={{
+                              padding: '0.9rem 1.1rem',
+                              borderRadius: '10px',
+                              border: isEditing ? '1.5px solid #18181b' : '1px solid #e2e8f0',
+                              backgroundColor: isEditing ? '#fbfbfe' : '#ffffff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '0.75rem',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {isEditing ? (
+                              <div style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  className="form-control-custom"
+                                  value={editingBrand.value}
+                                  onChange={(e) => setEditingBrand({ ...editingBrand, value: e.target.value })}
+                                  placeholder="Nom de la marque"
+                                  style={{ flex: 1, padding: '0.45rem 0.7rem', fontSize: '0.88rem', fontWeight: 600 }}
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  className="btn-primary-custom"
+                                  onClick={() => handleSaveEditBrand(brandName, editingBrand.value)}
+                                  style={{ padding: '0.45rem 0.8rem', fontSize: '0.85rem' }}
+                                  title="Enregistrer"
+                                >
+                                  <i className="fas fa-check" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-light-custom"
+                                  onClick={() => setEditingBrand(null)}
+                                  style={{ padding: '0.45rem 0.8rem', fontSize: '0.85rem' }}
+                                  title="Annuler"
+                                >
+                                  <i className="fas fa-times" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                                  <div
+                                    style={{
+                                      width: '34px',
+                                      height: '34px',
+                                      borderRadius: '8px',
+                                      backgroundColor: '#f5f3ff',
+                                      color: '#7c3aed',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '0.95rem',
+                                      fontWeight: 800,
+                                      flexShrink: 0
+                                    }}
+                                  >
+                                    <i className="fas fa-award" />
+                                  </div>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {brandName}
+                                    </div>
+                                    <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                                      {productCount} {productCount > 1 ? 'produits associés' : 'produit associé'}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    className="btn-light-custom"
+                                    onClick={() => setEditingBrand({ oldName: brandName, value: brandName })}
+                                    style={{ padding: '0.4rem 0.65rem', fontSize: '0.8rem', borderRadius: '6px' }}
+                                    title="Modifier la marque"
+                                  >
+                                    <i className="fas fa-pen" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-light-custom"
+                                    onClick={() => {
+                                      if (window.confirm(`Supprimer la marque "${brandName}" ?`)) {
+                                        handleDeleteBrand(brandName);
+                                      }
+                                    }}
+                                    style={{ padding: '0.4rem 0.65rem', fontSize: '0.8rem', color: '#ef4444', borderRadius: '6px' }}
+                                    title="Supprimer la marque"
                                   >
                                     <i className="fas fa-trash-alt" />
                                   </button>
@@ -3239,93 +3646,501 @@ export default function AdminProducts({ initialView }) {
                       />
                     </div>
 
-                    {/* État du Produit */}
-                    <div className="form-group-custom" style={{ gridColumn: '1 / -1' }}>
+                    {/* Code-barres / Barcode pour POS */}
+                    <div className="form-group-custom">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                        <label className="form-label-custom" style={{ margin: 0, fontWeight: 700, color: '#18181b' }}>
-                          État du Produit
+                        <label className="form-label-custom" style={{ margin: 0, fontWeight: 700, color: '#18181b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <i className="fas fa-barcode" style={{ color: '#111111' }} /> Code-barres (POS)
                         </label>
-                        {formData.format && (
-                          <span
-                            style={{
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              background: '#f1f5f9',
-                              color: '#334155',
-                              padding: '0.15rem 0.6rem',
-                              borderRadius: '9999px',
-                              border: '1px solid #cbd5e1'
-                            }}
-                          >
-                            Sélectionné : {formData.format}
-                          </span>
+                        <button
+                          type="button"
+                          onClick={generateBarcode}
+                          style={{
+                            background: '#f4f4f5',
+                            border: '1px solid #e4e4e7',
+                            color: '#18181b',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            padding: '3px 9px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          title="Générer automatiquement un code-barres EAN-13 unique"
+                        >
+                          <i className="fas fa-magic" /> Générer
+                        </button>
+                      </div>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          className="form-control-custom"
+                          placeholder="Écrire ou scanner le code-barres..."
+                          value={formData.barcode || ''}
+                          onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                          style={{ paddingRight: formData.barcode ? '5.2rem' : '1rem' }}
+                        />
+                        {formData.barcode && (
+                          <div style={{ position: 'absolute', right: '8px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(formData.barcode);
+                                showToast('Code-barres copié !');
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', fontSize: '0.85rem', padding: '2px 4px' }}
+                              title="Copier le code-barres"
+                            >
+                              <i className="far fa-copy" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormData((prev) => ({ ...prev, barcode: '' }))}
+                              style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '1rem', padding: '2px 4px' }}
+                              title="Effacer le code-barres"
+                            >
+                              &times;
+                            </button>
+                          </div>
                         )}
                       </div>
+                      {formData.barcode && (
+                        <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
+                          <span style={{ fontSize: '0.73rem', color: '#16a34a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <i className="fas fa-check-circle" /> Prêt pour Caisse POS
+                          </span>
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#52525b', letterSpacing: '0.5px', background: '#f4f4f5', padding: '1px 6px', borderRadius: '4px' }}>
+                            {formData.barcode}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                      {/* Menu déroulant quand on clique */}
-                      <div style={{ position: 'relative' }}>
-                        <select
-                          className="form-control-custom"
-                          value={formData.format || ''}
-                          onChange={(e) => setFormData({ ...formData, format: e.target.value })}
-                          style={{
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            color: formData.format ? '#0f172a' : '#94a3b8',
-                            backgroundColor: '#ffffff'
-                          }}
-                        >
-                          <option value="">-- Choisir l'état du produit --</option>
-                          <option value="Sous blister">📦 Sous blister</option>
-                          <option value="Très bon état">⭐ Très bon état</option>
-                          <option value="Bon état">👍 Bon état</option>
-                          <option value="Occasion">🔄 Occasion</option>
-                          {formData.format && !['Sous blister', 'Très bon état', 'Bon état', 'Occasion'].includes(formData.format) && (
-                            <option value={formData.format}>{formData.format}</option>
+                                        {/* Marque du Produit (Wishlist / Liste déroulante interactive) */}
+                    <div
+                      ref={formBrandDropdownRef}
+                      className="form-group-custom"
+                      style={{ gridColumn: '1 / -1', position: 'relative' }}
+                    >
+                      {/* Header with Title and Manage link */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <label className="form-label-custom" style={{ margin: 0, fontWeight: 700, color: '#18181b' }}>
+                            Marque du Produit
+                          </label>
+                          {formData.brand && (
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                background: '#f5f3ff',
+                                color: '#6d28d9',
+                                padding: '0.15rem 0.6rem',
+                                borderRadius: '9999px',
+                                border: '1px solid #ddd6fe',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem'
+                              }}
+                            >
+                              <span>{formData.brand}</span>
+                              <i
+                                className="fas fa-times"
+                                style={{ cursor: 'pointer', opacity: 0.8 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFormData((prev) => ({ ...prev, brand: '', author: '' }));
+                                }}
+                                title="Effacer la marque"
+                              />
+                            </span>
                           )}
-                        </select>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          {formData.brand && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData((prev) => ({ ...prev, brand: '', author: '' }))}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#888',
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                            >
+                              Désélectionner
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttributeTab('brands');
+                              setViewMode('attributes');
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#fe2c55',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}
+                          >
+                            <i className="fas fa-sliders-h" style={{ fontSize: '0.72rem' }} />
+                            Gérer
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Raccourcis en un clic (Pills interactives) */}
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-                        {[
-                          { label: 'Sous blister', icon: '📦', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
-                          { label: 'Très bon état', icon: '⭐', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-                          { label: 'Bon état', icon: '👍', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-                          { label: 'Occasion', icon: '🔄', color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' }
-                        ].map((opt) => {
-                          const isSelected = formData.format === opt.label;
-                          return (
-                            <button
-                              key={opt.label}
-                              type="button"
-                              onClick={() => setFormData({ ...formData, format: opt.label })}
+                      {/* Dropdown Trigger Box */}
+                      <div
+                        onClick={() => setIsFormBrandDropdownOpen((prev) => !prev)}
+                        style={{
+                          minHeight: '44px',
+                          padding: '0.45rem 0.85rem',
+                          borderRadius: '10px',
+                          border: isFormBrandDropdownOpen ? '1.5px solid #111111' : '1px solid #d4d4d8',
+                          backgroundColor: '#ffffff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isFormBrandDropdownOpen ? '0 0 0 3px rgba(0,0,0,0.06)' : '0 1px 2px rgba(0,0,0,0.03)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                          {formData.brand ? (
+                            <span
                               style={{
-                                padding: '0.42rem 0.9rem',
-                                fontSize: '0.82rem',
-                                fontWeight: isSelected ? 700 : 500,
-                                borderRadius: '9999px',
-                                border: `1.5px solid ${isSelected ? opt.color : opt.border}`,
-                                backgroundColor: isSelected ? opt.bg : '#ffffff',
-                                color: isSelected ? opt.color : '#475569',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.45rem',
+                                backgroundColor: '#18181b',
+                                color: '#ffffff',
+                                borderRadius: '6px',
+                                padding: '0.25rem 0.7rem',
+                                fontSize: '0.86rem',
+                                fontWeight: 600
+                              }}
+                            >
+                              <span>{formData.brand}</span>
+                              <i
+                                className="fas fa-times"
+                                style={{ fontSize: '0.72rem', opacity: 0.85, cursor: 'pointer', marginLeft: '2px' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFormData((prev) => ({ ...prev, brand: '', author: '' }));
+                                }}
+                                title="Désélectionner"
+                              />
+                            </span>
+                          ) : (
+                            <span style={{ color: '#71717a', fontSize: '0.88rem' }}>
+                              Sélectionner une marque dans la liste déroulante...
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                          <i
+                            className={`fas fa-chevron-${isFormBrandDropdownOpen ? 'up' : 'down'}`}
+                            style={{ fontSize: '0.85rem', color: '#71717a' }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Dropdown Menu Popover */}
+                      {isFormBrandDropdownOpen && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 6px)',
+                            left: 0,
+                            width: '100%',
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e4e4e7',
+                            borderRadius: '12px',
+                            boxShadow: '0 14px 40px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.06)',
+                            zIndex: 1050,
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {/* Search input inside dropdown */}
+                          <div
+                            style={{
+                              padding: '0.75rem',
+                              borderBottom: '1px solid #f4f4f5',
+                              backgroundColor: '#fafafa',
+                              position: 'relative'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <i
+                              className="fas fa-search"
+                              style={{
+                                position: 'absolute',
+                                left: '1.25rem',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: '#a1a1aa',
+                                fontSize: '0.85rem'
+                              }}
+                            />
+                            <input
+                              ref={formBrandSearchInputRef}
+                              type="text"
+                              placeholder="Rechercher une marque (ex: Apple, Samsung, OnePlus, Xiaomi...)..."
+                              value={formBrandSearchQuery}
+                              onChange={(e) => setFormBrandSearchQuery(e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.55rem 2rem 0.55rem 2.2rem',
+                                fontSize: '0.86rem',
+                                border: '1px solid #e4e4e7',
+                                borderRadius: '8px',
+                                outline: 'none',
+                                backgroundColor: '#ffffff'
+                              }}
+                            />
+                            {formBrandSearchQuery && (
+                              <button
+                                type="button"
+                                onClick={() => setFormBrandSearchQuery('')}
+                                style={{
+                                  position: 'absolute',
+                                  right: '1.25rem',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#a1a1aa',
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem'
+                                }}
+                              >
+                                <i className="fas fa-times" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* List of brands */}
+                          <div style={{ maxHeight: '250px', overflowY: 'auto', padding: '0.4rem' }}>
+                            {(() => {
+                              const filtered = brandsList.filter((b) =>
+                                !formBrandSearchQuery || b.toLowerCase().includes(formBrandSearchQuery.toLowerCase())
+                              );
+
+                              if (filtered.length === 0) {
+                                return (
+                                  <div style={{ padding: '1.25rem', textAlign: 'center', color: '#a1a1aa', fontSize: '0.85rem' }}>
+                                    Aucune marque ne correspond à "{formBrandSearchQuery}".
+                                    <div style={{ marginTop: '0.5rem' }}>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          const newName = formBrandSearchQuery.trim();
+                                          if (newName) {
+                                            const updated = [...brandsList, newName];
+                                            setBrandsList(updated);
+                                            setFormData((prev) => ({ ...prev, brand: newName, author: newName }));
+                                            setIsFormBrandDropdownOpen(false);
+                                            setFormBrandSearchQuery('');
+                                            await adminApi.saveAttributes({ action: 'add_brand', name: newName, brands: updated });
+                                            showToast(`Marque "${newName}" ajoutée et sélectionnée !`);
+                                          }
+                                        }}
+                                        style={{
+                                          padding: '0.35rem 0.75rem',
+                                          fontSize: '0.8rem',
+                                          fontWeight: 700,
+                                          backgroundColor: '#f5f3ff',
+                                          color: '#7c3aed',
+                                          border: '1px solid #ddd6fe',
+                                          borderRadius: '6px',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        + Ajouter "{formBrandSearchQuery}" comme marque
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return filtered.map((b) => {
+                                const isSelected = formData.brand === b;
+                                const pCount = products.filter(
+                                  (p) => (p.brand || p.author || '').toLowerCase() === b.toLowerCase()
+                                ).length;
+
+                                return (
+                                  <div
+                                    key={b}
+                                    onClick={() => {
+                                      setFormData((prev) => ({ ...prev, brand: b, author: b }));
+                                      setIsFormBrandDropdownOpen(false);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '0.6rem 0.85rem',
+                                      borderRadius: '8px',
+                                      cursor: 'pointer',
+                                      backgroundColor: isSelected ? '#f1f5f9' : 'transparent',
+                                      transition: 'background-color 0.1s ease',
+                                      margin: '1px 0'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (!isSelected) e.currentTarget.style.backgroundColor = '#f4f4f5';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                      <div>
+                                        <span
+                                          style={{
+                                            fontSize: '0.88rem',
+                                            fontWeight: isSelected ? 700 : 500,
+                                            color: isSelected ? '#18181b' : '#334155',
+                                            display: 'block'
+                                          }}
+                                        >
+                                          {b}
+                                        </span>
+                                        <span style={{ fontSize: '0.74rem', color: '#a1a1aa' }}>
+                                          {pCount} {pCount > 1 ? 'produits' : 'produit'}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {isSelected && (
+                                      <div
+                                        style={{
+                                          width: '20px',
+                                          height: '20px',
+                                          borderRadius: '50%',
+                                          backgroundColor: '#18181b',
+                                          color: '#ffffff',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: '0.7rem'
+                                        }}
+                                      >
+                                        <i className="fas fa-check" />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+
+                          {/* Footer with actions */}
+                          <div
+                            style={{
+                              padding: '0.65rem 0.85rem',
+                              borderTop: '1px solid #f4f4f5',
+                              backgroundColor: '#fafafa',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between'
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsFormBrandDropdownOpen(false);
+                                setAttributeTab('brands');
+                                setViewMode('attributes');
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#18181b',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.4rem',
-                                boxShadow: isSelected ? `0 2px 6px ${opt.border}` : '0 1px 2px rgba(0,0,0,0.03)',
-                                transition: 'all 0.15s ease'
+                                gap: '0.35rem'
                               }}
                             >
-                              <span>{opt.icon}</span>
-                              <span>{opt.label}</span>
-                              {isSelected && <i className="fas fa-check" style={{ fontSize: '0.75rem', marginLeft: '2px' }}></i>}
+                              <i className="fas fa-cog" style={{ fontSize: '0.75rem' }} />
+                              Gérer les marques
                             </button>
-                          );
-                        })}
-                      </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsFormBrandDropdownOpen(false)}
+                              style={{
+                                padding: '0.35rem 0.75rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                backgroundColor: '#18181b',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Fermer
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Raccourcis en un clic (Pills interactives pour sélection rapide) */}
+                      {brandsList.length > 0 && (
+                        <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.55rem', flexWrap: 'wrap' }}>
+                          {brandsList.slice(0, 12).map((b) => {
+                            const isSelected = formData.brand === b;
+                            return (
+                              <button
+                                key={b}
+                                type="button"
+                                onClick={() => setFormData((prev) => ({ ...prev, brand: isSelected ? '' : b, author: isSelected ? '' : b }))}
+                                style={{
+                                  padding: '0.38rem 0.85rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: isSelected ? 700 : 500,
+                                  borderRadius: '9999px',
+                                  border: `1px solid ${isSelected ? '#18181b' : '#e2e8f0'}`,
+                                  backgroundColor: isSelected ? '#18181b' : '#ffffff',
+                                  color: isSelected ? '#ffffff' : '#334155',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.03)',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <span>{b}</span>
+                                {isSelected && (
+                                  <i className="fas fa-check" style={{ fontSize: '0.68rem', marginLeft: '3px' }} />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
-                    {/* =========================================================================
+{/* =========================================================================
                         SECTION : MULTI-MÉDIAS DU PRODUIT (PHOTOS & VIDÉOS AVEC DRAG & DROP)
                         ========================================================================= */}
                     {(() => {
@@ -3665,6 +4480,224 @@ export default function AdminProducts({ initialView }) {
                         onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                       />
                     </div>
+
+                    {/* =========================================================================
+                        SECTION : MODÈLES 3D & RÉALITÉ AUGMENTÉE (AR / GLB & USDZ)
+                        ========================================================================= */}
+                    <div className="form-group-custom" style={{ gridColumn: '1 / -1', borderTop: '1px solid #f0f0f0', paddingTop: '1.5rem', marginTop: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <span style={{ fontSize: '1rem', fontWeight: 700, color: '#18181b' }}>
+                            👓 Modèle 3D & Réalité Augmentée (AR)
+                          </span>
+                          {(formData.model_glb || formData.model_usdz) && (
+                            <span className="badge-custom bg-soft-success" style={{ fontWeight: 700, fontSize: '0.74rem' }}>
+                              <i className="fas fa-check-circle me-1" />
+                              AR Disponible
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.76rem', color: '#71717a' }}>
+                          Les clients pourront cliquer sur « Voir » puis sur le bouton « AR » pour projeter l'article chez eux
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                        {/* 1. Fichier .GLB (Web 3D & Android AR) */}
+                        <div
+                          style={{
+                            border: formData.model_glb ? '1.5px solid #16a34a' : '1.5px dashed #d4d4d8',
+                            borderRadius: '10px',
+                            padding: '1.1rem',
+                            backgroundColor: formData.model_glb ? '#f0fdf4' : '#fafafa',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <span style={{ background: '#18181b', color: '#fff', borderRadius: '6px', padding: '3px 7px', fontSize: '0.72rem', fontWeight: 800 }}>
+                                .GLB
+                              </span>
+                              <strong style={{ fontSize: '0.85rem', color: '#18181b' }}>Modèle 3D Web & Android</strong>
+                            </div>
+                            {formData.model_glb && (
+                              <button
+                                type="button"
+                                onClick={() => setFormData((prev) => ({ ...prev, model_glb: '' }))}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                                title="Supprimer le fichier GLB"
+                              >
+                                <i className="fas fa-trash-alt me-1" /> Retirer
+                              </button>
+                            )}
+                          </div>
+
+                          <p style={{ fontSize: '0.74rem', color: '#71717a', margin: '0 0 0.8rem 0', lineHeight: 1.35 }}>
+                            Format 3D universel standard (.glb / .gltf) pour affichage 3D interactif et Réalité Augmentée Android (Google Scene Viewer).
+                          </p>
+
+                          {formData.model_glb ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '8px 10px' }}>
+                              <i className="fas fa-cube" style={{ color: '#16a34a', fontSize: '1.1rem' }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#166534', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {formData.model_glb.split('/').pop()}
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: '#15803d' }}>Prêt pour l'affichage 3D & RA Android</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <input
+                                ref={glbFileInputRef}
+                                type="file"
+                                accept=".glb,.gltf"
+                                style={{ display: 'none' }}
+                                onChange={handleUploadGlb}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => glbFileInputRef.current?.click()}
+                                disabled={uploadingGlb}
+                                style={{
+                                  width: '100%',
+                                  padding: '9px 12px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #d4d4d8',
+                                  backgroundColor: '#ffffff',
+                                  color: '#18181b',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  cursor: uploadingGlb ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px'
+                                }}
+                              >
+                                {uploadingGlb ? (
+                                  <>
+                                    <div style={{ width: '14px', height: '14px', border: '2px solid #71717a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                                    <span>Téléversement du fichier GLB...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="fas fa-cloud-upload-alt" style={{ color: '#2563eb' }} />
+                                    <span>Téléverser un fichier .GLB</span>
+                                  </>
+                                )}
+                              </button>
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Ou coller un lien URL .glb..."
+                                  value={formData.model_glb}
+                                  onChange={(e) => setFormData((prev) => ({ ...prev, model_glb: e.target.value }))}
+                                  style={{ width: '100%', padding: '5px 8px', fontSize: '0.74rem', borderRadius: '5px', border: '1px solid #e4e4e7' }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. Fichier .USDZ (Apple iOS Quick Look) */}
+                        <div
+                          style={{
+                            border: formData.model_usdz ? '1.5px solid #2563eb' : '1.5px dashed #d4d4d8',
+                            borderRadius: '10px',
+                            padding: '1.1rem',
+                            backgroundColor: formData.model_usdz ? '#eff6ff' : '#fafafa',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <span style={{ background: '#2563eb', color: '#fff', borderRadius: '6px', padding: '3px 7px', fontSize: '0.72rem', fontWeight: 800 }}>
+                                .USDZ
+                              </span>
+                              <strong style={{ fontSize: '0.85rem', color: '#18181b' }}>Apple AR Quick Look (iOS)</strong>
+                            </div>
+                            {formData.model_usdz && (
+                              <button
+                                type="button"
+                                onClick={() => setFormData((prev) => ({ ...prev, model_usdz: '' }))}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                                title="Supprimer le fichier USDZ"
+                              >
+                                <i className="fas fa-trash-alt me-1" /> Retirer
+                              </button>
+                            )}
+                          </div>
+
+                          <p style={{ fontSize: '0.74rem', color: '#71717a', margin: '0 0 0.8rem 0', lineHeight: 1.35 }}>
+                            Format officiel Apple Quick Look permettant la projection en Réalité Augmentée native sur iPhone et iPad.
+                          </p>
+
+                          {formData.model_usdz ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '8px 10px' }}>
+                              <i className="fab fa-apple" style={{ color: '#2563eb', fontSize: '1.2rem' }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e40af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {formData.model_usdz.split('/').pop()}
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: '#2563eb' }}>Prêt pour Apple AR Quick Look (iOS)</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <input
+                                ref={usdzFileInputRef}
+                                type="file"
+                                accept=".usdz"
+                                style={{ display: 'none' }}
+                                onChange={handleUploadUsdz}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => usdzFileInputRef.current?.click()}
+                                disabled={uploadingUsdz}
+                                style={{
+                                  width: '100%',
+                                  padding: '9px 12px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #d4d4d8',
+                                  backgroundColor: '#ffffff',
+                                  color: '#18181b',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  cursor: uploadingUsdz ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px'
+                                }}
+                              >
+                                {uploadingUsdz ? (
+                                  <>
+                                    <div style={{ width: '14px', height: '14px', border: '2px solid #71717a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                                    <span>Téléversement du fichier USDZ...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="fas fa-cloud-upload-alt" style={{ color: '#2563eb' }} />
+                                    <span>Téléverser un fichier .USDZ</span>
+                                  </>
+                                )}
+                              </button>
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Ou coller un lien URL .usdz..."
+                                  value={formData.model_usdz}
+                                  onChange={(e) => setFormData((prev) => ({ ...prev, model_usdz: e.target.value }))}
+                                  style={{ width: '100%', padding: '5px 8px', fontSize: '0.74rem', borderRadius: '5px', border: '1px solid #e4e4e7' }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Boutons d'Action */}
@@ -3771,26 +4804,69 @@ export default function AdminProducts({ initialView }) {
                 <h3 style={{ fontSize: '1.15rem', color: '#333', margin: '0.4rem 0 0.2rem' }}>
                   {formData.name || 'Titre du Produit'}
                 </h3>
-                {formData.format && (
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
-                    <span 
-                      style={{ 
-                        fontSize: '0.78rem', 
-                        fontWeight: 700, 
-                        color: formData.format === 'Sous blister' ? '#16a34a' : formData.format === 'Très bon état' ? '#2563eb' : formData.format === 'Bon état' ? '#d97706' : '#64748b',
-                        background: formData.format === 'Sous blister' ? '#f0fdf4' : formData.format === 'Très bon état' ? '#eff6ff' : formData.format === 'Bon état' ? '#fffbeb' : '#f8fafc',
-                        border: `1px solid ${formData.format === 'Sous blister' ? '#bbf7d0' : formData.format === 'Très bon état' ? '#bfdbfe' : formData.format === 'Bon état' ? '#fde68a' : '#e2e8f0'}`,
-                        padding: '0.2rem 0.65rem',
-                        borderRadius: '9999px',
+                {formData.brand && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.35rem' }}>
+                    <span
+                      style={{
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        color: '#18181b',
+                        background: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        padding: '0.15rem 0.65rem',
+                        borderRadius: '6px',
                         display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.35rem'
+                        alignItems: 'center'
                       }}
                     >
-                      {formData.format === 'Sous blister' ? '📦' : formData.format === 'Très bon état' ? '⭐' : formData.format === 'Bon état' ? '👍' : '🔄'} {formData.format}
+                      {formData.brand}
                     </span>
                   </div>
                 )}
+                {(formData.model_glb || formData.model_usdz) && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.45rem' }}>
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: '#15803d',
+                        background: '#dcfce7',
+                        border: '1px solid #86efac',
+                        padding: '0.15rem 0.65rem',
+                        borderRadius: '9999px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <i className="fas fa-cube" style={{ fontSize: '0.7rem' }}></i>
+                      3D & AR Activé
+                    </span>
+                  </div>
+                )}
+                {formData.barcode && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.45rem' }}>
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: '#18181b',
+                        background: '#f4f4f5',
+                        border: '1px solid #d4d4d8',
+                        padding: '0.15rem 0.65rem',
+                        borderRadius: '9999px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <i className="fas fa-barcode" style={{ fontSize: '0.7rem' }}></i>
+                      {formData.barcode}
+                    </span>
+                  </div>
+                )}
+
+                
 
                 <div
                   style={{
@@ -4390,9 +5466,18 @@ export default function AdminProducts({ initialView }) {
                           <td>
                             <div>
                               <strong style={{ color: '#333', fontSize: '0.95rem' }}>{p.name}</strong>
-                              {p.format ? (
-                                <div style={{ fontSize: '0.78rem', color: '#888' }}>{p.format}</div>
-                              ) : null}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '2px', flexWrap: 'wrap' }}>
+                                {p.brand || p.marque || p.author ? (
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#18181b', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '1px 6px', borderRadius: '4px' }}>
+                                    {p.brand || p.marque || p.author}
+                                  </span>
+                                ) : null}
+                                {p.barcode ? (
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '1px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <i className="fas fa-barcode" style={{ fontSize: '0.68rem' }} /> {p.barcode}
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                           </td>
                           <td>

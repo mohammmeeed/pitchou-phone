@@ -59,6 +59,11 @@ export default function AdminCashflow() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
+  // Autocomplete Tiers (Clients & Fournisseurs)
+  const [tiersList, setTiersList] = useState([]);
+  const [isTiersDropdownOpen, setIsTiersDropdownOpen] = useState(false);
+  const tiersDropdownRef = useRef(null);
+
   // Vue Active : 'journal' (défaut) ou 'categories' (paramètres des catégories)
   const [viewMode, setViewMode] = useState('journal');
 
@@ -85,9 +90,54 @@ export default function AdminCashflow() {
   const [editingDepense, setEditingDepense] = useState(null); // { oldName: string, value: string }
 
   useEffect(() => {
-    loadCashflow();
+    loadCashflow(activeTab, search);
     loadCategories();
   }, [activeTab]);
+
+  const loadTiers = async () => {
+    try {
+      const [resSuppliers, resCustomers] = await Promise.all([
+        adminApi.getSuppliers().catch(() => ({ data: [] })),
+        adminApi.getCustomers().catch(() => [])
+      ]);
+
+      const suppliers = (resSuppliers && resSuppliers.data) || [];
+      const customers = Array.isArray(resCustomers) ? resCustomers : ((resCustomers && resCustomers.data) || []);
+
+      const list = [
+        ...suppliers.map((s) => ({
+          id: s.id,
+          name: s.name,
+          sublabel: s.company || '',
+          phone: s.phone || '',
+          type: 'fournisseur',
+          displayName: `${s.name} (Fournisseur)`
+        })),
+        ...customers.map((c) => ({
+          id: c.id,
+          name: c.name,
+          sublabel: c.wilaya || '',
+          phone: c.phone || '',
+          type: 'client',
+          displayName: `${c.name} (Client)`
+        }))
+      ];
+      setTiersList(list);
+    } catch (err) {
+      console.warn('Erreur chargement tiers:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadTiers();
+    const handleClickOutside = (e) => {
+      if (tiersDropdownRef.current && !tiersDropdownRef.current.contains(e.target)) {
+        setIsTiersDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadCategories = async () => {
     try {
@@ -181,10 +231,10 @@ export default function AdminCashflow() {
     await adminApi.saveCashflowCategory({ action: 'delete', type: 'DEPENSE', name: catName });
   };
 
-  const loadCashflow = async () => {
+  const loadCashflow = async (targetTab = activeTab, targetSearch = search) => {
     setLoading(true);
     try {
-      const res = await adminApi.getCashflow({ tab: activeTab, search });
+      const res = await adminApi.getCashflow({ tab: targetTab, search: targetSearch });
       if (res && res.success) {
         setEntries(res.data || []);
         if (res.kpi) setKpi(res.kpi);
@@ -216,8 +266,11 @@ export default function AdminCashflow() {
       party_phone: '',
       order_type: defaultCat,
       source: 'CAISSE POS',
-      attachment_url: ''
+      attachment_url: '',
+      tier_type: '',
+      tier_id: null
     });
+    loadTiers();
     setIsModalOpen(true);
   };
 
@@ -268,7 +321,9 @@ export default function AdminCashflow() {
         party_phone: formData.party_phone,
         order_type: formData.order_type || (modalType === 'RECETTE' ? 'AUTRE RECETTE' : 'AUTRE DÉPENSE'),
         source: formData.source || 'CAISSE POS',
-        attachment_url: formData.attachment_url || null
+        attachment_url: formData.attachment_url || null,
+        tier_type: formData.tier_type || '',
+        tier_id: formData.tier_id || null
       };
 
       const res = formData.id
@@ -323,11 +378,6 @@ export default function AdminCashflow() {
     : computedDailyProfit;
 
   const filteredEntries = entries.filter((item) => {
-    if (activeTab === 'recettes' && item.type !== 'RECETTE') return false;
-    if (activeTab === 'depenses' && item.type !== 'DEPENSE') return false;
-    if (activeTab === 'ventes' && item.type !== 'VENTE') return false;
-    if (activeTab === 'recettes_depenses' && item.type !== 'RECETTE' && item.type !== 'DEPENSE') return false;
-
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -340,7 +390,49 @@ export default function AdminCashflow() {
   });
 
   const totalPages = Math.ceil(filteredEntries.length / itemsPerPage) || 1;
-  const paginatedEntries = filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
+  const paginatedEntries = filteredEntries.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setCurrentPage(1);
+    loadCashflow(tabId, search);
+  };
+
+  const filteredTiers = tiersList.filter((item) => {
+    if (!formData.party_name) return true;
+    const q = formData.party_name.toLowerCase();
+    return (
+      (item.name || '').toLowerCase().includes(q) ||
+      (item.sublabel || '').toLowerCase().includes(q) ||
+      (item.phone || '').includes(q) ||
+      (item.displayName || '').toLowerCase().includes(q)
+    );
+  });
+
+  const handleSelectTier = (tier) => {
+    setFormData((prev) => {
+      const isFournisseur = tier.type === 'fournisseur';
+      const isClient = tier.type === 'client';
+      let autoOrderType = prev.order_type;
+
+      if (isFournisseur && modalType === 'DEPENSE') {
+        autoOrderType = 'VERSEMENT FOURNISSEUR';
+      } else if (isClient && modalType === 'RECETTE') {
+        autoOrderType = 'VERSEMENT CLIENT';
+      }
+
+      return {
+        ...prev,
+        party_name: tier.name,
+        party_phone: tier.phone || prev.party_phone,
+        tier_type: tier.type,
+        tier_id: tier.id,
+        order_type: autoOrderType
+      };
+    });
+    setIsTiersDropdownOpen(false);
+  };
 
   return (
     <AdminLayout>
@@ -848,15 +940,17 @@ export default function AdminCashflow() {
           {/* Tabs Navigation */}
           <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
             {[
-              { id: 'all', label: `TOUT JOURNAL (${counts.all ?? filteredEntries.length})`, icon: 'fas fa-book' },
-              { id: 'recettes', label: `RECETTES (${counts.recettes ?? 0})`, icon: 'fas fa-arrow-down' },
-              { id: 'depenses', label: `DÉPENSES (${counts.depenses ?? 0})`, icon: 'fas fa-arrow-up' },
-              { id: 'ventes', label: `VENTES (${counts.ventes ?? 0})`, icon: 'fas fa-shopping-cart' }
+              { id: 'all', label: `TOUT JOURNAL (${counts.all ?? 0})`, icon: 'fas fa-book' },
+              { id: 'recettes_depenses', label: `RECETTES & DÉPENSES (${counts.recettes_depenses ?? (counts.recettes + counts.depenses)})`, icon: 'fas fa-exchange-alt' },
+              { id: 'ventes', label: `VENTES (${counts.ventes ?? 0})`, icon: 'fas fa-shopping-cart' },
+              { id: 'achats', label: `ACHATS FOURNISSEURS (${counts.achats ?? 0})`, icon: 'fas fa-truck-loading' },
+              { id: 'versements_clients', label: `VERSEMENTS CLIENTS (${counts.versements_clients ?? 0})`, icon: 'fas fa-user-check' },
+              { id: 'versements_fournisseurs', label: `VERSEMENTS FOURNISSEURS (${counts.versements_fournisseurs ?? 0})`, icon: 'fas fa-money-bill-wave' }
             ].map((tab) => (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 style={{
                   padding: '0.55rem 0.95rem',
                   borderRadius: '6px',
@@ -945,24 +1039,21 @@ export default function AdminCashflow() {
                     <tr key={row.id} style={{ borderBottom: '1px solid #f4f4f5' }}>
                       {/* TYPE */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        {row.type === 'VENTE' && (
+                        {(row.order_type === 'VERSEMENT CLIENT' || row.order_type === 'VERSEMENT FOURNISSEUR' || row.type === 'VERSEMENT') ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.65rem', borderRadius: '4px', backgroundColor: '#0284c7', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800 }}>
+                            <i className="fas fa-arrow-down" style={{ fontSize: '0.68rem' }} /> VERSEMENT
+                          </span>
+                        ) : row.type === 'VENTE' ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.65rem', borderRadius: '4px', backgroundColor: '#15803d', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800 }}>
                             <i className="fas fa-shopping-cart" style={{ fontSize: '0.68rem' }} /> VENTE
                           </span>
-                        )}
-                        {row.type === 'DEPENSE' && (
+                        ) : row.type === 'DEPENSE' ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.65rem', borderRadius: '4px', backgroundColor: '#b91c1c', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800 }}>
                             <i className="fas fa-arrow-up" style={{ fontSize: '0.68rem' }} /> DÉPENSE
                           </span>
-                        )}
-                        {row.type === 'RECETTE' && (
+                        ) : (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.65rem', borderRadius: '4px', backgroundColor: '#15803d', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800 }}>
                             <i className="fas fa-arrow-down" style={{ fontSize: '0.68rem' }} /> RECETTE
-                          </span>
-                        )}
-                        {row.type === 'VERSEMENT' && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.65rem', borderRadius: '4px', backgroundColor: '#0284c7', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800 }}>
-                            <i className="fas fa-arrow-down" style={{ fontSize: '0.68rem' }} /> VERSEMENT
                           </span>
                         )}
                       </td>
@@ -1038,7 +1129,7 @@ export default function AdminCashflow() {
 
                       {/* BÉNÉFICE PRODUITS */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', fontSize: '0.84rem', fontWeight: 700, color: '#16a34a' }}>
-                        {parseFloat(row.profit_amount) > 0 ? `+${formatDA(row.profit_amount)} DA` : '-'}
+                        {row.order_type?.includes('VERSEMENT') ? '-' : (parseFloat(row.profit_amount) > 0 ? `+${formatDA(row.profit_amount)} DA` : '-')}
                       </td>
 
                       {/* DATE */}
@@ -1049,6 +1140,21 @@ export default function AdminCashflow() {
                       {/* ACTIONS */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {(row.order_type === 'VERSEMENT CLIENT' || row.order_type === 'VERSEMENT FOURNISSEUR' || row.type === 'VERSEMENT') && (
+                            <span style={{
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '4px',
+                              backgroundColor: '#0284c7',
+                              color: '#ffffff',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}>
+                              <i className="fas fa-check" style={{ fontSize: '0.65rem' }} /> {row.order_type === 'VERSEMENT FOURNISSEUR' ? 'PAYÉ' : 'REÇU'}
+                            </span>
+                          )}
 
                           {/* Bouton Voir Fichier / Justificatif */}
                           {row.attachment_url && (
@@ -1354,28 +1460,160 @@ export default function AdminCashflow() {
                 </div>
               </div>
 
-              {/* Ligne 2 : Tiers / Bénéficiaire & Téléphone (Optionnel) */}
+              {/* Ligne 2 : Tiers / Bénéficiaire & Téléphone avec Recherche Automatique Client / Fournisseur */}
               <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#71717a', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-                    CLIENT / FOURNISSEUR (TIERS)
+                <div style={{ position: 'relative' }} ref={tiersDropdownRef}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', fontWeight: 700, color: '#71717a', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+                    <span>CLIENT / FOURNISSEUR (TIERS)</span>
+                    {formData.tier_type && (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          padding: '0.1rem 0.4rem',
+                          borderRadius: '4px',
+                          backgroundColor: formData.tier_type === 'fournisseur' ? '#eff6ff' : '#ecfdf5',
+                          color: formData.tier_type === 'fournisseur' ? '#2563eb' : '#16a34a',
+                          fontWeight: 700,
+                          textTransform: 'none'
+                        }}
+                      >
+                        ✓ {formData.tier_type === 'fournisseur' ? 'Fournisseur sélectionné' : 'Client sélectionné'}
+                      </span>
+                    )}
                   </label>
-                  <input
-                    type="text"
-                    placeholder={modalType === 'RECETTE' ? 'Ex: Client Passager' : 'Ex: Fournisseur Emballage'}
-                    value={formData.party_name}
-                    onChange={(e) => setFormData({ ...formData, party_name: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.7rem 1rem',
-                      fontSize: '0.9rem',
-                      borderRadius: '8px',
-                      border: '1px solid #e4e4e7',
-                      backgroundColor: '#f8fafc',
-                      outline: 'none',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder={modalType === 'RECETTE' ? 'Rechercher ou écrire un client/fournisseur...' : 'Rechercher ou écrire un fournisseur/client...'}
+                      value={formData.party_name}
+                      onFocus={() => setIsTiersDropdownOpen(true)}
+                      onChange={(e) => {
+                        setFormData({ ...formData, party_name: e.target.value, tier_type: '', tier_id: null });
+                        setIsTiersDropdownOpen(true);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.7rem 2.2rem 0.7rem 1rem',
+                        fontSize: '0.9rem',
+                        borderRadius: '8px',
+                        border: formData.tier_type ? (formData.tier_type === 'fournisseur' ? '1.5px solid #3b82f6' : '1.5px solid #16a34a') : '1px solid #e4e4e7',
+                        backgroundColor: '#f8fafc',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    {formData.party_name && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({ ...formData, party_name: '', party_phone: '', tier_type: '', tier_id: null });
+                        }}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          color: '#9ca3af',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          fontSize: '1.1rem',
+                          lineHeight: 1
+                        }}
+                        title="Effacer"
+                      >
+                        &times;
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Liste déroulante avec recherche automatique */}
+                  {isTiersDropdownOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e4e4e7',
+                        borderRadius: '8px',
+                        boxShadow: '0 12px 28px rgba(0,0,0,0.18)',
+                        marginTop: '4px',
+                        maxHeight: '220px',
+                        overflowY: 'auto',
+                        zIndex: 1050
+                      }}
+                    >
+                      {filteredTiers.length === 0 ? (
+                        <div style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#71717a' }}>
+                          Aucun contact existant ne correspond. Le texte saisi sera enregistré comme tiers libre.
+                        </div>
+                      ) : (
+                        filteredTiers.map((t) => (
+                          <div
+                            key={`${t.type}-${t.id}`}
+                            onClick={() => handleSelectTier(t)}
+                            style={{
+                              padding: '0.65rem 0.95rem',
+                              borderBottom: '1px solid #f4f4f5',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              transition: 'background-color 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                              <span
+                                style={{
+                                  width: '26px',
+                                  height: '26px',
+                                  borderRadius: '6px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.74rem',
+                                  backgroundColor: t.type === 'fournisseur' ? '#eff6ff' : '#ecfdf5',
+                                  color: t.type === 'fournisseur' ? '#3b82f6' : '#16a34a'
+                                }}
+                              >
+                                <i className={t.type === 'fournisseur' ? 'fas fa-truck' : 'fas fa-user'} />
+                              </span>
+                              <div>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#111111' }}>
+                                  {t.name}{' '}
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: t.type === 'fournisseur' ? '#2563eb' : '#16a34a' }}>
+                                    ({t.type === 'fournisseur' ? 'Fournisseur' : 'Client'})
+                                  </span>
+                                </div>
+                                {(t.phone || t.sublabel) && (
+                                  <div style={{ fontSize: '0.72rem', color: '#71717a' }}>
+                                    {t.phone ? `Tél: ${t.phone}` : ''} {t.sublabel ? `• ${t.sublabel}` : ''}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '4px',
+                                backgroundColor: t.type === 'fournisseur' ? '#eff6ff' : '#ecfdf5',
+                                color: t.type === 'fournisseur' ? '#2563eb' : '#16a34a'
+                              }}
+                            >
+                              {t.type === 'fournisseur' ? 'Fournisseur' : 'Client'}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>

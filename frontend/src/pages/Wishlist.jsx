@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
+import { getProductSubcategory } from '../utils/productUtils';
 import BookDetailBottomSheet from '../components/BookDetailBottomSheet';
 import { useDating } from '../context/DatingContext';
 import { useTheme } from '../context/ThemeContext';
@@ -47,9 +48,30 @@ const Wishlist = ({ defaultCategory = null }) => {
   const addToLiked = datingCtx?.addToLiked || (() => {});
   const isLiked = datingCtx?.isLiked || ((id) => likedList.some(item => String(item.id) === String(id)));
   const [searchQuery, setSearchQuery] = useState('');
-  const [dbCategories, setDbCategories] = useState([]);
-  const [dbSubcategories, setDbSubcategories] = useState({});
-  const [dbCategoryImages, setDbCategoryImages] = useState({});
+  const [dbCategories, setDbCategories] = useState(() => {
+    try {
+      const cached = localStorage.getItem('pitchou_cached_categories');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [dbSubcategories, setDbSubcategories] = useState(() => {
+    try {
+      const cached = localStorage.getItem('pitchou_cached_subcategories');
+      return cached ? JSON.parse(cached) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+  const [dbCategoryImages, setDbCategoryImages] = useState(() => {
+    try {
+      const cached = localStorage.getItem('pitchou_cached_category_images');
+      return cached ? JSON.parse(cached) : {};
+    } catch (e) {
+      return {};
+    }
+  });
   const [selectedSubcategory, setSelectedSubcategory] = useState(null);
   const [sortBy, setSortBy] = useState('count'); // 'count' | 'az' | 'za'
   const [detailCard, setDetailCard] = useState(null);
@@ -79,12 +101,15 @@ const Wishlist = ({ defaultCategory = null }) => {
         if (data && data.success) {
           if (Array.isArray(data.categories)) {
             setDbCategories(data.categories);
+            try { localStorage.setItem('pitchou_cached_categories', JSON.stringify(data.categories)); } catch (e) {}
           }
           if (data.subcategories && typeof data.subcategories === 'object') {
             setDbSubcategories(data.subcategories);
+            try { localStorage.setItem('pitchou_cached_subcategories', JSON.stringify(data.subcategories)); } catch (e) {}
           }
           if (data.category_images && typeof data.category_images === 'object') {
             setDbCategoryImages(data.category_images);
+            try { localStorage.setItem('pitchou_cached_category_images', JSON.stringify(data.category_images)); } catch (e) {}
           }
         }
       })
@@ -131,8 +156,6 @@ const Wishlist = ({ defaultCategory = null }) => {
             ? item.category.split(',').map((s) => s.trim())
             : (Array.isArray(item.interests) ? item.interests : []));
 
-      const coverImg = item.image || (Array.isArray(item.images) && item.images[0]) || null;
-
       // Dédupliquer les catégories parentes pour ce produit
       const seenParentsForThisProduct = new Set();
 
@@ -164,16 +187,13 @@ const Wishlist = ({ defaultCategory = null }) => {
           catMap.set(catKey, { 
             name: catKey, 
             count: 1, 
-            image: customImg || coverImg, 
+            image: customImg, 
             hasCustomImage: !!customImg,
             subcategories: dbSubcategories[catKey] || []
           });
         } else {
           const entry = catMap.get(catKey);
           entry.count += 1;
-          if (!entry.hasCustomImage && !entry.image && coverImg) {
-            entry.image = coverImg;
-          }
         }
       });
     });
@@ -288,7 +308,7 @@ const Wishlist = ({ defaultCategory = null }) => {
     const categorySubs = (dbSubcategories[selectedCategory] || []).map(s => s.toLowerCase().trim());
     const activeSubLower = selectedSubcategory ? selectedSubcategory.toLowerCase().trim() : null;
 
-    return allProfiles.filter((prod) => {
+    const filtered = allProfiles.filter((prod) => {
       const pCats = Array.isArray(prod.categories) && prod.categories.length > 0
         ? prod.categories
         : (typeof prod.category === 'string' && prod.category.trim() !== ''
@@ -308,6 +328,13 @@ const Wishlist = ({ defaultCategory = null }) => {
         if (categorySubs.includes(cLower)) return true;
         return false;
       });
+    });
+
+    // Tri strict : En stock (> 0) en premier, Rupture (<= 0) toujours à la fin
+    return [...filtered].sort((a, b) => {
+      const aInStock = (Number(a.stock) || 0) > 0 ? 1 : 0;
+      const bInStock = (Number(b.stock) || 0) > 0 ? 1 : 0;
+      return bInStock - aInStock;
     });
   }, [selectedCategory, selectedSubcategory, dbSubcategories, likedList, allProfiles]);
 
@@ -674,6 +701,7 @@ const Wishlist = ({ defaultCategory = null }) => {
                 <div className="home-grid-2x2">
                   {displayedBooks.map((card) => {
                     const displayPrice = card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : (card.distance || '');
+                    const isCardOutOfStock = card.stock !== undefined && Number(card.stock) <= 0;
 
                     return (
                       <div
@@ -681,10 +709,37 @@ const Wishlist = ({ defaultCategory = null }) => {
                         data-product-id={card.id}
                         onClick={() => setDetailCard(card)}
                         className="home-product-card"
-                        style={{ cursor: 'pointer' }}
+                        style={{
+                          cursor: 'pointer',
+                          opacity: isCardOutOfStock ? 0.72 : 1,
+                          filter: isCardOutOfStock ? 'grayscale(50%)' : 'none',
+                          transition: 'opacity 0.2s, filter 0.2s'
+                        }}
                       >
                         {/* Image Couverture */}
                         <div style={{ position: 'relative', width: '100%', paddingTop: '130%', background: '#1c1c1e', overflow: 'hidden' }}>
+                          {isCardOutOfStock && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: '8px',
+                                left: '8px',
+                                background: 'rgba(15, 23, 42, 0.88)',
+                                color: '#f87171',
+                                border: '1px solid rgba(239, 68, 68, 0.8)',
+                                fontSize: '9px',
+                                fontWeight: 800,
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                zIndex: 4,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.4px',
+                                backdropFilter: 'blur(4px)'
+                              }}
+                            >
+                              Out of stock
+                            </span>
+                          )}
                           {(() => {
                             const rawVid = card.video || (card.videos && card.videos[0]);
                             const cardVid = rawVid && typeof rawVid === 'string' && rawVid.trim() !== '' ? rawVid.trim() : null;
@@ -749,28 +804,34 @@ const Wishlist = ({ defaultCategory = null }) => {
                             );
                           })()}
 
-                          {/* Badge Format */}
-                          {(card.format || card.badge) && (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                bottom: '8px',
-                                left: '8px',
-                                background: 'rgba(0, 0, 0, 0.55)',
-                                backdropFilter: 'blur(6px)',
-                                color: '#fff',
-                                fontSize: '10px',
-                                padding: '3px 7px',
-                                borderRadius: '6px',
-                                maxWidth: '85%',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
-                              }}
-                            >
-                              {card.format || card.badge}
-                            </span>
-                          )}
+                          {/* Badge Sous-Catégorie */}
+                          {(() => {
+                            const badgeText = getProductSubcategory(card);
+                            if (!badgeText) return null;
+                            return (
+                              <span
+                                style={{
+                                  position: 'absolute',
+                                  bottom: '8px',
+                                  left: '8px',
+                                  background: 'rgba(0, 0, 0, 0.65)',
+                                  backdropFilter: 'blur(6px)',
+                                  color: '#fff',
+                                  fontSize: '10px',
+                                  fontWeight: 600,
+                                  padding: '3px 7px',
+                                  borderRadius: '4px',
+                                  maxWidth: '85%',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  zIndex: 2
+                                }}
+                              >
+                                {badgeText}
+                              </span>
+                            );
+                          })()}
                         </div>
 
                         {/* Infos Produit */}
@@ -815,13 +876,13 @@ const Wishlist = ({ defaultCategory = null }) => {
                               style={{
                                 fontSize: '11px',
                                 fontWeight: 600,
-                                color: 'var(--secondary, #666)',
-                                background: 'rgba(0,0,0,0.05)',
+                                color: isCardOutOfStock ? '#ffffff' : 'var(--secondary, #666)',
+                                background: isCardOutOfStock ? '#6b7280' : 'rgba(0,0,0,0.05)',
                                 padding: '3px 8px',
                                 borderRadius: '6px'
                               }}
                             >
-                              Voir
+                              {isCardOutOfStock ? 'Out of stock' : 'Voir'}
                             </span>
                           </div>
                         </div>

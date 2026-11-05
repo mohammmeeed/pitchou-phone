@@ -366,6 +366,44 @@ export const adminApi = {
     }
   },
 
+  // 3b. Customer Orders History
+  async getCustomerOrders(customer) {
+    if (!customer) return [];
+    try {
+      const phone = customer.phone ? String(customer.phone).trim() : '';
+      const name = customer.name ? String(customer.name).trim() : '';
+      const map = new Map();
+
+      if (phone) {
+        const res = await fetch(`${API_BASE_URL}/orders?phone=${encodeURIComponent(phone)}`);
+        if (res.ok) {
+          const json = await res.json();
+          (json.data || []).forEach((o) => map.set(o.id, o));
+        }
+      }
+
+      if (name) {
+        const res = await fetch(`${API_BASE_URL}/orders?search=${encodeURIComponent(name)}`);
+        if (res.ok) {
+          const json = await res.json();
+          (json.data || []).forEach((o) => {
+            if ((o.customer_name || '').toLowerCase().trim() === name.toLowerCase().trim()) {
+              map.set(o.id, o);
+            }
+          });
+        }
+      }
+
+      const orders = Array.from(map.values());
+      // Tri du plus récent au plus ancien
+      orders.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+      return orders;
+    } catch (err) {
+      console.warn('Fallback getCustomerOrders:', err.message);
+      return [];
+    }
+  },
+
   // 4. Customers List
   async getCustomers() {
     try {
@@ -436,9 +474,20 @@ export const adminApi = {
     }
   },
 
+  async getUnreadMessagesCount() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/messages?unread_count=1`);
+      if (!res.ok) throw new Error('API unread messages non accessible');
+      const json = await res.json();
+      return json.unread_count || 0;
+    } catch (err) {
+      return 0;
+    }
+  },
+
   async getCustomerMessages(customerId) {
     try {
-      const res = await fetch(`${API_BASE_URL}/messages?customer_id=${customerId}`);
+      const res = await fetch(`${API_BASE_URL}/messages?customer_id=${customerId}&admin=1`);
       if (!res.ok) throw new Error('API customer messages non accessible');
       const json = await res.json();
       return json;
@@ -724,7 +773,8 @@ export const adminApi = {
           subcategories: data.subcategories || {},
           category_images: data.category_images || {},
           languages: data.languages || [],
-          wilayas: Array.isArray(data.wilayas) ? data.wilayas : []
+          wilayas: Array.isArray(data.wilayas) ? data.wilayas : [],
+          brands: Array.isArray(data.brands) ? data.brands : []
         };
       }
     } catch (err) {
@@ -735,10 +785,12 @@ export const adminApi = {
       const savedCats = localStorage.getItem('tiktok_shop_categories');
       const savedLangs = localStorage.getItem('tiktok_shop_languages');
       const savedWilayas = localStorage.getItem('tiktok_shop_wilayas');
+      const savedBrands = localStorage.getItem('pitchou_shop_brands');
       return {
         categories: savedCats ? JSON.parse(savedCats) : [],
         languages: savedLangs ? JSON.parse(savedLangs) : ['Français', 'Anglais', 'Arabe'],
-        wilayas: savedWilayas ? JSON.parse(savedWilayas) : []
+        wilayas: savedWilayas ? JSON.parse(savedWilayas) : [],
+        brands: savedBrands ? JSON.parse(savedBrands) : ['Apple', 'Samsung', 'OnePlus', 'Xiaomi', 'Realme', 'Google Pixel', 'Huawei', 'Oppo', 'Infinix', 'Tecno', 'Hoco', 'Anker', 'Baseus']
       };
     } catch (e) {
       return {
@@ -774,6 +826,12 @@ export const adminApi = {
         localStorage.setItem('tiktok_shop_wilayas', JSON.stringify(data.wilayas));
       } else if (payload.wilayas) {
         localStorage.setItem('tiktok_shop_wilayas', JSON.stringify(payload.wilayas));
+      }
+      if (payload.brands) {
+        localStorage.setItem('pitchou_shop_brands', JSON.stringify(payload.brands));
+      }
+      if (data && Array.isArray(data.brands)) {
+        localStorage.setItem('pitchou_shop_brands', JSON.stringify(data.brands));
       }
       return data;
     } catch (err) {
@@ -874,6 +932,180 @@ export const adminApi = {
       console.error('Erreur saveCashflowCategory:', err);
       throw err;
     }
+  },
+
+  // Point de Vente (POS / Caisse Boutique)
+  async getPosData() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/pos`);
+      if (!res.ok) throw new Error('Erreur HTTP ' + res.status);
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur getPosData:', err);
+      return { success: false, products: [], recent_sales: [] };
+    }
+  },
+
+  async createPosSale(saleData) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/pos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(saleData)
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || 'Erreur lors de la validation de la vente');
+      }
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur createPosSale:', err);
+      throw err;
+    }
+  }
+,
+
+  // Fournisseurs & Dettes Fournisseurs
+  async getSuppliers(params = {}) {
+    try {
+      const qs = new URLSearchParams(params).toString();
+      const res = await fetch(`${API_BASE_URL}/suppliers.php${qs ? '?' + qs : ''}`);
+      if (!res.ok) throw new Error('Erreur HTTP ' + res.status);
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur getSuppliers:', err);
+      return { success: false, data: [], kpi: { total_suppliers: 0, total_purchases: 0, total_paid: 0, total_debt: 0, debtors_count: 0 } };
+    }
+  },
+
+  async getSupplierDetails(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers.php?id=${id}`);
+      if (!res.ok) throw new Error('Erreur HTTP ' + res.status);
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur getSupplierDetails:', err);
+      throw err;
+    }
+  },
+
+  async createSupplier(data) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', ...data })
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur createSupplier:', err);
+      throw err;
+    }
+  },
+
+  async updateSupplier(data) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', ...data })
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur updateSupplier:', err);
+      throw err;
+    }
+  },
+
+  async deleteSupplier(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers.php?type=supplier&id=${id}`, {
+        method: 'DELETE'
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur deleteSupplier:', err);
+      throw err;
+    }
+  },
+
+  async addSupplierPayment(data) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_payment', ...data })
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur addSupplierPayment:', err);
+      throw err;
+    }
+  },
+
+  // Achats & Stocks Fournisseurs
+  async getPurchases(params = {}) {
+    try {
+      const queryObj = { type: 'purchases', ...params };
+      const qs = new URLSearchParams(queryObj).toString();
+      const res = await fetch(`${API_BASE_URL}/suppliers.php?${qs}`);
+      if (!res.ok) throw new Error('Erreur HTTP ' + res.status);
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur getPurchases:', err);
+      return { success: false, data: [], kpi: { total_purchases: 0, total_paid: 0, total_remaining: 0, count: 0 } };
+    }
+  },
+
+  async createPurchase(data) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create_purchase', ...data })
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur createPurchase:', err);
+      throw err;
+    }
+  },
+
+  async updatePurchase(data) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_purchase', ...data })
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur updatePurchase:', err);
+      throw err;
+    }
+  },
+
+  async deletePurchase(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers.php?type=purchase&id=${id}`, {
+        method: 'DELETE'
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur deletePurchase:', err);
+      throw err;
+    }
+  },
+
+  async deleteSupplierPayment(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/suppliers.php?type=payment&id=${id}`, {
+        method: 'DELETE'
+      });
+      return await res.json();
+    } catch (err) {
+      console.error('Erreur deleteSupplierPayment:', err);
+      throw err;
+    }
   }
 };
-

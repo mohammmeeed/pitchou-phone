@@ -17,7 +17,7 @@ body {
   padding: 0;
   background-color: #f7f7f9;
   overflow-x: hidden;
-  overflow-y: auto !important;
+  overflow-y: visible;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -35,7 +35,7 @@ body {
   min-height: 100vh;
   height: auto !important;
   overflow-x: hidden;
-  overflow-y: auto !important;
+  overflow-y: visible !important;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
 }
@@ -587,12 +587,17 @@ body::-webkit-scrollbar-thumb:hover,
 }
 
 /* Categories 2x2 Screen-Fit Grid (Exactement 4 cartes : 2 lignes x 2 colonnes par écran) */
+.categories-grid-2x2 {
+  touch-action: pan-y !important;
+}
+
 .categories-grid-2x2 .dz-media-card.style-3 {
   border-radius: 16px !important;
   overflow: hidden !important;
   height: clamp(170px, calc((100dvh - 200px) / 2), 340px) !important;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1) !important;
   transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+  touch-action: pan-y !important;
 }
 
 .categories-grid-2x2 .dz-media-card.style-3:active {

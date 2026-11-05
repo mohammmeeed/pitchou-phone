@@ -20,6 +20,13 @@ DirectoryIndex index.html
     # /api/products -> backend/api/products.php
     RewriteRule ^api/(.*)$ backend/api/$1.php [L,QSA]
 
+    # 2.5 Routage des uploads vers backend/uploads/ si le fichier existe
+    RewriteCond %{DOCUMENT_ROOT}/backend/uploads/$1 -f
+    RewriteRule ^uploads/(.*)$ backend/uploads/$1 [L]
+    RewriteCond %{DOCUMENT_ROOT}/uploads/$1 -f
+    RewriteRule ^uploads/(.*)$ uploads/$1 [L]
+    RewriteRule ^uploads/(.*)$ backend/uploads/$1 [L]
+
     # 3. Fichiers et dossiers réels existants (assets, uploads, favicon, index.html)
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d

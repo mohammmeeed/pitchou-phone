@@ -77,7 +77,63 @@ function formatProduct(array $product): array {
     $product['categories'] = array_values($categories);
     $product['category'] = !empty($product['categories']) ? implode(', ', $product['categories']) : ($product['category'] ?? '');
     $product['etat'] = $product['format'] ?? '';
+    $brandVal = !empty($product['brand']) ? trim($product['brand']) : (!empty($product['author']) ? trim($product['author']) : '');
+    if (empty($brandVal)) {
+        $titleLower = strtolower($product['name'] ?? '');
+        if (strpos($titleLower, 'iphone') !== false || strpos($titleLower, 'apple') !== false) {
+            $brandVal = 'Apple';
+        } elseif (strpos($titleLower, 'samsung') !== false) {
+            $brandVal = 'Samsung';
+        } elseif (strpos($titleLower, 'hoco') !== false) {
+            $brandVal = 'Hoco';
+        } elseif (strpos($titleLower, 'anker') !== false) {
+            $brandVal = 'Anker';
+        } elseif (strpos($titleLower, 'oneplus') !== false || strpos($titleLower, 'one plus') !== false) {
+            $brandVal = 'OnePlus';
+        } elseif (strpos($titleLower, 'xiaomi') !== false || strpos($titleLower, 'redmi') !== false) {
+            $brandVal = 'Xiaomi';
+        } elseif (strpos($titleLower, 'realme') !== false) {
+            $brandVal = 'Realme';
+        }
+    }
+    $product['brand'] = $brandVal;
+    $product['marque'] = $brandVal;
+    if (empty($product['author']) && !empty($brandVal)) {
+        $product['author'] = $brandVal;
+    }
     $product['purchase_price'] = isset($product['purchase_price']) ? (float)$product['purchase_price'] : 0.0;
+    $product['model_glb'] = trim($product['model_glb'] ?? '');
+    $product['model_usdz'] = trim($product['model_usdz'] ?? '');
+    $product['barcode'] = trim($product['barcode'] ?? '');
+
+    // Déterminer la sous-catégorie du produit (exclure les catégories principales et les marques)
+    $topCategories = ['Téléphones', 'Accessoires', 'Batteries', 'Chargeurs & Câbles', 'Écrans & Pièces', 'Livres'];
+    $topCategoriesNorm = array_map(fn($c) => mb_strtolower(trim($c)), $topCategories);
+    $knownBrandsNorm = ['apple', 'samsung', 'xiaomi', 'oneplus', 'one plus', 'realme', 'google pixel', 'pixel', 'huawei', 'oppo', 'infinix', 'tecno', 'honor', 'hoco', 'anker', 'baseus', 'sony', 'redmi', 'poco'];
+    $brandNorm = !empty($brandVal) ? mb_strtolower(trim($brandVal)) : '';
+
+    $subCategory = '';
+    if (!empty($product['categories']) && is_array($product['categories'])) {
+        foreach ($product['categories'] as $c) {
+            $cTrim = trim($c);
+            $cNorm = mb_strtolower($cTrim);
+            if ($cTrim !== '' && !in_array($cNorm, $topCategoriesNorm, true) && !in_array($cNorm, $knownBrandsNorm, true) && $cNorm !== $brandNorm) {
+                $subCategory = $cTrim;
+                break;
+            }
+        }
+    }
+    // Si vide, vérifier si le format/état contient une sous-catégorie valide (Sous blister, Très bon état, etc.)
+    if (empty($subCategory) && !empty($product['format'])) {
+        $fTrim = trim($product['format']);
+        $fNorm = mb_strtolower($fTrim);
+        if ($fTrim !== '' && !in_array($fNorm, $topCategoriesNorm, true) && !in_array($fNorm, $knownBrandsNorm, true) && $fNorm !== $brandNorm) {
+            $subCategory = $fTrim;
+        }
+    }
+    $product['subcategory'] = $subCategory;
+    $product['sub_category'] = $subCategory;
+    $product['sous_categorie'] = $subCategory;
 
     return $product;
 }
@@ -206,7 +262,11 @@ function getProductColumns(PDO $pdo): array {
         'videos'         => "ALTER TABLE products ADD COLUMN videos TEXT DEFAULT NULL",
         'languages'      => "ALTER TABLE products ADD COLUMN languages TEXT DEFAULT NULL",
         'format'         => "ALTER TABLE products ADD COLUMN format VARCHAR(100) DEFAULT ''",
-        'location'       => "ALTER TABLE products ADD COLUMN location VARCHAR(150) DEFAULT ''"
+        'location'       => "ALTER TABLE products ADD COLUMN location VARCHAR(150) DEFAULT ''",
+        'brand'          => "ALTER TABLE products ADD COLUMN brand VARCHAR(150) DEFAULT ''",
+        'model_glb'      => "ALTER TABLE products ADD COLUMN model_glb TEXT DEFAULT NULL",
+        'model_usdz'     => "ALTER TABLE products ADD COLUMN model_usdz TEXT DEFAULT NULL",
+        'barcode'        => "ALTER TABLE products ADD COLUMN barcode VARCHAR(100) DEFAULT ''"
     ];
 
     foreach ($missingToCreate as $colName => $alterSql) {
@@ -281,9 +341,14 @@ function handlePost(?PDO $pdo): void {
         $cols = ['name', 'price'];
         $vals = [trim($input['name']), (float)$input['price']];
 
+        $brandVal = trim($input['brand'] ?? ($input['marque'] ?? ($input['author'] ?? '')));
         if (isset($existingCols['author'])) {
             $cols[] = 'author';
-            $vals[] = trim($input['author'] ?? '');
+            $vals[] = $brandVal;
+        }
+        if (isset($existingCols['brand'])) {
+            $cols[] = 'brand';
+            $vals[] = $brandVal;
         }
         if (isset($existingCols['format'])) {
             $cols[] = 'format';
@@ -304,6 +369,18 @@ function handlePost(?PDO $pdo): void {
         if (isset($existingCols['categories'])) {
             $cols[] = 'categories';
             $vals[] = $categoriesJson;
+        }
+        if (isset($existingCols['model_glb'])) {
+            $cols[] = 'model_glb';
+            $vals[] = trim($input['model_glb'] ?? '');
+        }
+        if (isset($existingCols['model_usdz'])) {
+            $cols[] = 'model_usdz';
+            $vals[] = trim($input['model_usdz'] ?? '');
+        }
+        if (isset($existingCols['barcode'])) {
+            $cols[] = 'barcode';
+            $vals[] = trim($input['barcode'] ?? '');
         }
         if (isset($existingCols['rating'])) {
             $cols[] = 'rating';
@@ -426,9 +503,14 @@ function handlePut(?PDO $pdo): void {
             $fields[] = "name = ?";
             $params[] = trim($input['name']);
         }
+        $brandVal = trim($input['brand'] ?? ($input['marque'] ?? ($input['author'] ?? '')));
         if (isset($existingCols['author'])) {
             $fields[] = "author = ?";
-            $params[] = trim($input['author'] ?? '');
+            $params[] = $brandVal;
+        }
+        if (isset($existingCols['brand'])) {
+            $fields[] = "brand = ?";
+            $params[] = $brandVal;
         }
         if (isset($existingCols['format'])) {
             $fields[] = "format = ?";
@@ -453,6 +535,18 @@ function handlePut(?PDO $pdo): void {
         if (isset($existingCols['categories'])) {
             $fields[] = "categories = ?";
             $params[] = $categoriesJson;
+        }
+        if (isset($existingCols['model_glb']) && array_key_exists('model_glb', $input)) {
+            $fields[] = "model_glb = ?";
+            $params[] = trim($input['model_glb'] ?? '');
+        }
+        if (isset($existingCols['model_usdz']) && array_key_exists('model_usdz', $input)) {
+            $fields[] = "model_usdz = ?";
+            $params[] = trim($input['model_usdz'] ?? '');
+        }
+        if (isset($existingCols['barcode']) && array_key_exists('barcode', $input)) {
+            $fields[] = "barcode = ?";
+            $params[] = trim($input['barcode'] ?? '');
         }
         if (isset($existingCols['image'])) {
             $fields[] = "image = ?";
@@ -505,6 +599,7 @@ function handlePut(?PDO $pdo): void {
                     if (isset($input['price'])) $prod['price'] = (float)$input['price'];
                     if (isset($input['stock'])) $prod['stock'] = (int)$input['stock'];
                     if (isset($input['format']) || isset($input['etat'])) $prod['format'] = trim($input['format'] ?? ($input['etat'] ?? ''));
+                    if (isset($input['barcode'])) $prod['barcode'] = trim($input['barcode']);
                     if (!empty($categories)) {
                         $prod['categories'] = $categories;
                         $prod['category'] = $categoriesStr;

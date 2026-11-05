@@ -6,7 +6,7 @@ const defaultDatingValue = {
   allProfiles: [],
   loadingProducts: false,
   setProfiles: () => {},
-  activeFilters: { search: '', categories: [], languages: [], maxPrice: 1000000 },
+  activeFilters: { search: '', categories: [], brands: [], languages: [], maxPrice: 1000000 },
   setActiveFilters: () => {},
   fetchProducts: () => {},
   swipedList: [],
@@ -86,7 +86,7 @@ export const DatingProvider = ({ children }) => {
         .replace(/[\u0300-\u036f]/g, '')
         .trim();
 
-    return allProfiles.filter((p) => {
+    const filtered = allProfiles.filter((p) => {
       // 0. Recherche textuelle (titre, auteur, catégorie, description, langue)
       if (activeFilters.search && activeFilters.search.trim() !== '') {
         const q = normalize(activeFilters.search);
@@ -95,6 +95,7 @@ export const DatingProvider = ({ children }) => {
         const titleMatch = normalize(p.name || p.title).includes(q);
         // Auteur
         const authorMatch = normalize(p.author).includes(q);
+        const brandMatch = normalize(p.brand || p.marque).includes(q);
         // Description
         const descMatch = normalize(p.bio || p.description).includes(q);
 
@@ -114,7 +115,7 @@ export const DatingProvider = ({ children }) => {
             : (typeof p.language === 'string' ? [p.language] : []));
         const langMatch = pLangs.some((l) => normalize(l).includes(q));
 
-        if (!titleMatch && !authorMatch && !descMatch && !catMatch && !langMatch) {
+        if (!titleMatch && !authorMatch && !brandMatch && !descMatch && !catMatch && !langMatch) {
           return false;
         }
       }
@@ -132,6 +133,18 @@ export const DatingProvider = ({ children }) => {
           return false;
         }
       }
+      // Marques de produits (Apple, Samsung, Xiaomi, etc.)
+      const selectedBrands = Array.isArray(activeFilters.brands)
+        ? activeFilters.brands
+        : (Array.isArray(activeFilters.marques) ? activeFilters.marques : []);
+      if (selectedBrands.length > 0) {
+        const pBrand = (p.brand || p.marque || p.author || '').trim().toLowerCase();
+        const matchesBrand = selectedBrands.some(
+          (b) => (b || '').trim().toLowerCase() === pBrand
+        );
+        if (!matchesBrand) return false;
+      }
+
       // 2. Langues
       if (activeFilters.languages && activeFilters.languages.length > 0) {
         const pLangs = Array.isArray(p.languages)
@@ -156,6 +169,13 @@ export const DatingProvider = ({ children }) => {
         return false;
       }
       return true;
+    });
+
+    // Tri strict : En stock (> 0) en premier, Rupture (<= 0) toujours à la fin
+    return [...filtered].sort((a, b) => {
+      const aInStock = (Number(a.stock) || 0) > 0 ? 1 : 0;
+      const bInStock = (Number(b.stock) || 0) > 0 ? 1 : 0;
+      return bInStock - aInStock;
     });
   }, [allProfiles, activeFilters]);
 
@@ -281,12 +301,22 @@ export const DatingProvider = ({ children }) => {
       if (!res.ok) throw new Error('API non joignable');
       const json = await res.json();
       if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
-        const formatted = json.data.map((p) => ({
-          id: p.id,
-          name: p.name,
-          title: p.name,
-          author: p.author || '',
-          format: p.format || '',
+        const formatted = json.data.map((p) => {
+          const brandVal = (p.brand || p.marque || p.author || '').trim();
+          return {
+            id: p.id,
+            name: p.name,
+            title: p.name,
+            brand: brandVal,
+            marque: brandVal,
+            author: brandVal || p.author || '',
+            subcategory: (p.subcategory || p.sub_category || p.sous_categorie || '').trim(),
+            sub_category: (p.subcategory || p.sub_category || p.sous_categorie || '').trim(),
+            format: p.format || '',
+            etat: p.etat || p.format || '',
+            model_glb: p.model_glb || p.model_3d_glb || '',
+            model_usdz: p.model_usdz || p.model_3d_usdz || '',
+            barcode: p.barcode || '',
           price: Number(p.price) || 0,
           purchase_price: Number(p.purchase_price) || 0,
           priceFormatted: `${Number(p.price).toLocaleString('fr-FR')} DA`,
@@ -309,11 +339,13 @@ export const DatingProvider = ({ children }) => {
             : (typeof p.languages === 'string' && p.languages.trim() !== ''
               ? p.languages.split(',').map((s) => s.trim()).filter(Boolean)
               : [])
-        }));
+          };
+        });
 
-        // Filtrer strictement les livres en stock (> 0) pour le site public
+        // Produits en stock (> 0) en premier, produits en rupture (<= 0) toujours à la fin
         const inStock = formatted.filter((p) => (Number(p.stock) || 0) > 0);
-        setAllProfiles(shuffleArray(inStock));
+        const outOfStock = formatted.filter((p) => (Number(p.stock) || 0) <= 0);
+        setAllProfiles([...shuffleArray(inStock), ...shuffleArray(outOfStock)]);
       } else {
         setAllProfiles([]);
       }
@@ -345,7 +377,8 @@ export const DatingProvider = ({ children }) => {
           price: Number(product.price) || 0,
           purchase_price: Number(product.purchase_price) || 0,
           quantity: 1,
-          image: product.image || (product.video ? product.video : '/assets/images/categories/telephones.svg')
+          image: product.image || (product.video ? product.video : '/assets/images/categories/telephones.svg'),
+          video: product.video || (product.videos && product.videos[0]) || ''
         }
       ];
     });

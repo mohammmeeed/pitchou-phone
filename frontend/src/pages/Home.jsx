@@ -8,6 +8,7 @@ import BookDetailBottomSheet from '../components/BookDetailBottomSheet';
 import { useDating } from '../context/DatingContext';
 import { useTheme } from '../context/ThemeContext';
 import Loader from '../components/Loader';
+import { getProductSubcategory } from '../utils/productUtils';
 
 const Home = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -62,6 +63,9 @@ const Home = () => {
   // Filtres actifs depuis le contexte global
   const activeFilters = datingCtx?.activeFilters || {};
   const selectedCategories = Array.isArray(activeFilters.categories) ? activeFilters.categories : [];
+  const selectedBrands = Array.isArray(activeFilters.brands)
+    ? activeFilters.brands
+    : (Array.isArray(activeFilters.marques) ? activeFilters.marques : []);
   const selectedLanguages = Array.isArray(activeFilters.languages) ? activeFilters.languages : [];
   const selectedEtats = Array.isArray(activeFilters.etats) ? activeFilters.etats : [];
   const currentMaxPrice = activeFilters.maxPrice !== undefined ? Number(activeFilters.maxPrice) : 1000000;
@@ -73,10 +77,11 @@ const Home = () => {
         setSearchBarHeight(h);
       }
     }
-  }, [searchOpen, selectedCategories, selectedEtats, selectedLanguages, currentMaxPrice]);
+  }, [searchOpen, selectedCategories, selectedBrands, selectedEtats, selectedLanguages, currentMaxPrice]);
 
-  // Catégories et Langues existantes dynamiques
+  // Catégories, Marques et Langues existantes dynamiques
   const [dbCategories, setDbCategories] = useState([]);
+  const [dbBrands, setDbBrands] = useState([]);
 
   useEffect(() => {
     fetch('/api/attributes')
@@ -88,12 +93,18 @@ const Home = () => {
             ? Object.values(data.subcategories).flat()
             : [];
           setDbCategories(Array.from(new Set([...cats, ...subs])));
+          if (Array.isArray(data.brands) && data.brands.length > 0) {
+            setDbBrands(data.brands);
+          }
         }
       })
       .catch(() => {});
   }, []);
 
   const defaultLanguages = useMemo(() => ['Français', 'Anglais', 'Arabe'], []);
+  const defaultBrands = useMemo(() => [
+    'Apple', 'Samsung', 'Xiaomi', 'OnePlus', 'Realme', 'Google Pixel', 'Huawei', 'Oppo', 'Infinix', 'Tecno', 'Honor', 'Hoco', 'Anker'
+  ], []);
 
   const allProducts = useMemo(() => {
     return (datingCtx?.allProfiles && datingCtx.allProfiles.length > 0)
@@ -113,6 +124,13 @@ const Home = () => {
     const combined = Array.from(new Set([...dbCategories, ...fromProducts]));
     return combined.filter((c) => c && c.trim() !== '');
   }, [allProducts, dbCategories]);
+
+  const brandsList = useMemo(() => {
+    const fromProducts = allProducts.map((p) => (p.brand || p.marque || p.author || '').trim()).filter(Boolean);
+    const sourceBrands = dbBrands.length > 0 ? dbBrands : defaultBrands;
+    const combined = Array.from(new Set([...sourceBrands, ...fromProducts]));
+    return combined.filter((b) => b && b.trim() !== '');
+  }, [allProducts, dbBrands, defaultBrands]);
 
   const languagesList = useMemo(() => {
     const fromProducts = allProducts.flatMap((p) => {
@@ -191,6 +209,19 @@ const Home = () => {
     });
   };
 
+  const toggleBrand = (brand) => {
+    if (!datingCtx?.setActiveFilters) return;
+    datingCtx.setActiveFilters((prev) => {
+      const current = Array.isArray(prev?.brands)
+        ? prev.brands
+        : (Array.isArray(prev?.marques) ? prev.marques : []);
+      const updated = current.includes(brand)
+        ? current.filter((b) => b !== brand)
+        : [...current, brand];
+      return { ...prev, brands: updated, marques: updated };
+    });
+  };
+
   const toggleEtat = (etat) => {
     if (!datingCtx?.setActiveFilters) return;
     datingCtx.setActiveFilters((prev) => {
@@ -227,7 +258,10 @@ const Home = () => {
     datingCtx.setActiveFilters({
       search: '',
       categories: [],
+      brands: [],
+      marques: [],
       languages: [],
+      etats: [],
       maxPrice: 1000000
     });
   };
@@ -717,7 +751,7 @@ const Home = () => {
               <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary, #71717a)' }}>
                 Catégories
               </span>
-              {(selectedCategories.length > 0 || selectedEtats.length > 0 || selectedLanguages.length > 0 || currentMaxPrice < 1000000 || searchQuery) && (
+              {(selectedCategories.length > 0 || selectedBrands.length > 0 || selectedEtats.length > 0 || selectedLanguages.length > 0 || currentMaxPrice < 1000000 || searchQuery) && (
                 <button
                   type="button"
                   onClick={handleResetFilters}
@@ -762,15 +796,15 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Ligne 2 : État du Produit */}
+          {/* Ligne 2 : Marques */}
           <div style={{ marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--secondary, #71717a)' }}>
-                État du produit
+                Marques
               </span>
-              {selectedEtats.length > 0 && (
+              {selectedBrands.length > 0 && (
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)' }}>
-                  {selectedEtats.length} sélectionné{selectedEtats.length > 1 ? 's' : ''}
+                  {selectedBrands.length} sélectionnée{selectedBrands.length > 1 ? 's' : ''}
                 </span>
               )}
             </div>
@@ -785,22 +819,16 @@ const Home = () => {
                 msOverflowStyle: 'none'
               }}
             >
-              {[
-                { label: 'Sous blister', icon: '📦' },
-                { label: 'Très bon état', icon: '⭐' },
-                { label: 'Bon état', icon: '👍' },
-                { label: 'Occasion', icon: '🔄' }
-              ].map((item) => {
-                const isSelected = selectedEtats.includes(item.label);
+              {brandsList.map((brand) => {
+                const isSelected = selectedBrands.includes(brand);
                 return (
                   <button
-                    key={item.label}
+                    key={brand}
                     type="button"
-                    onClick={() => toggleEtat(item.label)}
+                    onClick={() => toggleBrand(brand)}
                     className={`filter-chip ${isSelected ? 'active' : ''}`}
                   >
-                    <span style={{ marginRight: '4px' }}>{item.icon}</span>
-                    {item.label}
+                    {brand}
                   </button>
                 );
               })}
@@ -936,6 +964,7 @@ const Home = () => {
               {visibleGridProfiles.map((card) => {
                 const isCardLiked = datingCtx?.isLiked ? datingCtx.isLiked(card.id) : false;
                 const displayPrice = card.price ? `${Number(card.price).toLocaleString('fr-FR')} DA` : (card.distance || '');
+                const isCardOutOfStock = card.stock !== undefined && Number(card.stock) <= 0;
 
                 return (
                   <div
@@ -943,9 +972,36 @@ const Home = () => {
                     data-product-id={card.id}
                     onClick={() => setDetailCard(card)}
                     className="home-product-card"
+                    style={{
+                      opacity: isCardOutOfStock ? 0.72 : 1,
+                      filter: isCardOutOfStock ? 'grayscale(50%)' : 'none',
+                      transition: 'opacity 0.2s, filter 0.2s'
+                    }}
                   >
                     {/* Image Couverture */}
                     <div style={{ position: 'relative', width: '100%', paddingTop: '130%', background: '#1c1c1e', overflow: 'hidden' }}>
+                      {isCardOutOfStock && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '8px',
+                            background: 'rgba(15, 23, 42, 0.88)',
+                            color: '#f87171',
+                            border: '1px solid rgba(239, 68, 68, 0.8)',
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            zIndex: 4,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.4px',
+                            backdropFilter: 'blur(4px)'
+                          }}
+                        >
+                          Out of stock
+                        </span>
+                      )}
                       {(() => {
                         const rawVid = card.video || (card.videos && card.videos[0]);
                         const cardVid = rawVid && typeof rawVid === 'string' && rawVid.trim() !== '' ? rawVid.trim() : null;
@@ -1010,11 +1066,37 @@ const Home = () => {
                         );
                       })()}
 
-                      {/* Badge État du Produit */}
+                      {/* Badge Modèle 3D / AR */}
+                      {Boolean(card.model_glb || card.model_usdz) && (
+                        <span
+                          title="Modèle 3D et Réalité Augmentée disponible"
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'rgba(24, 24, 27, 0.75)',
+                            backdropFilter: 'blur(6px)',
+                            color: '#38bdf8',
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            zIndex: 2,
+                            border: '1px solid rgba(56, 189, 248, 0.45)'
+                          }}
+                        >
+                          <i className="fas fa-cube" style={{ fontSize: '9px' }} />
+                          <span>3D</span>
+                        </span>
+                      )}
+
+                      {/* Badge Sous-Catégorie */}
                       {(() => {
-                        const rawEtat = card.format || card.etat;
-                        const cardEtat = rawEtat && typeof rawEtat === 'string' && rawEtat.trim() !== '' && rawEtat.trim().toLowerCase() !== 'format' ? rawEtat.trim() : null;
-                        if (!cardEtat) return null;
+                        const badgeText = getProductSubcategory(card);
+                        if (!badgeText) return null;
                         return (
                           <span
                             style={{
@@ -1031,10 +1113,11 @@ const Home = () => {
                               maxWidth: '85%',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
-                              textOverflow: 'ellipsis'
+                              textOverflow: 'ellipsis',
+                              zIndex: 2
                             }}
                           >
-                            {cardEtat}
+                            {badgeText}
                           </span>
                         );
                       })()}
@@ -1082,13 +1165,13 @@ const Home = () => {
                           style={{
                             fontSize: '11px',
                             fontWeight: 600,
-                            color: 'var(--secondary, #666)',
-                            background: 'rgba(0,0,0,0.05)',
+                            color: isCardOutOfStock ? '#ffffff' : 'var(--secondary, #666)',
+                            background: isCardOutOfStock ? '#6b7280' : 'rgba(0,0,0,0.05)',
                             padding: '3px 8px',
                             borderRadius: '6px'
                           }}
                         >
-                          Voir
+                          {isCardOutOfStock ? 'Out of stock' : 'Voir'}
                         </span>
                       </div>
                     </div>

@@ -14,6 +14,7 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
   const [touchStartX, setTouchStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [showArModal, setShowArModal] = useState(false);
   const galleryTrackRef = useRef(null);
 
   useEffect(() => {
@@ -132,8 +133,14 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
     category: hasCategory ? rawCategory : '',
     format: hasFormat ? rawFormat : '',
     bio: hasBio ? rawBio : '',
-    languages: bookLanguages
+    languages: bookLanguages,
+    model_glb: (dbProduct?.model_glb ?? card?.model_glb ?? '') || (dbProduct?.model_3d_glb ?? card?.model_3d_glb ?? ''),
+    model_usdz: (dbProduct?.model_usdz ?? card?.model_usdz ?? '') || (dbProduct?.model_3d_usdz ?? card?.model_3d_usdz ?? '')
   };
+
+  const glbModel = String(activeBook.model_glb || '').trim();
+  const usdzModel = String(activeBook.model_usdz || '').trim();
+  const hasAr = Boolean(glbModel || usdzModel);
 
   // Construction dynamique de la galerie multi-photos et vidéos
   const galleryItems = React.useMemo(() => {
@@ -268,7 +275,10 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
     }, 380);
   };
 
+  const isOutOfStock = activeBook.stock !== undefined && Number(activeBook.stock) <= 0;
+
   const handleAddToCart = () => {
+    if (isOutOfStock) return;
     addToCart(activeBook);
     setAddedToCart(true);
     setTimeout(() => {
@@ -326,6 +336,31 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
               cursor: totalItems > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
             }}
           >
+            {/* Badge Out of stock */}
+            {isOutOfStock && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '14px',
+                  left: '14px',
+                  zIndex: 20,
+                  backgroundColor: 'rgba(15, 23, 42, 0.88)',
+                  color: '#f87171',
+                  border: '1px solid rgba(239, 68, 68, 0.8)',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  letterSpacing: '0.6px',
+                  textTransform: 'uppercase',
+                  backdropFilter: 'blur(6px)',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)'
+                }}
+              >
+                Out of stock
+              </div>
+            )}
+
             {/* Slider Track */}
             <div 
               ref={galleryTrackRef}
@@ -485,18 +520,76 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
                   </button>
                 );
               })}
+
+              {/* Bouton miniature AR / 3D */}
+              {hasAr && (
+                <button
+                  type="button"
+                  onClick={() => setShowArModal(true)}
+                  className="book-sheet-thumb-btn"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#18181b',
+                    color: '#ffffff',
+                    border: '1.5px solid #38bdf8',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    minWidth: '50px'
+                  }}
+                  title="Voir en 3D et Réalité Augmentée"
+                >
+                  <i className="fas fa-cube" style={{ fontSize: '15px', color: '#38bdf8' }} />
+                  <span style={{ fontSize: '9px', fontWeight: 800, marginTop: '2px', color: '#38bdf8' }}>AR 3D</span>
+                </button>
+              )}
             </div>
           )}
 
           {/* Book Info */}
           <div className="book-sheet-body">
-            <div className="mb-2">
-              <h3 className="book-sheet-title mb-0">{activeName}</h3>
-              {hasAuthor ? (
-                <span className="text-muted d-block" style={{ fontSize: '13px', marginTop: '3px' }}>
-                  Par {rawAuthor}
-                </span>
-              ) : null}
+            <div className="d-flex align-items-center justify-content-between mb-2" style={{ gap: '12px' }}>
+              <div>
+                <h3 className="book-sheet-title mb-0">{activeName}</h3>
+                {hasAuthor ? (
+                  <span className="text-muted d-block" style={{ fontSize: '13px', marginTop: '3px' }}>
+                    Marque : <strong style={{ color: '#111827' }}>{rawAuthor}</strong>
+                  </span>
+                ) : null}
+              </div>
+
+              {/* Bouton Voir en AR */}
+              {hasAr && (
+                <button
+                  type="button"
+                  onClick={() => setShowArModal(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)',
+                    color: '#ffffff',
+                    border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                    borderRadius: '9999px',
+                    padding: '7px 15px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+                    backdropFilter: 'blur(8px)',
+                    transition: 'transform 0.15s ease',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.04)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                >
+                  <i className="fas fa-vr-cardboard" style={{ fontSize: '13px', color: '#38bdf8' }} />
+                  <span>Voir en AR</span>
+                </button>
+              )}
             </div>
 
             {/* Badges Catégorie & Format récupérés depuis la BDD (uniquement si renseignés) */}
@@ -595,10 +688,25 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
           </div>
           <button 
             type="button" 
-            className={`btn btn-lg btn-gradient rounded-xl book-sheet-buy-btn ${addedToCart ? 'added' : ''}`}
-            onClick={handleAddToCart}
+            disabled={isOutOfStock}
+            className={`btn btn-lg rounded-xl book-sheet-buy-btn ${isOutOfStock ? 'disabled' : (addedToCart ? 'added' : 'btn-gradient')}`}
+            onClick={isOutOfStock ? undefined : handleAddToCart}
+            style={isOutOfStock ? {
+              backgroundColor: '#6b7280',
+              backgroundImage: 'none',
+              borderColor: '#6b7280',
+              color: '#ffffff',
+              cursor: 'not-allowed',
+              opacity: 0.9,
+              boxShadow: 'none'
+            } : undefined}
           >
-            {addedToCart ? (
+            {isOutOfStock ? (
+              <>
+                <i className="icon feather icon-slash me-2"></i>
+                Out of stock
+              </>
+            ) : addedToCart ? (
               <>
                 <i className="icon feather icon-check me-2"></i>
                 Ajouté au panier !
@@ -612,6 +720,200 @@ const BookDetailBottomSheet = ({ card, isOpen, onClose }) => {
           </button>
         </div>
       </div>
+
+      {/* Modal Plein Écran : Vue 3D Interactive & Réalité Augmentée (model-viewer) */}
+      {showArModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.88)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 999999,
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+          onClick={() => setShowArModal(false)}
+        >
+          {/* En-tête de la modale */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 20px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+              color: '#ffffff'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: '#18181b',
+                  border: '1.5px solid #38bdf8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="fas fa-cube" style={{ fontSize: '16px', color: '#38bdf8' }} />
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>
+                  {activeName}
+                </h4>
+                <span style={{ fontSize: '12px', color: '#a1a1aa' }}>
+                  Vue 3D & Réalité Augmentée (AR)
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowArModal(false)}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: '16px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background-color 0.15s ease'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.22)')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)')}
+            >
+              <i className="fas fa-times" />
+            </button>
+          </div>
+
+          {/* Visualiseur 3D Google model-viewer */}
+          <div
+            style={{
+              flex: 1,
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <model-viewer
+              src={glbModel || undefined}
+              ios-src={usdzModel || undefined}
+              alt={activeName}
+              ar
+              ar-modes="webxr scene-viewer quick-look"
+              camera-controls
+              auto-rotate
+              shadow-intensity="1.2"
+              exposure="1.0"
+              interaction-prompt="auto"
+              style={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'transparent'
+              }}
+            >
+              {/* Bouton personnalisé AR (activé sur Android et iOS) */}
+              <button
+                slot="ar-button"
+                style={{
+                  position: 'absolute',
+                  bottom: '24px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: '#2563eb',
+                  color: '#ffffff',
+                  borderRadius: '9999px',
+                  border: 'none',
+                  padding: '12px 26px',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  boxShadow: '0 8px 24px rgba(37, 99, 235, 0.45)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  zIndex: 10,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <i className="fas fa-vr-cardboard" style={{ fontSize: '16px' }} />
+                <span>Voir dans votre pièce (RA)</span>
+              </button>
+            </model-viewer>
+
+            {/* Bulle d'indication tactile / souris */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '16px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                backdropFilter: 'blur(8px)',
+                color: '#ffffff',
+                borderRadius: '9999px',
+                padding: '6px 16px',
+                fontSize: '12px',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                pointerEvents: 'none',
+                border: '1px solid rgba(255, 255, 255, 0.15)'
+              }}
+            >
+              <i className="fas fa-hand-pointer" style={{ color: '#38bdf8' }} />
+              <span>Glissez pour pivoter à 360° • Pincez pour zoomer</span>
+            </div>
+          </div>
+
+          {/* Lien direct Apple AR Quick Look pour Safari iOS */}
+          {usdzModel && (
+            <div
+              style={{
+                padding: '12px 20px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <a
+                rel="ar"
+                href={usdzModel}
+                style={{
+                  color: '#38bdf8',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <i className="fab fa-apple" />
+                Lancer directement Apple AR Quick Look (iPhone / iPad)
+              </a>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

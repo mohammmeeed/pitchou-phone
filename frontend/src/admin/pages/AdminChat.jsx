@@ -426,16 +426,47 @@ export default function AdminChat() {
 
                       <div
                         style={{
-                          fontSize: '0.78rem',
-                          color: isSelected ? '#111111' : '#777',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          fontWeight: isSelected ? 600 : 400
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem'
                         }}
                       >
-                        {conv.last_sender === 'admin' && <span style={{ fontWeight: 600 }}>Vous : </span>}
-                        {conv.last_message}
+                        <div
+                          style={{
+                            fontSize: '0.78rem',
+                            color: isSelected ? '#111111' : '#777',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            fontWeight: isSelected ? 600 : 400,
+                            flex: 1
+                          }}
+                        >
+                          {conv.last_sender === 'admin' && <span style={{ fontWeight: 600 }}>Vous : </span>}
+                          {conv.last_message}
+                        </div>
+                        {Number(conv.unread_count) > 0 && !isSelected && (
+                          <span
+                            style={{
+                              backgroundColor: '#ef4444',
+                              color: '#ffffff',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              minWidth: '16px',
+                              height: '16px',
+                              borderRadius: '9999px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '0 4px',
+                              lineHeight: 1,
+                              flexShrink: 0
+                            }}
+                          >
+                            {conv.unread_count}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

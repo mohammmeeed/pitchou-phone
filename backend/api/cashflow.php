@@ -59,6 +59,11 @@ function initCashflowTable(PDO $pdo): void {
     try {
         $pdo->exec("ALTER TABLE `cashflow_entries` ADD COLUMN `attachment_url` VARCHAR(255) DEFAULT NULL AFTER `note`");
     } catch (Exception $e) {}
+
+    try {
+        $pdo->exec("ALTER TABLE `cashflow_entries` ADD COLUMN `customer_id` INT(11) DEFAULT NULL AFTER `party_phone`");
+        $pdo->exec("ALTER TABLE `cashflow_entries` ADD COLUMN `supplier_id` INT(11) DEFAULT NULL AFTER `customer_id`");
+    } catch (Exception $e) {}
 }
 
 function handleGet(PDO $pdo): void {
@@ -79,9 +84,9 @@ function handleGet(PDO $pdo): void {
     } elseif ($tab === 'achats') {
         $sql .= " AND type = 'DEPENSE' AND (order_type LIKE '%ACHAT%' OR source = 'FOURNISSEUR')";
     } elseif ($tab === 'versements_clients') {
-        $sql .= " AND type = 'VERSEMENT' AND (order_type LIKE '%CLIENT%' OR party_name LIKE '%Client%')";
+        $sql .= " AND (type IN ('VERSEMENT', 'RECETTE')) AND (order_type LIKE '%CLIENT%' OR party_name LIKE '%Client%' OR customer_id IS NOT NULL)";
     } elseif ($tab === 'versements_fournisseurs') {
-        $sql .= " AND (type = 'DEPENSE' OR type = 'VERSEMENT') AND (order_type LIKE '%FOURNISSEUR%' OR source = 'FOURNISSEUR')";
+        $sql .= " AND (type IN ('DEPENSE', 'VERSEMENT')) AND (order_type LIKE '%FOURNISSEUR%' OR source = 'FOURNISSEUR' OR supplier_id IS NOT NULL)";
     }
 
     if (!empty($search)) {
@@ -151,8 +156,8 @@ function handleGet(PDO $pdo): void {
         'recettes_depenses' => (int)$pdo->query("SELECT COUNT(*) FROM `cashflow_entries` WHERE type IN ('RECETTE', 'DEPENSE')")->fetchColumn(),
         'ventes' => (int)$pdo->query("SELECT COUNT(*) FROM `cashflow_entries` WHERE type = 'VENTE'")->fetchColumn(),
         'achats' => (int)$pdo->query("SELECT COUNT(*) FROM `cashflow_entries` WHERE type = 'DEPENSE' AND (order_type LIKE '%ACHAT%' OR source = 'FOURNISSEUR')")->fetchColumn(),
-        'versements_clients' => (int)$pdo->query("SELECT COUNT(*) FROM `cashflow_entries` WHERE type = 'VERSEMENT' AND (order_type LIKE '%CLIENT%' OR party_name LIKE '%Client%')")->fetchColumn(),
-        'versements_fournisseurs' => (int)$pdo->query("SELECT COUNT(*) FROM `cashflow_entries` WHERE (type = 'DEPENSE' OR type = 'VERSEMENT') AND (order_type LIKE '%FOURNISSEUR%' OR source = 'FOURNISSEUR')")->fetchColumn()
+        'versements_clients' => (int)$pdo->query("SELECT COUNT(*) FROM `cashflow_entries` WHERE (type IN ('VERSEMENT', 'RECETTE')) AND (order_type LIKE '%CLIENT%' OR party_name LIKE '%Client%' OR customer_id IS NOT NULL)")->fetchColumn(),
+        'versements_fournisseurs' => (int)$pdo->query("SELECT COUNT(*) FROM `cashflow_entries` WHERE (type IN ('DEPENSE', 'VERSEMENT')) AND (order_type LIKE '%FOURNISSEUR%' OR source = 'FOURNISSEUR' OR supplier_id IS NOT NULL)")->fetchColumn()
     ];
 
     echo json_encode([
@@ -187,14 +192,92 @@ function handlePost(PDO $pdo): void {
         return;
     }
 
+    $tierType = strtolower(trim($input['tier_type'] ?? '')); // 'fournisseur' | 'client' | ''
+    $tierId = !empty($input['tier_id']) ? (int)$input['tier_id'] : null;
+    $customerId = null;
+    $supplierId = null;
+
     $prefix = $type === 'RECETTE' ? 'REC' : 'DEP';
     $refNumber = $prefix . '-' . date('Ymd-His');
 
-    $stmt = $pdo->prepare("INSERT INTO `cashflow_entries`
-        (`type`, `ref_number`, `party_name`, `party_phone`, `order_type`, `source`, `products_amount`, `shipping_fee`, `total_amount`, `paid_amount`, `remaining_amount`, `profit_amount`, `note`, `attachment_url`, `status`, `operation_date`)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    // Détection & Liaison automatique Fournisseur
+    if ($tierType === 'fournisseur' || stripos($orderType, 'FOURNISSEUR') !== false) {
+        $supStmt = null;
+        if ($tierId) {
+            $supStmt = $pdo->prepare("SELECT * FROM `suppliers` WHERE id = ?");
+            $supStmt->execute([$tierId]);
+        } elseif (!empty($partyName)) {
+            $supStmt = $pdo->prepare("SELECT * FROM `suppliers` WHERE name = ? OR company = ? LIMIT 1");
+            $supStmt->execute([$partyName, $partyName]);
+        }
+        $supplier = $supStmt ? $supStmt->fetch() : null;
 
-    $profit = $type === 'RECETTE' ? $amount : 0;
+        if ($supplier) {
+            $supplierId = (int)$supplier['id'];
+            $partyName = $supplier['name'];
+            if (empty($partyPhone) && !empty($supplier['phone'])) {
+                $partyPhone = $supplier['phone'];
+            }
+        }
+
+        // Si c'est une dépense/versement fournisseur
+        if ($type === 'DEPENSE' && ($tierType === 'fournisseur' || stripos($orderType, 'FOURNISSEUR') !== false || $supplierId !== null)) {
+            $lastPaymentId = (int)$pdo->query("SELECT MAX(id) FROM `supplier_payments`")->fetchColumn();
+            $refNumber = 'VRST-' . ($lastPaymentId + 1);
+            $source = 'VERSEMENT';
+            $orderType = 'VERSEMENT FOURNISSEUR';
+
+            if ($supplierId) {
+                $spStmt = $pdo->prepare("INSERT INTO `supplier_payments` 
+                    (`reference`, `supplier_id`, `supplier_name`, `amount`, `payment_method`, `notes`, `payment_date`) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $spStmt->execute([
+                    $refNumber,
+                    $supplierId,
+                    $partyName,
+                    $amount,
+                    'Espèces',
+                    $note,
+                    $operationDate
+                ]);
+            }
+        }
+    }
+
+    // Détection & Liaison automatique Client
+    if ($tierType === 'client' || stripos($orderType, 'CLIENT') !== false) {
+        $clStmt = null;
+        if ($tierId) {
+            $clStmt = $pdo->prepare("SELECT * FROM `customers` WHERE id = ?");
+            $clStmt->execute([$tierId]);
+        } elseif (!empty($partyPhone)) {
+            $clStmt = $pdo->prepare("SELECT * FROM `customers` WHERE TRIM(phone) = ? LIMIT 1");
+            $clStmt->execute([trim($partyPhone)]);
+        } elseif (!empty($partyName)) {
+            $clStmt = $pdo->prepare("SELECT * FROM `customers` WHERE TRIM(name) = ? LIMIT 1");
+            $clStmt->execute([trim($partyName)]);
+        }
+        $client = $clStmt ? $clStmt->fetch() : null;
+
+        if ($client) {
+            $customerId = (int)$client['id'];
+            $partyName = $client['name'];
+            if (empty($partyPhone) && !empty($client['phone'])) {
+                $partyPhone = $client['phone'];
+            }
+        }
+
+        if ($type === 'RECETTE' || $type === 'VERSEMENT') {
+            $orderType = 'VERSEMENT CLIENT';
+            $source = 'VERSEMENT';
+        }
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO `cashflow_entries`
+        (`type`, `ref_number`, `party_name`, `party_phone`, `customer_id`, `supplier_id`, `order_type`, `source`, `products_amount`, `shipping_fee`, `total_amount`, `paid_amount`, `remaining_amount`, `profit_amount`, `note`, `attachment_url`, `status`, `operation_date`)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+    $profit = ($type === 'RECETTE' && stripos($orderType, 'VERSEMENT') === false) ? $amount : 0;
     $status = 'RÉGLÉ';
 
     $stmt->execute([
@@ -202,6 +285,8 @@ function handlePost(PDO $pdo): void {
         $refNumber,
         $partyName,
         $partyPhone,
+        $customerId,
+        $supplierId,
         $orderType,
         $source,
         0,

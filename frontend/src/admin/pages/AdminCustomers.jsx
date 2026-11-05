@@ -28,6 +28,31 @@ export default function AdminCustomers() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
+  // Modal Historique d'achats du client
+  const [historyCustomer, setHistoryCustomer] = useState(null);
+  const [customerOrders, setCustomerOrders] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const handleOpenHistory = async (customer) => {
+    setHistoryCustomer(customer);
+    setLoadingHistory(true);
+    setCustomerOrders([]);
+    try {
+      const orders = await adminApi.getCustomerOrders(customer);
+      setCustomerOrders(orders);
+    } catch (err) {
+      console.error('Erreur chargement historique client:', err);
+      setCustomerOrders([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleCloseHistory = () => {
+    setHistoryCustomer(null);
+    setCustomerOrders([]);
+  };
+
   useEffect(() => {
     loadCustomers();
   }, []);
@@ -208,6 +233,217 @@ export default function AdminCustomers() {
   const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
   const paginatedCustomers = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  // Modal Historique d'achats du client (Design épuré sans badges ni jaune)
+  const renderHistoryModal = () => {
+    if (!historyCustomer) return null;
+
+    const totalSpent = customerOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '16px'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) handleCloseHistory();
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            maxWidth: '820px',
+            width: '100%',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            overflow: 'hidden',
+            border: '1px solid #e4e4e7'
+          }}
+        >
+          {/* Header simple */}
+          <div
+            style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid #e4e4e7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}
+          >
+            <div>
+              <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#18181b' }}>
+                Historique des achats — {historyCustomer.name}
+              </h4>
+              <div style={{ fontSize: '0.82rem', color: '#71717a', marginTop: '3px' }}>
+                Client #{historyCustomer.id}
+                {historyCustomer.phone ? ` • ${historyCustomer.phone}` : ''}
+                {historyCustomer.wilaya ? ` • ${historyCustomer.wilaya}` : ''}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleCloseHistory}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '1.5rem',
+                color: '#71717a',
+                cursor: 'pointer',
+                lineHeight: 1,
+                padding: '4px 8px'
+              }}
+              title="Fermer"
+            >
+              &times;
+            </button>
+          </div>
+
+          {/* Récapitulatif simple (sans badges) */}
+          <div
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: '#fafafa',
+              borderBottom: '1px solid #e4e4e7',
+              fontSize: '0.85rem',
+              color: '#3f3f46',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '8px'
+            }}
+          >
+            <div>
+              <strong>{customerOrders.length}</strong> achat{customerOrders.length > 1 ? 's' : ''} enregistré{customerOrders.length > 1 ? 's' : ''}
+            </div>
+            <div>
+              Total dépensé : <strong>{totalSpent.toLocaleString('fr-FR')} DA</strong>
+            </div>
+          </div>
+
+          {/* Liste sous forme de tableau sobre et simple */}
+          <div style={{ padding: '1rem 1.5rem', overflowY: 'auto', flex: 1 }}>
+            {loadingHistory ? (
+              <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#71717a' }}>
+                <i className="flaticon-381-reload font-24 mb-2 d-block" />
+                Chargement de l'historique...
+              </div>
+            ) : customerOrders.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#71717a' }}>
+                Aucun achat enregistré pour ce client.
+              </div>
+            ) : (
+              <div className="table-responsive-custom">
+                <table className="table-custom" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #e4e4e7', textAlign: 'left', fontSize: '0.78rem', color: '#71717a' }}>
+                      <th style={{ padding: '8px 10px', fontWeight: 600 }}>Commande</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600 }}>Date</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600 }}>Canal</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600 }}>Articles</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600 }}>Montant</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600 }}>Statut</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600, textAlign: 'right' }}>Détails</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customerOrders.map((ord) => {
+                      const isPos = ord.delivery_type === 'boutique' || String(ord.order_number || '').startsWith('#POS');
+                      return (
+                        <tr key={ord.id} style={{ borderBottom: '1px solid #f4f4f5' }}>
+                          <td style={{ padding: '10px 10px', fontWeight: 700, color: '#18181b', whiteSpace: 'nowrap' }}>
+                            {ord.order_number}
+                          </td>
+                          <td style={{ padding: '10px 10px', fontSize: '0.82rem', color: '#71717a', whiteSpace: 'nowrap' }}>
+                            {ord.created_at}
+                          </td>
+                          <td style={{ padding: '10px 10px', fontSize: '0.82rem', color: '#3f3f46', whiteSpace: 'nowrap' }}>
+                            {isPos ? 'Boutique (POS)' : 'En ligne'}
+                          </td>
+                          <td style={{ padding: '10px 10px', fontSize: '0.85rem', color: '#18181b' }}>
+                            <div>{ord.items_summary || 'Articles divers'}</div>
+                            {ord.notes && (
+                              <div style={{ fontSize: '0.74rem', color: '#71717a', marginTop: '2px' }}>
+                                {ord.notes}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 10px', fontWeight: 700, color: '#18181b', whiteSpace: 'nowrap' }}>
+                            {Number(ord.total_amount || 0).toLocaleString('fr-FR')} DA
+                          </td>
+                          <td style={{ padding: '10px 10px', fontSize: '0.82rem', color: '#3f3f46', whiteSpace: 'nowrap' }}>
+                            {ord.status || 'Livrée'}
+                          </td>
+                          <td style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <Link
+                              to={`/admin/orders?search=${encodeURIComponent(ord.order_number)}`}
+                              className="btn-light-custom"
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: '0.78rem',
+                                borderRadius: '4px',
+                                textDecoration: 'none',
+                                display: 'inline-block'
+                              }}
+                            >
+                              Voir
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Footer simple */}
+          <div
+            style={{
+              padding: '0.85rem 1.5rem',
+              borderTop: '1px solid #e4e4e7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#fafafa'
+            }}
+          >
+            <Link
+              to="/admin/pos"
+              className="btn-light-custom"
+              style={{
+                fontSize: '0.85rem',
+                padding: '0.45rem 0.9rem',
+                borderRadius: '6px',
+                textDecoration: 'none'
+              }}
+            >
+              Caisse POS
+            </Link>
+            <button
+              type="button"
+              className="btn-light-custom"
+              onClick={handleCloseHistory}
+              style={{ padding: '0.45rem 1.25rem', fontSize: '0.85rem', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // =========================================================================
   // VUE 2 : PAGE COMPLÈTE D'ÉDITION DU CLIENT
   // =========================================================================
@@ -243,9 +479,15 @@ export default function AdminCustomers() {
           </div>
 
           <div className="page-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span className="badge-custom bg-soft-info" style={{ fontSize: '0.85rem', padding: '0.5rem 0.9rem' }}>
-              <i className="flaticon-381-box-1 me-1" /> {editingCustomer.total_orders || 0} commande(s)
-            </span>
+            <button
+              type="button"
+              className="badge-custom bg-soft-info"
+              onClick={() => handleOpenHistory(editingCustomer)}
+              title="Cliquer pour afficher l'historique d'achats"
+              style={{ fontSize: '0.85rem', padding: '0.5rem 0.9rem', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+            >
+              <i className="fas fa-history me-1" /> {editingCustomer.total_orders || 0} commande(s)
+            </button>
             <span className="badge-custom bg-soft-success" style={{ fontSize: '0.85rem', padding: '0.5rem 0.9rem' }}>
               <i className="flaticon-381-diamond me-1" /> {Number(editingCustomer.total_spent || 0).toLocaleString()} DA
             </span>
@@ -488,6 +730,10 @@ export default function AdminCustomers() {
             </button>
           </div>
         </form>
+
+        
+        {renderHistoryModal()}
+
       </AdminLayout>
     );
   }
@@ -573,14 +819,15 @@ export default function AdminCustomers() {
                 <th>Email</th>
                 <th>Wilaya / Adresse</th>
                 <th>Nb Commandes</th>
-                <th>Total Dépensé (DA)</th>
+                <th style={{ color: '#dc2626' }}>Dette (DA)</th>
+                <th style={{ minWidth: '200px' }}>Progression Règlement</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '3rem' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '3rem' }}>
                     {loading ? 'Chargement des clients...' : 'Aucun client trouvé.'}
                   </td>
                 </tr>
@@ -629,12 +876,59 @@ export default function AdminCustomers() {
                       <strong>{c.total_orders ?? 0}</strong>
                     </td>
                     <td>
-                      <strong style={{ color: '#111111', fontSize: '0.95rem' }}>
-                        {Number(c.total_spent || 0).toLocaleString()} DA
+                      <strong style={{ fontSize: '0.92rem', color: (c.balance || 0) > 0 ? '#dc2626' : '#16a34a' }}>
+                        {Number(c.balance || 0).toLocaleString()} DA
                       </strong>
+                    </td>
+                    <td style={{ verticalAlign: 'middle', minWidth: '200px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', fontSize: '0.74rem' }}>
+                        <span style={{ fontWeight: 700, color: (c.progress ?? 100) >= 100 ? '#16a34a' : '#d97706' }}>
+                          {c.progress !== undefined ? c.progress : 100}%
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            padding: '0.15rem 0.45rem',
+                            borderRadius: '4px',
+                            backgroundColor: (c.progress ?? 100) >= 100 ? '#ecfdf5' : '#fffbeb',
+                            color: (c.progress ?? 100) >= 100 ? '#16a34a' : '#d97706',
+                            border: `1px solid ${(c.progress ?? 100) >= 100 ? '#bbf7d0' : '#fde68a'}`
+                          }}
+                        >
+                          {(c.progress ?? 100) >= 100 ? 'Réglé' : `Reste: ${Math.round(c.balance || 0).toLocaleString()} DA`}
+                        </span>
+                      </div>
+                      <div style={{ height: '6px', width: '100%', backgroundColor: '#e5e7eb', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${c.progress !== undefined ? c.progress : 100}%`,
+                            backgroundColor: (c.progress ?? 100) >= 100 ? '#16a34a' : ((c.progress ?? 0) < 50 ? '#dc2626' : '#d97706'),
+                            transition: 'width 0.3s ease'
+                          }}
+                        />
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#71717a', marginTop: '3px' }}>
+                        Total: {Number(c.total_spent || c.total_invoiced || 0).toLocaleString()} DA
+                      </div>
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                        <button
+                          type="button"
+                          className="btn-icon-custom"
+                          title="Historique des achats"
+                          onClick={() => handleOpenHistory(c)}
+                          style={{
+                            border: '1px solid #e4e4e7',
+                            backgroundColor: '#f4f4f5',
+                            color: '#18181b',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <i className="fas fa-history" />
+                        </button>
                         <button
                           type="button"
                           className="btn-icon-custom bg-soft-info"
@@ -694,6 +988,10 @@ export default function AdminCustomers() {
           itemLabel="clients"
         />
       </div>
+
+      
+      {renderHistoryModal()}
+
     </AdminLayout>
   );
 }

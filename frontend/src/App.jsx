@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { ThemeProvider } from './context/ThemeContext';
 import { DatingProvider } from './context/DatingContext';
 import F12Blocker from './components/F12Blocker';
+import { initFaviconManager } from './utils/favicon';
 
 // Background Visit Tracker for live dynamic traffic analytics in Admin Dashboard
 function VisitTracker() {
@@ -70,9 +71,12 @@ import ErrorPage from './pages/ErrorPage';
 import AdminDashboard from './admin/pages/AdminDashboard';
 import AdminProducts from './admin/pages/AdminProducts';
 import AdminOrders from './admin/pages/AdminOrders';
+import AdminPos from './admin/pages/AdminPos';
 import AdminCustomers from './admin/pages/AdminCustomers';
 import AdminChat from './admin/pages/AdminChat';
 import AdminCashflow from './admin/pages/AdminCashflow';
+import AdminSuppliers from './admin/pages/AdminSuppliers';
+import AdminPurchases from './admin/pages/AdminPurchases';
 import AdminParameter from './admin/pages/AdminParameter';
 import AdminLogin from './admin/pages/AdminLogin';
 import AdminAccount from './admin/pages/AdminAccount';
@@ -88,6 +92,10 @@ function AdminProtectedRoute({ children }) {
 }
 
 function App() {
+  useEffect(() => {
+    return initFaviconManager();
+  }, []);
+
   return (
     <ThemeProvider>
       <DatingProvider>
@@ -196,7 +204,10 @@ function App() {
             <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
             <Route path="/admin/products" element={<AdminProtectedRoute><AdminProducts /></AdminProtectedRoute>} />
             <Route path="/admin/attributes" element={<AdminProtectedRoute><AdminProducts initialView="attributes" /></AdminProtectedRoute>} />
+            <Route path="/admin/pos" element={<AdminProtectedRoute><AdminPos /></AdminProtectedRoute>} />
             <Route path="/admin/orders" element={<AdminProtectedRoute><AdminOrders /></AdminProtectedRoute>} />
+            <Route path="/admin/purchases" element={<AdminProtectedRoute><AdminPurchases /></AdminProtectedRoute>} />
+            <Route path="/admin/suppliers" element={<AdminProtectedRoute><AdminSuppliers /></AdminProtectedRoute>} />
             <Route path="/admin/cashflow" element={<AdminProtectedRoute><AdminCashflow /></AdminProtectedRoute>} />
             <Route path="/admin/journal" element={<Navigate to="/admin/cashflow" replace />} />
             <Route path="/admin/customers" element={<AdminProtectedRoute><AdminCustomers /></AdminProtectedRoute>} />

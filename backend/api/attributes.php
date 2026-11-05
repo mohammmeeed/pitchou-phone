@@ -27,6 +27,22 @@ if ($db !== null) {
 
 $defaultCategories = [];
 
+$defaultBrands = [
+    'Apple',
+    'Samsung',
+    'OnePlus',
+    'Xiaomi',
+    'Realme',
+    'Google Pixel',
+    'Huawei',
+    'Oppo',
+    'Infinix',
+    'Tecno',
+    'Hoco',
+    'Anker',
+    'Baseus'
+];
+
 $defaultLanguages = [
     'Français',
     'Anglais',
@@ -130,7 +146,7 @@ function normalizeWilayasList(array $list, array $defaultWilayas): array {
     return !empty($normalized) ? $normalized : $defaultWilayas;
 }
 
-function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultLanguages, array $defaultWilayas = []): array {
+function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultLanguages, array $defaultWilayas = [], array $defaultBrands = []): array {
     if ($db === null) {
         $fallbackFile = __DIR__ . '/../database/settings_fallback.json';
         $rows = [];
@@ -158,16 +174,24 @@ function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultL
                 $wilayas = normalizeWilayasList($decoded, $defaultWilayas);
             }
         }
+        $brands = $defaultBrands;
+        if (!empty($rows['attributes_brands'])) {
+            $decoded = json_decode($rows['attributes_brands'], true);
+            if (is_array($decoded) && count($decoded) > 0) {
+                $brands = array_values(array_filter(array_map('trim', $decoded)));
+            }
+        }
         return [
             'categories' => $categories,
             'subcategories' => $subcategories,
             'category_images' => json_decode($rows['attributes_category_images'] ?? '{}', true) ?? [],
             'languages' => $defaultLanguages,
-            'wilayas' => $wilayas
+            'wilayas' => $wilayas,
+            'brands' => $brands
         ];
     }
 
-    $stmt = $db->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('attributes_categories', 'attributes_subcategories', 'attributes_category_images', 'attributes_languages', 'attributes_wilayas')");
+    $stmt = $db->prepare("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('attributes_categories', 'attributes_subcategories', 'attributes_category_images', 'attributes_languages', 'attributes_wilayas', 'attributes_brands')");
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
@@ -234,16 +258,34 @@ function getStoredAttributes(?PDO $db, array $defaultCategories, array $defaultL
         }
     }
 
+    $brands = $defaultBrands;
+    if (!empty($rows['attributes_brands'])) {
+        $decoded = json_decode($rows['attributes_brands'], true);
+        if (is_array($decoded) && count($decoded) > 0) {
+            $brands = array_values(array_filter(array_map('trim', $decoded)));
+        }
+    }
+    $seenBrand = [];
+    $dedupedBrands = [];
+    foreach ($brands as $b) {
+        $clean = trim($b);
+        $lower = mb_strtolower($clean, 'UTF-8');
+        if ($clean !== '' && !isset($seenBrand[$lower])) {
+            $seenBrand[$lower] = true;
+            $dedupedBrands[] = $clean;
+        }
+    }
     return [
         'categories' => $dedupedCategories,
         'subcategories' => $subcategories,
         'category_images' => $categoryImages,
         'languages' => $dedupedLanguages,
-        'wilayas' => $wilayas
+        'wilayas' => $wilayas,
+        'brands' => $dedupedBrands
     ];
 }
 
-function saveStoredAttributes(?PDO $db, array $categories, array $languages, array $wilayas, array $categoryImages = [], array $subcategories = []): void {
+function saveStoredAttributes(?PDO $db, array $categories, array $languages, array $wilayas, array $categoryImages = [], array $subcategories = [], array $brands = []): void {
     if ($db === null) {
         $fallbackFile = __DIR__ . '/../database/settings_fallback.json';
         $data = [];
@@ -255,6 +297,7 @@ function saveStoredAttributes(?PDO $db, array $categories, array $languages, arr
         $data['attributes_languages'] = json_encode(array_values(array_unique($languages)), JSON_UNESCAPED_UNICODE);
         $data['attributes_wilayas'] = json_encode(array_values($wilayas), JSON_UNESCAPED_UNICODE);
         $data['attributes_category_images'] = json_encode($categoryImages, JSON_UNESCAPED_UNICODE);
+        $data['attributes_brands'] = json_encode(array_values(array_unique($brands)), JSON_UNESCAPED_UNICODE);
         @file_put_contents($fallbackFile, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         return;
     }
@@ -264,20 +307,22 @@ function saveStoredAttributes(?PDO $db, array $categories, array $languages, arr
     $stmt->execute(['attributes_languages', json_encode(array_values(array_unique($languages)), JSON_UNESCAPED_UNICODE)]);
     $stmt->execute(['attributes_wilayas', json_encode(array_values($wilayas), JSON_UNESCAPED_UNICODE)]);
     $stmt->execute(['attributes_category_images', json_encode($categoryImages, JSON_UNESCAPED_UNICODE)]);
+    $stmt->execute(['attributes_brands', json_encode(array_values(array_unique($brands)), JSON_UNESCAPED_UNICODE)]);
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        $data = getStoredAttributes($db, $defaultCategories, $defaultLanguages, $defaultWilayas);
+        $data = getStoredAttributes($db, $defaultCategories, $defaultLanguages, $defaultWilayas, $defaultBrands);
         echo json_encode([
             'success' => true,
             'categories' => $data['categories'],
             'subcategories' => $data['subcategories'] ?? (object)[],
             'category_images' => $data['category_images'] ?? (object)[],
             'languages' => $data['languages'],
-            'wilayas' => $data['wilayas']
+            'wilayas' => $data['wilayas'],
+            'brands' => $data['brands']
         ], JSON_UNESCAPED_UNICODE);
         break;
 
@@ -287,12 +332,13 @@ switch ($method) {
         $input = json_decode($raw, true) ?? $_POST;
         $action = $input['action'] ?? 'save_all';
 
-        $current = getStoredAttributes($db, $defaultCategories, $defaultLanguages, $defaultWilayas);
+        $current = getStoredAttributes($db, $defaultCategories, $defaultLanguages, $defaultWilayas, $defaultBrands);
         $categories = $current['categories'];
         $subcategories = $current['subcategories'] ?? [];
         $categoryImages = $current['category_images'] ?? [];
         $languages = $current['languages'];
         $wilayas = $current['wilayas'];
+        $brands = $current['brands'] ?? [];
 
         if ($action === 'save_all') {
             if (isset($input['categories']) && is_array($input['categories'])) {
@@ -306,6 +352,9 @@ switch ($method) {
             }
             if (isset($input['languages']) && is_array($input['languages'])) {
                 $languages = array_values(array_filter(array_map('trim', $input['languages'])));
+            }
+            if (isset($input['brands']) && is_array($input['brands'])) {
+                $brands = array_values(array_filter(array_map('trim', $input['brands'])));
             }
             if (isset($input['wilayas']) && is_array($input['wilayas'])) {
                 $wNorm = [];
@@ -323,6 +372,39 @@ switch ($method) {
                     }
                 }
                 $wilayas = $wNorm;
+            }
+        } elseif ($action === 'add_brand') {
+            $name = trim($input['name'] ?? '');
+            if ($name !== '' && !in_array($name, $brands, true)) {
+                $brands[] = $name;
+            }
+        } elseif ($action === 'edit_brand') {
+            $oldName = trim($input['oldName'] ?? '');
+            $newName = trim($input['newName'] ?? '');
+            if ($oldName !== '' && $newName !== '') {
+                $idx = array_search($oldName, $brands, true);
+                if ($idx !== false) {
+                    $brands[$idx] = $newName;
+                }
+                if ($db !== null) {
+                    try {
+                        $uStmt = $db->prepare("UPDATE products SET brand = ? WHERE brand = ?");
+                        $uStmt->execute([$newName, $oldName]);
+                    } catch (Exception $e) {}
+                    try {
+                        $uStmt2 = $db->prepare("UPDATE products SET author = ? WHERE author = ?");
+                        $uStmt2->execute([$newName, $oldName]);
+                    } catch (Exception $e) {}
+                }
+            }
+        } elseif ($action === 'delete_brand') {
+            $name = trim($input['name'] ?? '');
+            if ($name !== '') {
+                $brands = array_values(array_filter($brands, fn($b) => $b !== $name));
+            }
+        } elseif ($action === 'save_all_brands') {
+            if (isset($input['brands']) && is_array($input['brands'])) {
+                $brands = array_values(array_filter(array_map('trim', $input['brands'])));
             }
         } elseif ($action === 'add_category') {
             $name = trim($input['name'] ?? '');
@@ -552,7 +634,7 @@ switch ($method) {
             $subcategories = $input['subcategories'];
         }
 
-        saveStoredAttributes($db, $categories, $languages, $wilayas, $categoryImages, $subcategories);
+        saveStoredAttributes($db, $categories, $languages, $wilayas, $categoryImages, $subcategories, $brands);
 
         echo json_encode([
             'success' => true,
@@ -561,7 +643,8 @@ switch ($method) {
             'subcategories' => $subcategories,
             'category_images' => $categoryImages,
             'languages' => $languages,
-            'wilayas' => $wilayas
+            'wilayas' => $wilayas,
+            'brands' => $brands
         ], JSON_UNESCAPED_UNICODE);
         break;
 

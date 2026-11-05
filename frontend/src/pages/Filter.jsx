@@ -68,6 +68,17 @@ const Filter = () => {
     return list;
   }, [dbCategories, dbSubcategories, allProducts]);
 
+  const defaultBrands = useMemo(() => [
+    'Apple', 'Samsung', 'Xiaomi', 'OnePlus', 'Realme', 'Google Pixel', 'Huawei', 'Oppo', 'Infinix', 'Tecno', 'Honor', 'Hoco', 'Anker'
+  ], []);
+
+  const brandsList = useMemo(() => {
+    const fromProducts = allProducts.map((p) => (p.brand || p.marque || p.author || '').trim()).filter(Boolean);
+    const sourceBrands = dbBrands.length > 0 ? dbBrands : defaultBrands;
+    const combined = Array.from(new Set([...sourceBrands, ...fromProducts]));
+    return combined.filter((b) => b && b.trim() !== '');
+  }, [allProducts, dbBrands, defaultBrands]);
+
   // Langues existantes
   const defaultLanguages = useMemo(() => {
     try {
@@ -98,6 +109,24 @@ const Filter = () => {
     return [];
   });
 
+  const [selectedBrands, setSelectedBrands] = useState(() => {
+    if (Array.isArray(activeFilters.brands) && activeFilters.brands.length > 0) {
+      return activeFilters.brands;
+    }
+    if (Array.isArray(activeFilters.marques) && activeFilters.marques.length > 0) {
+      return activeFilters.marques;
+    }
+    return [];
+  });
+
+  const toggleBrand = (brand) => {
+    setSelectedBrands((prev) =>
+      prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]
+    );
+  };
+
+  const [brandsOpen, setBrandsOpen] = useState(true);
+
   const [selectedEtats, setSelectedEtats] = useState(() => {
     if (Array.isArray(activeFilters.etats) && activeFilters.etats.length > 0) {
       return activeFilters.etats;
@@ -110,8 +139,6 @@ const Filter = () => {
       prev.includes(etat) ? prev.filter((e) => e !== etat) : [...prev, etat]
     );
   };
-
-  const [etatsOpen, setEtatsOpen] = useState(true);
 
   const [selectedLanguages, setSelectedLanguages] = useState(() => {
     if (Array.isArray(activeFilters.languages) && activeFilters.languages.length > 0) {
@@ -393,22 +420,22 @@ const Filter = () => {
             )}
           </div>
 
-          {/* CARTE : ÉTAT DU PRODUIT (Neuf, 10/10, Bon état, Occasion) */}
+          {/* CARTE : MARQUES */}
           <div className="card style-1" style={{ overflow: 'hidden', marginBottom: '16px' }}>
             <div 
               className="card-header d-flex align-items-center justify-content-between"
-              onClick={() => setEtatsOpen((prev) => !prev)}
+              onClick={() => setBrandsOpen((prev) => !prev)}
               style={{
                 cursor: 'pointer',
                 userSelect: 'none',
-                borderBottom: etatsOpen ? '1px solid #f1f3f6' : 'none',
+                borderBottom: brandsOpen ? '1px solid #f1f3f6' : 'none',
                 padding: '14px 16px',
                 transition: 'background-color 0.15s ease'
               }}
             >
               <div className="d-flex align-items-center gap-2">
-                <h6 className="title font-w400 font-14 mb-0">État du Produit</h6>
-                {selectedEtats.length > 0 && (
+                <h6 className="title font-w400 font-14 mb-0">Marques</h6>
+                {selectedBrands.length > 0 && (
                   <span 
                     style={{
                       fontSize: '11px',
@@ -419,7 +446,7 @@ const Filter = () => {
                       borderRadius: '12px'
                     }}
                   >
-                    {selectedEtats.length}
+                    {selectedBrands.length}
                   </span>
                 )}
               </div>
@@ -428,13 +455,13 @@ const Filter = () => {
                 <span 
                   style={{ 
                     fontSize: '13px', 
-                    color: selectedEtats.length > 0 ? 'var(--primary)' : '#9ca3af', 
+                    color: selectedBrands.length > 0 ? 'var(--primary)' : '#9ca3af', 
                     fontWeight: 500 
                   }}
                 >
-                  {selectedEtats.length === 0 
-                    ? 'Tous les états' 
-                    : (selectedEtats.length === 1 ? selectedEtats[0] : `${selectedEtats.length} sélect.`)}
+                  {selectedBrands.length === 0 
+                    ? 'Toutes les marques' 
+                    : (selectedBrands.length === 1 ? selectedBrands[0] : `${selectedBrands.length} sélect.`)}
                 </span>
                 <svg 
                   width="18" 
@@ -447,7 +474,7 @@ const Filter = () => {
                   strokeLinejoin="round"
                   style={{
                     transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                    transform: etatsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transform: brandsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                     flexShrink: 0
                   }}
                 >
@@ -456,20 +483,15 @@ const Filter = () => {
               </div>
             </div>
 
-            {etatsOpen && (
-              <div className="card-body p-0">
-                {[
-                  { name: 'Sous blister', icon: '📦' },
-                  { name: 'Très bon état', icon: '⭐' },
-                  { name: 'Bon état', icon: '👍' },
-                  { name: 'Occasion', icon: '🔄' }
-                ].map((item, idx, arr) => {
-                  const isChecked = selectedEtats.includes(item.name);
+            {brandsOpen && (
+              <div className="card-body p-0" style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                {brandsList.map((brandName, idx, arr) => {
+                  const isChecked = selectedBrands.includes(brandName);
                   const isLast = idx === arr.length - 1;
                   return (
                     <div
-                      key={item.name}
-                      onClick={() => toggleEtat(item.name)}
+                      key={brandName}
+                      onClick={() => toggleBrand(brandName)}
                       className="d-flex align-items-center justify-content-between px-3 py-2"
                       style={{
                         cursor: 'pointer',
@@ -482,14 +504,10 @@ const Filter = () => {
                         style={{
                           fontSize: '14px',
                           fontWeight: isChecked ? 600 : 400,
-                          color: isChecked ? '#111827' : '#374151',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px'
+                          color: isChecked ? '#111827' : '#374151'
                         }}
                       >
-                        <span>{item.icon}</span>
-                        <span>{item.name}</span>
+                        {brandName}
                       </span>
 
                       <div 

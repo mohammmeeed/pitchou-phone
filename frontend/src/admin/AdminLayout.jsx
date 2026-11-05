@@ -26,6 +26,28 @@ export default function AdminLayout({ children }) {
 
   // Mode Plein Écran (Fullscreen)
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Compteur de messages clients non lus (badge rouge mini dans la barre latérale)
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUnread = async () => {
+      try {
+        const count = await adminApi.getUnreadMessagesCount();
+        if (isMounted) {
+          setUnreadMessagesCount(Number(count) || 0);
+        }
+      } catch (e) {}
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 3500);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [location.pathname]);
+
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -179,9 +201,24 @@ export default function AdminLayout({ children }) {
       category: 'Gestion Commerciale',
       items: [
         {
+          title: 'POS',
+          to: '/admin/pos',
+          icon: 'fas fa-cash-register'
+        },
+        {
           title: 'Commandes',
           to: '/admin/orders',
           icon: 'flaticon-381-file'
+        },
+        {
+          title: 'Achats & Stocks',
+          to: '/admin/purchases',
+          icon: 'fas fa-shopping-cart'
+        },
+        {
+          title: 'Fournisseurs',
+          to: '/admin/suppliers',
+          icon: 'fas fa-truck'
         },
         {
           title: 'Journal de Caisse',
@@ -272,12 +309,36 @@ export default function AdminLayout({ children }) {
       color: '#fe2c55'
     },
     {
+      title: 'POS',
+      to: '/admin/pos',
+      icon: 'fas fa-cash-register',
+      category: 'Gestion Commerciale',
+      keywords: 'pos caisse boutique comptoir vente ticket imprimer magasin',
+      color: '#10b981'
+    },
+    {
       title: 'Commandes',
       to: '/admin/orders',
       icon: 'flaticon-381-file',
       category: 'Gestion Commerciale',
       keywords: 'commandes orders livraisons facturation expéditions vente bon',
       color: '#10b981'
+    },
+    {
+      title: 'Achats & Stocks',
+      to: '/admin/purchases',
+      icon: 'fas fa-shopping-cart',
+      category: 'Gestion Commerciale',
+      keywords: 'achats factures stocks approvisionnement matériel marchandises fournisseurs',
+      color: '#10b981'
+    },
+    {
+      title: 'Fournisseurs',
+      to: '/admin/suppliers',
+      icon: 'fas fa-truck',
+      category: 'Gestion Commerciale',
+      keywords: 'fournisseurs dettes versements achats matériel prestataires règlements',
+      color: '#3b82f6'
     },
     {
       title: 'Journal de Caisse',
@@ -435,6 +496,32 @@ export default function AdminLayout({ children }) {
                       >
                         <i className={item.icon} />
                         {!isCollapsed && <span>{item.title}</span>}
+                        {item.to === '/admin/chat' && unreadMessagesCount > 0 && (
+                          <span
+                            className="menu-badge"
+                            style={{
+                              backgroundColor: '#ef4444',
+                              color: '#ffffff',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              minWidth: '18px',
+                              height: '18px',
+                              borderRadius: '9999px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '0 5px',
+                              lineHeight: 1,
+                              marginLeft: isCollapsed ? 0 : 'auto',
+                              position: isCollapsed ? 'absolute' : 'relative',
+                              top: isCollapsed ? '6px' : 'auto',
+                              right: isCollapsed ? '6px' : 'auto',
+                              boxShadow: '0 2px 4px rgba(239, 68, 68, 0.4)'
+                            }}
+                          >
+                            {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                          </span>
+                        )}
                       </Link>
                     </li>
                   );

@@ -144,6 +144,61 @@ function handleGet(?PDO $pdo): void {
     // Toujours recalculer et synchroniser les commandes réelles et dépenses cumulées
     syncCustomerStats($pdo);
 
+function attachCustomerFinancialStats(PDO $pdo, array &$customers): void {
+    $ordersStmt = $pdo->query("SELECT customer_phone, 
+        COUNT(*) as ord_count, 
+        SUM(CASE WHEN status != 'Annulée' THEN total_amount ELSE 0 END) as total_invoiced,
+        SUM(CASE WHEN status IN ('Livrée', 'Payée') THEN total_amount ELSE 0 END) as total_order_paid
+        FROM orders 
+        GROUP BY customer_phone");
+    $ordersData = [];
+    while ($row = $ordersStmt->fetch(PDO::FETCH_ASSOC)) {
+        $p = trim($row['customer_phone'] ?? '');
+        if ($p !== '') {
+            $ordersData[$p] = $row;
+        }
+    }
+
+    $cfStmt = $pdo->query("SELECT customer_id, party_phone, party_name, 
+        SUM(paid_amount) as total_cf_paid 
+        FROM cashflow_entries 
+        WHERE type IN ('VERSEMENT', 'RECETTE') AND (order_type LIKE '%CLIENT%' OR party_name LIKE '%Client%' OR customer_id IS NOT NULL)
+        GROUP BY customer_id, party_phone, party_name");
+    $cfData = $cfStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($customers as &$c) {
+        $cId = (int)($c['id'] ?? 0);
+        $phone = trim($c['phone'] ?? '');
+        $name = trim($c['name'] ?? '');
+
+        $oData = ($phone !== '' && isset($ordersData[$phone])) ? $ordersData[$phone] : null;
+        $totalInvoiced = $oData ? (float)$oData['total_invoiced'] : (float)($c['total_spent'] ?? 0);
+        $totalOrderPaid = $oData ? (float)$oData['total_order_paid'] : (float)($c['total_spent'] ?? 0);
+
+        $extraPaid = 0;
+        foreach ($cfData as $cf) {
+            $matchId = !empty($cf['customer_id']) && (int)$cf['customer_id'] === $cId;
+            $matchPhone = !empty($cf['party_phone']) && $phone !== '' && trim($cf['party_phone']) === $phone;
+            $matchName = !empty($cf['party_name']) && $name !== '' && strcasecmp(trim($cf['party_name']), $name) === 0;
+
+            if ($matchId || $matchPhone || $matchName) {
+                $extraPaid += (float)$cf['total_cf_paid'];
+            }
+        }
+
+        $totalPaid = $totalOrderPaid + $extraPaid;
+        $balance = max(0, $totalInvoiced - $totalPaid);
+        $progress = $totalInvoiced > 0 ? min(100, round(($totalPaid / $totalInvoiced) * 100)) : 100;
+
+        $c['total_invoiced'] = $totalInvoiced;
+        $c['total_paid'] = $totalPaid;
+        $c['balance'] = $balance;
+        $c['progress'] = $progress;
+    }
+    unset($c);
+}
+
+
     if (isset($_GET['id'])) {
         $stmt = $pdo->prepare("SELECT * FROM customers WHERE id = ?");
         $stmt->execute([(int)$_GET['id']]);
@@ -153,6 +208,8 @@ function handleGet(?PDO $pdo): void {
                 $customer['password'] = 'motdepasse123';
             }
             $customer['address'] = cleanCustomerAddress($customer['wilaya'] ?? '', $customer['commune'] ?? '', $customer['address'] ?? '');
+            $singleArr = [&$customer];
+            attachCustomerFinancialStats($pdo, $singleArr);
             echo json_encode(["success" => true, "data" => $customer]);
         } else {
             http_response_code(404);
@@ -170,6 +227,7 @@ function handleGet(?PDO $pdo): void {
         $c['address'] = cleanCustomerAddress($c['wilaya'] ?? '', $c['commune'] ?? '', $c['address'] ?? '');
     }
     unset($c);
+    attachCustomerFinancialStats($pdo, $customers);
     echo json_encode(["success" => true, "data" => $customers, "count" => count($customers)]);
 }
 
